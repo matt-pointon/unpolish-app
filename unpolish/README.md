@@ -53,7 +53,8 @@ To ship a build without it, set `"enabled": false` in the config or leave the ta
 
 - Press **`\`** (or the launcher in the corner) to open the panel.
 - **1–4** pick Black & White, Sketch, Blueprint, Pastel Blocks while the panel is open. **0** restores Original. **Esc** closes.
-- **Edit theme** reveals palette, typography, border weight and style, corners, shadows, details and image treatment.
+- **Edit theme** reveals collapsible groups — Color (status colors behind their own disclosure), Type & lines, Images & details, Shortcut — with Reset preset and Copy configuration always at the bottom.
+- **Review link** opens a small share view: the theme being shared, *Hide controls for viewers*, any unsaved-edit warning, and an explicit **Copy link** button.
 - **Shortcuts** shows every binding and lets you reassign them. Shortcuts never fire while typing in inputs, textareas, selects or contenteditable regions.
 
 ## Configuration
@@ -112,7 +113,7 @@ The classifier reads each element's rendered styles (background, borders, shadow
 
 ## Review links
 
-**Copy review link** keeps the current path, your app's query parameters and hash, and adds:
+**Review link → Copy link** keeps the current path, your app's query parameters and hash, and adds:
 
 | Parameter | Values |
 | --- | --- |

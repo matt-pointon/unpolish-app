@@ -102,6 +102,7 @@
   var frame = $('#demo-frame');
   var seg = $('#demo-themes');
   var badge = $('#demo-badge');
+  var select = $('#demo-select');
   var labels = { original: 'Original', 'black-white': 'Black & White', sketch: 'Sketch', blueprint: 'Blueprint', pastel: 'Pastel Blocks' };
   var api = null;
 
@@ -112,6 +113,7 @@
       b.setAttribute('aria-checked', String(on));
       b.tabIndex = on ? 0 : -1;
     });
+    select.value = t;
     badge.textContent = labels[t];
     badge.setAttribute('data-theme', t);
   }
@@ -141,6 +143,7 @@
     if (!b || !api) return;
     api.setTheme(b.getAttribute('data-theme'));
   });
+  select.addEventListener('change', function () { if (api) api.setTheme(select.value); });
   seg.addEventListener('keydown', function (e) {
     var d = { ArrowRight: 1, ArrowDown: 1, ArrowLeft: -1, ArrowUp: -1 }[e.key];
     if (!d || !api) return;

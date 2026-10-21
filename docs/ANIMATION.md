@@ -7,7 +7,7 @@ Motion was planned with Emil Kowalski's skills, in order: `find-animation-opport
 | # | Location | Purpose | Frequency | Motion |
 | --- | --- | --- | --- | --- |
 | 1 | Panel opened from the launcher (`unpolish.js`, `.panel.anim`) | Spatial consistency | Occasional | `scale(0.96)` + `opacity: 0` → settled, 180ms `--ease-out`, `transform-origin` at the launcher corner. Close: 130ms to `scale(0.98)` |
-| 2 | *Edit theme* section, review-link note (`reveal()`) | Preventing a jarring change | Occasional | height + opacity, 200ms `--ease-out` (accordion exception); chevron rotates 200ms |
+| 2 | *Edit theme* and *Review link* views (`reveal()`); editor group and website disclosure chevrons rotate 200ms | Preventing a jarring change | Occasional | height + opacity, 200ms `--ease-out` (accordion exception); chevron rotates 200ms |
 | 3 | Buttons, theme tiles, launcher (`:active`) | Feedback | Tens/day | `scale(0.95–0.97)`, 160ms `--ease-out` |
 | 4 | Copy feedback (panel toast, site toast, button label) | State indication | Occasional | toast: opacity + `translateY(4px)` (panel) / `16px` (site), 180–200ms transition, leaves the way it came; label swaps instantly |
 | 5 | Website hero | Delight (first view, marketing) | Rare | 520ms rise, 50ms stagger, `--ease-out`; never blocks interaction |

@@ -61,7 +61,7 @@
       detailsHint: 'Rotating color blocks',
       defaults: {
         palette: { paper: '#fbf8f3', surface: '#ffffff', ink: '#2b2733', muted: '#665f70', line: '#e4dbcf', accent: '#cbc0ff', danger: '#ffc4ba', success: '#c3eacc', warning: '#ffe2a3', block1: '#ffe0d3', block2: '#d6e9ff', block3: '#d9f1df', block4: '#ebe1ff', block5: '#fff0c2' },
-        typography: 'rounded', border: { weight: 0, style: 'none' }, radius: 12, shadows: 'none', details: true, images: 'original'
+        typography: 'rounded', border: { weight: 0, style: 'none' }, radius: 8, shadows: 'none', details: true, images: 'original'
       }
     }
   };
@@ -447,7 +447,7 @@
     v.phBg = id === 'blueprint' ? mix(v.paper, '#000000', 0.12) : id === 'pastel' ? p.block2 : id === 'sketch' ? mix(v.surface, v.ink, 0.04) : mix(v.surface, v.ink, 0.05);
     v.phIcon = placeholderIcon(id === 'blueprint' ? v.line : mix(v.ink, v.surface, 0.45));
 
-    v.blocks = id === 'pastel' ? [1, 2, 3, 4, 5].map(function (n) { return mix(v.surface, p['block' + n], 0.35 + r * 0.65); }) : null;
+    v.blocks = id === 'pastel' ? [1, 2, 3, 4, 5].map(function (n) { return mix(v.surface, p['block' + n], 0.55); }) : null;
     if (id === 'pastel' && !s.details) v.blocks = v.blocks.map(function () { return mix(v.surface, p.block2, 0.35 + r * 0.65); });
     if (lite) return v;
 
@@ -479,12 +479,13 @@
       v.patterns.shade = ['repeating-linear-gradient(-50deg, ' + alpha(v.ink, ha) + ' 0 0.8px, transparent 0.8px ' + round(7 - r * 2.5, 1) + 'px)', 'auto'];
     }
     if (id === 'blueprint' && s.details) {
-      var g1 = alpha(v.line, round(0.05 + r * 0.1, 3)), g2 = alpha(v.line, round(0.1 + r * 0.16, 3));
+      // One faint grid and small corner marks: drafting character without visual noise.
+      var g1 = alpha(v.line, 0.08);
       v.page = {
-        image: 'linear-gradient(' + g2 + ' 1px, transparent 1px), linear-gradient(90deg, ' + g2 + ' 1px, transparent 1px), linear-gradient(' + g1 + ' 1px, transparent 1px), linear-gradient(90deg, ' + g1 + ' 1px, transparent 1px)',
-        size: '120px 120px, 120px 120px, 24px 24px, 24px 24px'
+        image: 'linear-gradient(' + g1 + ' 1px, transparent 1px), linear-gradient(90deg, ' + g1 + ' 1px, transparent 1px)',
+        size: '24px 24px, 24px 24px'
       };
-      var ts = Math.round(8 + r * 10);
+      var ts = 9;
       v.tick = { size: ts, tl: tickSvg('tl', v.line, ts), tr: tickSvg('tr', v.line, ts), bl: tickSvg('bl', v.line, ts), br: tickSvg('br', v.line, ts) };
     }
     v.underlineTones = id === 'black-white';
@@ -622,6 +623,8 @@
         rule(S('[data-up~="fill-0"][data-up~="blk-' + i + '"], [data-up~="fill-1"][data-up~="tone-neutral"][data-up~="blk-' + i + '"]'), '--_bg:var(--up-block-' + i + ')');
         rule(S('[data-up~="box"][data-up~="blk-' + i + '"]:not([data-up~="bg"])'), 'background-color:var(--up-block-' + i + ')' + I);
       });
+      // Surfaces inside a block take on the block: fewer surface distinctions, flatter result.
+      rule(S('[data-up~="fill-0"][data-up~="blk-none"], [data-up~="fill-1"][data-up~="tone-neutral"][data-up~="blk-none"]'), '--_bg:transparent');
     }
     // Translucent layers (scrims, frosted bars) keep their transparency.
     for (var a = 1; a <= 9; a++) rule(S('[data-up~="bg"][data-up~="a' + a + '"]'), 'background-color:color-mix(in srgb, var(--_bg) ' + (a * 10) + '%, transparent)' + I);
@@ -802,7 +805,7 @@
     this.engine = engine;
     this.tags = new WeakMap();      // el -> token string we wrote
     this.info = new WeakMap();      // el -> { bg (effective, opaque), color }
-    this.blockCount = new WeakMap(); // box ancestor -> counter for pastel blocks
+    this.blockCount = new WeakMap(); // sibling group -> pastel block colour
     this.stable = new WeakMap();     // el -> { v, blk, anc }
     this.variant = 0;
     this.pageBg = { r: 255, g: 255, b: 255, a: 1 };
@@ -1059,7 +1062,7 @@
     if (box && !control && !/^(INPUT|TEXTAREA|SELECT)$/.test(tag) && neutralSurface) {
       if (pinfo.blk) tokens.push('blk-none');
       else {
-        tokens.push('blk-' + this.stableBlock(el, pinfo.box || document.body));
+        tokens.push('blk-' + this.stableBlock(el));
         info.blk = true;
       }
     }
@@ -1116,12 +1119,13 @@
     if (s.v == null) { s.v = this.variant++ % 2; this.stable.set(el, s); }
     return s.v;
   };
-  Classifier.prototype.stableBlock = function (el, anc) {
-    var s = this.stable.get(el) || {};
-    if (s.blk == null || s.anc !== anc) {
-      var n = this.blockCount.get(anc) || 0;
-      this.blockCount.set(anc, n + 1);
-      s.blk = n % 5; s.anc = anc;
+  /* Siblings share one colour field (a grid of cards reads as one block of content);
+     each new group takes the next colour. */
+  Classifier.prototype.stableBlock = function (el) {
+    var s = this.stable.get(el) || {}, group = el.parentElement || el.parentNode;
+    if (s.blk == null || s.group !== group) {
+      if (!this.blockCount.has(group)) this.blockCount.set(group, (this.nextBlock = (this.nextBlock || 0) + 1) - 1);
+      s.blk = this.blockCount.get(group) % 5; s.group = group;
       this.stable.set(el, s);
     }
     return s.blk;
@@ -1596,7 +1600,7 @@
   var PANEL_CSS = [
     // !important inside a shadow tree beats the page's !important on the host, so page CSS can't reach in.
     ':host{all:initial!important;display:contents!important}',
-    ':host{--bg:#141416;--bg2:#1d1d21;--bg3:#26262b;--bg4:#303036;--line:rgba(255,255,255,.08);--line2:rgba(255,255,255,.14);--text:#f4f4f5;--text2:#a7a7af;--text3:#74747c;--accent:#e6f36a;--accent-ink:#151515;--warn:#ffcf6e;--ease:cubic-bezier(0.23,1,0.32,1);',
+    ':host{--bg:#141416;--bg2:#1d1d21;--bg3:#26262b;--bg4:#303036;--line:rgba(255,255,255,.08);--line2:rgba(255,255,255,.14);--text:#f4f4f5;--text2:#b8b8c0;--text3:#8f8f98;--accent:#e6f36a;--accent-ink:#151515;--warn:#ffcf6e;--ease:cubic-bezier(0.23,1,0.32,1);',
     '}',
     '.launcher,.panel,.hud{font:500 12.5px/1.4 ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;color:var(--text);-webkit-font-smoothing:antialiased;letter-spacing:0;text-align:left;text-transform:none;word-spacing:normal;visibility:visible}',
     '*,*::before,*::after{box-sizing:border-box}',
@@ -1608,14 +1612,17 @@
     ':focus-visible{outline:2px solid var(--accent);outline-offset:2px}',
     'kbd{font:600 10.5px/1 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;display:inline-flex;align-items:center;justify-content:center;min-width:18px;height:18px;padding:0 5px;border-radius:5px;background:var(--bg3);color:var(--text2);box-shadow:inset 0 -1px 0 rgba(0,0,0,.35)}',
     // launcher
-    '.launcher{position:fixed;z-index:2147483646;width:38px;height:38px;border-radius:13px;display:grid;place-items:center;background:var(--bg);color:var(--text);box-shadow:0 0 0 1px var(--line2),0 8px 24px rgba(0,0,0,.28);opacity:.62;transition:opacity 150ms ease,transform 160ms var(--ease);touch-action:manipulation}',
+    // .vp tracks the visual viewport, so the controls stay reachable even when the host page overflows on mobile.
+    '.vp{position:fixed;left:0;top:0;width:100vw;height:100vh;pointer-events:none;z-index:2147483646}',
+    '.vp>*{pointer-events:auto}',
+    '.launcher{position:absolute;z-index:1;width:38px;height:38px;border-radius:13px;display:grid;place-items:center;background:var(--bg);color:var(--text);box-shadow:0 0 0 1px var(--line2),0 8px 24px rgba(0,0,0,.28);opacity:.62;transition:opacity 150ms ease,transform 160ms var(--ease);touch-action:manipulation}',
     '.launcher svg{width:20px;height:20px}',
     '.launcher:active{transform:scale(.95)}',
     '.launcher[aria-expanded="true"],.launcher:focus-visible{opacity:1}',
     '@media (hover:hover) and (pointer:fine){.launcher:hover{opacity:1}}',
     '.launcher .dot{position:absolute;top:6px;right:6px;width:6px;height:6px;border-radius:50%;background:var(--accent);box-shadow:0 0 0 2px var(--bg)}',
     // panel
-    '.panel{position:fixed;z-index:2147483647;width:312px;max-width:calc(100vw - 16px);max-height:calc(100vh - 24px);overflow:auto;overscroll-behavior:contain;background:var(--bg);border-radius:22px;box-shadow:0 0 0 1px var(--line2),0 24px 60px -12px rgba(0,0,0,.55),0 8px 20px rgba(0,0,0,.25);padding:6px 12px 10px;transform-origin:var(--origin,bottom right);scrollbar-width:thin;scrollbar-color:var(--bg4) transparent}',
+    '.panel{position:absolute;z-index:2;width:312px;max-width:calc(100% - 16px);max-height:calc(100% - 24px);overflow:auto;overscroll-behavior:contain;background:var(--bg);border-radius:22px;box-shadow:0 0 0 1px var(--line2),0 24px 60px -12px rgba(0,0,0,.55),0 8px 20px rgba(0,0,0,.25);padding:6px 12px 10px;transform-origin:var(--origin,bottom right);scrollbar-width:thin;scrollbar-color:var(--bg4) transparent}',
     '.panel.anim{transition:opacity 180ms var(--ease),transform 180ms var(--ease)}',
     '.panel.anim-out{transition:opacity 130ms var(--ease),transform 130ms var(--ease)}',
     '.panel.from{opacity:0;transform:scale(.96)}',
@@ -1686,20 +1693,33 @@
     '.note{border-radius:12px;padding:10px 11px;margin:0 0 8px;background:rgba(255,207,110,.08);color:#f3dfb4;font-size:11.5px;line-height:1.45}',
     '.note b{color:var(--warn);font-weight:650}',
     '.note .row{margin-top:8px;gap:6px}',
-    '.share-info{margin:0 0 8px;padding:10px 11px;border-radius:12px;background:var(--bg2);display:flex;flex-direction:column;gap:8px;font-weight:600}',
-    '.share-info .ok-dot{display:grid;place-items:center;width:18px;height:18px;border-radius:50%;background:var(--accent);color:var(--accent-ink)}',
-    '.share-info .ok-dot svg{width:12px;height:12px}',
+    '.share{display:flex;flex-direction:column;gap:10px}',
+    '.share .note{margin:0}',
+    '.share .footer-actions{margin-top:0}',
+    '.pill{margin-left:auto;font-size:11px;font-weight:600;color:var(--text);background:var(--bg4);border-radius:999px;padding:3px 9px}',
+    '.desc{margin:0;color:var(--text2);font-size:11.5px;line-height:1.45}',
     '.check{display:flex;align-items:center;gap:8px;color:var(--text2);font-size:11.5px;font-weight:500;cursor:pointer;margin:0}',
     '.check input{appearance:none;-webkit-appearance:none;width:16px;height:16px;border-radius:5px;background:var(--bg3);box-shadow:inset 0 0 0 1px var(--line2);display:grid;place-items:center;cursor:pointer;transition:background-color 120ms ease}',
     '.check input:checked{background:var(--accent);box-shadow:none}',
     '.check input:checked::after{content:"";width:8px;height:4px;border:solid var(--accent-ink);border-width:0 0 2px 2px;transform:translateY(-1px) rotate(-45deg)}',
     // editor
-    '.section{padding:10px 0;border-top:1px solid var(--line)}',
-    '.section:first-child{border-top:0;padding-top:2px}',
-    '.section h3{all:unset;display:flex;align-items:center;gap:6px;font-weight:600;color:var(--text);margin-bottom:8px}',
-    '.section h3 .hint{margin-left:auto}',
+    '.editor{padding:2px 12px}',
+    '.sec{border-top:1px solid var(--line)}',
+    '.sec:first-child{border-top:0}',
+    '.sec>summary,.more>summary{list-style:none;display:flex;align-items:center;gap:8px;cursor:pointer;-webkit-user-select:none;user-select:none}',
+    '.sec>summary::-webkit-details-marker,.more>summary::-webkit-details-marker{display:none}',
+    '.sec>summary{min-height:42px;font-weight:600;color:var(--text);border-radius:8px}',
+    '.sec>summary .hint{margin-left:auto}',
+    '.sec>summary .chev,.more>summary .chev{width:14px;height:14px;color:var(--text2);flex:none;transition:transform 200ms var(--ease)}',
+    '.sec>summary span:first-child+ .chev{margin-left:auto}',
+    '.sec[open]>summary .chev,.more[open]>summary .chev{transform:rotate(180deg)}',
+    '.sec-body{padding:0 0 14px;display:flex;flex-direction:column;gap:10px}',
+    '.sub{font-size:11px;font-weight:600;color:var(--text2);margin-top:2px}',
+    '.more>summary{font-size:11.5px;font-weight:600;color:var(--text2);padding:4px 0}',
+    '.more[open]>summary{margin-bottom:10px}',
+    '.editor-actions{position:sticky;bottom:-10px;margin:0 -12px;padding:10px 12px 12px;background:var(--bg2);border-top:1px solid var(--line);border-radius:0 0 14px 14px}',
     '.swatches{display:grid;grid-template-columns:repeat(5,1fr);gap:8px 6px}',
-    '.sw{display:flex;flex-direction:column;align-items:center;gap:4px;position:relative;color:var(--text3);font-size:10px;font-weight:600}',
+    '.sw{display:flex;flex-direction:column;align-items:center;gap:5px;position:relative;color:var(--text2);font-size:10.5px;font-weight:600}',
     '.sw span.c{width:28px;height:28px;border-radius:50%;box-shadow:inset 0 0 0 1px rgba(255,255,255,.18),0 0 0 3px var(--bg2);transition:transform 160ms var(--ease)}',
     '.sw input{position:absolute;inset:0 0 auto 50%;width:28px;height:28px;transform:translateX(-50%);opacity:0;cursor:pointer;border:0;padding:0}',
     '.sw:focus-within span.c{box-shadow:inset 0 0 0 1px rgba(255,255,255,.18),0 0 0 2px var(--bg2),0 0 0 4px var(--accent)}',
@@ -1708,7 +1728,7 @@
     '.seg button{flex:1 1 auto;min-width:0;height:26px;border-radius:8px;color:var(--text2);font-size:11px;font-weight:600;white-space:nowrap;padding:0 5px;transition:background-color 150ms ease,color 150ms ease}',
     '@media (hover:hover) and (pointer:fine){.seg button:hover{color:var(--text)}}',
     '.seg button[aria-pressed="true"],.seg button[aria-checked="true"]{background:var(--bg4);color:var(--text)}',
-    '.field{display:grid;grid-template-columns:68px 1fr;align-items:center;gap:8px;margin:6px 0}',
+    '.field{display:grid;grid-template-columns:68px 1fr;align-items:center;gap:8px;margin:0}',
     '.field>.label{font-weight:500;color:var(--text2)}',
     'select{appearance:none;-webkit-appearance:none;height:30px;border-radius:9px;background:var(--bg) url("data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 16 16%27%3E%3Cpath d=%27M4.5 6.5L8 10l3.5-3.5%27 stroke=%27%23a7a7af%27 stroke-width=%271.5%27 fill=%27none%27/%3E%3C/svg%3E") no-repeat right 8px center/14px;border:0;padding:0 28px 0 10px;color:var(--text);font-weight:600;cursor:pointer;width:100%}',
     'select option{background:#1d1d21;color:#f4f4f5}',
@@ -1743,12 +1763,13 @@
     '.toast.show{opacity:1;transform:none}',
     '.toast:empty{display:none}',
     '.manual{width:100%;height:96px;margin-top:6px;border-radius:9px;border:0;background:var(--bg);color:var(--text2);font:11px/1.45 ui-monospace,Menlo,monospace;padding:8px;resize:vertical}',
-    '.hud{position:fixed;z-index:2147483647;left:50%;bottom:24px;transform:translateX(-50%);padding:8px 14px;border-radius:999px;background:var(--bg);box-shadow:0 0 0 1px var(--line2),0 10px 30px rgba(0,0,0,.35);font-weight:600;font-size:12.5px;display:flex;gap:8px;align-items:center;transition:opacity 150ms ease;pointer-events:none}',
+    '.hud{position:absolute;z-index:3;left:50%;bottom:24px;transform:translateX(-50%);padding:8px 14px;border-radius:999px;background:var(--bg);box-shadow:0 0 0 1px var(--line2),0 10px 30px rgba(0,0,0,.35);font-weight:600;font-size:12.5px;display:flex;gap:8px;align-items:center;transition:opacity 150ms ease;pointer-events:none}',
     '.hud.hide{opacity:0}',
     '.hud svg{width:15px;height:15px;color:var(--accent)}',
     '.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}',
-    '@media (max-width:520px){.panel{width:auto;left:8px!important;right:8px!important;top:auto!important;bottom:8px!important;max-height:min(78vh,620px);border-radius:20px}.head{cursor:default}.btn{height:38px}.tile{padding-bottom:7px}}',
-    '@media (prefers-reduced-motion:reduce){.panel.from,.panel.to-out{transform:none}.btn,.tile,.launcher,.icon-btn,.sw span.c{transition-property:background-color,color,opacity,box-shadow}.btn:active,.tile:active,.launcher:active,.icon-btn:active,.sw:active span.c{transform:none}.toast{transform:none}.collapse.anim{transition:opacity 150ms ease}.toggle::after{transition:none}}'
+    '@media (pointer:coarse){.foot .k{display:none}}',
+    '@media (max-width:520px){.panel{width:auto;left:8px!important;right:8px!important;top:auto!important;bottom:8px!important;max-height:min(78%,620px);border-radius:20px}.head{cursor:default}.btn{height:38px}.tile{padding-bottom:7px}}',
+    '@media (prefers-reduced-motion:reduce){.chev{transition:none!important}.panel.from,.panel.to-out{transform:none}.btn,.tile,.launcher,.icon-btn,.sw span.c{transition-property:background-color,color,opacity,box-shadow}.btn:active,.tile:active,.launcher:active,.icon-btn:active,.sw:active span.c{transform:none}.toast{transform:none}.collapse.anim{transition:opacity 150ms ease}.toggle::after{transition:none}}'
   ].join('\n');
 
   function h(tag, attrs, html) {
@@ -1779,7 +1800,9 @@
     this.root.appendChild(style);
 
     this.launcher = h('button', { class: 'launcher', type: 'button', 'aria-label': 'Open Unpolish theme selector', 'aria-expanded': 'false', 'aria-controls': 'up-panel' }, ICONS.mark + '<span class="dot" hidden></span>');
-    this.root.appendChild(this.launcher);
+    this.vp = h('div', { class: 'vp' });
+    this.root.appendChild(this.vp);
+    this.vp.appendChild(this.launcher);
     this.launcher.addEventListener('click', function () { self.toggle({ via: 'pointer', fromLauncher: true }); });
 
     var p = this.panel = h('section', { class: 'panel', id: 'up-panel', role: 'dialog', 'aria-modal': 'false', 'aria-label': 'Unpolish', hidden: true });
@@ -1794,11 +1817,15 @@
         '<div class="themes" role="radiogroup" aria-label="Theme"></div>' +
         '<div class="actions">' +
           '<button class="btn" type="button" data-act="edit" aria-expanded="false" aria-controls="up-editor">Edit theme' + ICONS.chev + '</button>' +
-          '<button class="btn" type="button" data-act="share"><span class="swap">' + ICONS.link + '<span>Review link</span></span></button>' +
+          '<button class="btn" type="button" data-act="share" aria-expanded="false" aria-controls="up-share">' + ICONS.link + 'Review link' + ICONS.chev + '</button>' +
         '</div>' +
-        '<div class="collapse" data-share-warn hidden><div class="note" role="alert"></div></div>' +
-        '<div class="collapse" data-share-info hidden><div class="share-info"><div class="row"><span class="ok-dot">' + ICONS.check + '</span><span data-share-text>Review link copied</span></div>' +
-          '<label class="check"><input type="checkbox" data-hide-ui> Hide controls for viewers</label></div></div>' +
+        '<div class="collapse" id="up-share" data-share hidden><div class="group share">' +
+          '<div class="row"><span class="label">Share this view</span><span class="pill" data-share-theme></span></div>' +
+          '<p class="desc" data-share-desc></p>' +
+          '<label class="check"><input type="checkbox" data-hide-ui> Hide controls for viewers</label>' +
+          '<div class="note" data-share-warn role="status" hidden></div>' +
+          '<div class="footer-actions" data-share-actions></div>' +
+        '</div></div>' +
         '<div class="collapse" id="up-editor" data-editor hidden></div>' +
         '<div class="draft" data-draft hidden></div>' +
       '</div>' +
@@ -1811,9 +1838,10 @@
       '</div>' +
       '<div class="toast" role="status" aria-live="polite"></div>' +
       '<div class="sr" data-live aria-live="polite"></div>';
-    this.root.appendChild(p);
+    this.vp.appendChild(p);
     this.hud = h('div', { class: 'hud hide', 'aria-hidden': 'true' });
-    this.root.appendChild(this.hud);
+    this.vp.appendChild(this.hud);
+    this.trackViewport();
 
     this.q = function (s) { return p.querySelector(s); };
     this.tiles = this.q('.themes');
@@ -1848,9 +1876,8 @@
       var act = b.getAttribute('data-act');
       if (act === 'close') self.close({ via: e.detail === 0 ? 'keyboard' : 'pointer' });
       if (act === 'edit') self.setEdit(!self.editOpen);
-      if (act === 'share') self.share(false);
-      if (act === 'share-anyway') self.share(true);
-      if (act === 'share-cancel') self.hideShareWarn();
+      if (act === 'share') self.setShare(!self.shareOpen);
+      if (act === 'copy-link') self.copyLink();
       if (act === 'copy-config') self.copyConfig();
       if (act === 'reset-theme') { app.resetTheme(); self.flash('Reset ' + THEMES[app.state.active].label + ' to project defaults'); }
       if (act === 'discard') { app.discardLocal(); self.flash('Back to project defaults'); }
@@ -1862,7 +1889,7 @@
     });
     this.q('[data-hide-ui]').addEventListener('change', function (e) {
       self.hideForViewers = e.target.checked;
-      self.share(true, e.target.checked ? 'Link updated — controls hidden' : 'Link updated — controls visible');
+      self.syncShare();
     });
 
     this.bindDrag();
@@ -1877,17 +1904,18 @@
   UI.prototype.bindDrag = function () {
     var self = this, head = this.q('[data-drag]'), start = null;
     head.addEventListener('pointerdown', function (e) {
-      if (e.button !== 0 || e.target.closest('button') || window.innerWidth <= 520) return;
-      var r = self.panel.getBoundingClientRect();
-      start = { x: e.clientX, y: e.clientY, left: r.left, top: r.top, id: e.pointerId };
+      if (e.button !== 0 || e.target.closest('button') || self.viewport().width <= 520) return;
+      var r = self.panel.getBoundingClientRect(), v = self.viewport();
+      start = { x: e.clientX, y: e.clientY, left: r.left - v.left, top: r.top - v.top, id: e.pointerId };
       head.setPointerCapture(e.pointerId);
       head.classList.add('dragging');
     });
     head.addEventListener('pointermove', function (e) {
       if (!start || e.pointerId !== start.id) return;
       var r = self.panel.getBoundingClientRect();
-      var left = clamp(start.left + e.clientX - start.x, 8, window.innerWidth - r.width - 8);
-      var top = clamp(start.top + e.clientY - start.y, 8, window.innerHeight - 48);
+      var v = self.viewport();
+      var left = clamp(start.left + e.clientX - start.x, 8, v.width - r.width - 8);
+      var top = clamp(start.top + e.clientY - start.y, 8, v.height - 48);
       self.pos = { left: left, top: top };
       self.place();
     });
@@ -1901,6 +1929,24 @@
     window.addEventListener('resize', function () { if (self.isOpen) self.place(); });
   };
 
+  UI.prototype.trackViewport = function () {
+    var vv = window.visualViewport, box = this.vp.style, self = this;
+    if (!vv) return;
+    function sync() {
+      box.left = vv.offsetLeft + 'px'; box.top = vv.offsetTop + 'px';
+      box.width = vv.width + 'px'; box.height = vv.height + 'px';
+      if (self.isOpen) self.place();
+    }
+    vv.addEventListener('resize', sync);
+    vv.addEventListener('scroll', sync);
+    sync();
+  };
+
+  UI.prototype.viewport = function () {
+    var r = this.vp.getBoundingClientRect();
+    return { left: r.left, top: r.top, width: r.width || window.innerWidth, height: r.height || window.innerHeight };
+  };
+
   UI.prototype.corner = function () {
     var c = this.app.config.launcher || 'bottom-right';
     return { v: c.indexOf('top') === 0 ? 'top' : 'bottom', h: /left$/.test(c) ? 'left' : 'right' };
@@ -1911,17 +1957,18 @@
     L.top = L.bottom = L.left = L.right = '';
     L[c.v] = '16px'; L[c.h] = '16px';
     P.top = P.bottom = P.left = P.right = '';
-    if (this.pos && window.innerWidth > 520) {
+    var v = this.viewport();
+    if (this.pos && v.width > 520) {
       var r = this.panel.getBoundingClientRect();
-      P.left = clamp(this.pos.left, 8, Math.max(8, window.innerWidth - (r.width || 312) - 8)) + 'px';
-      P.top = clamp(this.pos.top, 8, Math.max(8, window.innerHeight - 48)) + 'px';
+      P.left = clamp(this.pos.left, 8, Math.max(8, v.width - (r.width || 312) - 8)) + 'px';
+      P.top = clamp(this.pos.top, 8, Math.max(8, v.height - 48)) + 'px';
       this.panel.style.setProperty('--origin', 'center');
-      P.maxHeight = 'calc(100vh - ' + (parseFloat(P.top) + 8) + 'px)';
+      P.maxHeight = 'calc(100% - ' + (parseFloat(P.top) + 8) + 'px)';
     } else {
       var off = this.launcherVisible() ? 62 : 16;
       P[c.v] = off + 'px';
       P[c.h] = '16px';
-      P.maxHeight = window.innerWidth > 520 ? 'calc(100vh - ' + (off + 12) + 'px)' : '';
+      P.maxHeight = v.width > 520 ? 'calc(100% - ' + (off + 12) + 'px)' : '';
       this.panel.style.setProperty('--origin', c.v + ' ' + c.h);
     }
   };
@@ -1972,7 +2019,7 @@
       p.hidden = true;
       p.classList.remove('anim', 'anim-out', 'from', 'to-out');
     }
-    this.hideShareWarn(true);
+    if (this.shareOpen) this.setShare(false, true);
     this.renderLauncher();
     if (focusInside) {
       var back = this.returnFocus && this.returnFocus.isConnected && this.returnFocus !== document.body ? this.returnFocus : (this.launcherVisible() ? this.launcher : null);
@@ -2010,6 +2057,7 @@
   UI.prototype.setEdit = function (on) {
     var ed = this.q('[data-editor]'), btn = this.q('[data-act="edit"]');
     if (this.app.state.active === 'original') on = false;
+    if (on && this.shareOpen) this.setShare(false, true);
     this.editOpen = on;
     btn.setAttribute('aria-expanded', String(on));
     if (on) this.renderEditor();
@@ -2068,11 +2116,14 @@
       : kind === 'draft' ? 'You have adjustments saved only in this browser. Copy configuration to save them to the project.'
       : 'Matches the project configuration.';
     this.q('[data-review]').hidden = !st.review;
+    this.syncShare();
     this.q('[data-toggle-key]').textContent = prettyCombo(app.shortcuts().toggle) || '\\';
     this.panel.setAttribute('data-keys', '1');
 
     var draft = this.q('[data-draft]');
-    if (kind === 'draft') {
+    // The share view carries its own save prompt, so the draft bar steps aside while it's open.
+    if (this.shareOpen) draft.hidden = true;
+    else if (kind === 'draft') {
       draft.hidden = false;
       draft.innerHTML = '<b>Unsaved in project.</b> Your adjustments live in this browser only.' +
         '<div class="footer-actions"><button class="btn small primary" type="button" data-act="copy-config"><span class="swap">' + ICONS.copy + '<span>Copy configuration</span></span></button>' +
@@ -2110,26 +2161,40 @@
 
   UI.prototype.buildEditor = function (ed, id, s, T, key) {
     var app = this.app, self = this;
-    var html = '<div class="group"><div class="section"><h3>Colors<span class="hint">' + T.label + '</span></h3><div class="swatches">';
-    Object.keys(s.palette).forEach(function (k) {
-      html += '<label class="sw"><span class="c"></span><input type="color" data-k="palette.' + k + '" aria-label="' + PALETTE_LABELS[k] + ' color">' + PALETTE_LABELS[k] + '</label>';
-    });
-    html += '</div></div>';
-    html += '<div class="section"><h3>Type &amp; lines</h3>';
-    html += '<div class="field"><span class="label" id="up-l-type">Typography</span><select data-k="typography" aria-labelledby="up-l-type">' +
-      TYPE_OPTIONS.map(function (o) { return '<option value="' + o[0] + '">' + o[1] + '</option>'; }).join('') + '</select></div>';
-    html += '<div class="field"><span class="label" id="up-l-bw">Border</span><div class="row"><input type="range" min="0" max="4" step="0.25" data-k="border.weight" aria-labelledby="up-l-bw"><span class="val" data-bw-val></span></div></div>';
-    html += seg('Lines', 'border.style', BORDER_STYLES);
-    html += seg('Corners', 'radius', RADIUS_OPTIONS);
-    html += seg('Shadows', 'shadows', SHADOW_OPTIONS);
-    html += seg('Images', 'images', IMAGE_OPTIONS);
-    html += '<div class="field"><span class="label" id="up-l-det">Details</span><div class="row"><span class="hint">' + T.detailsHint + '</span><button type="button" class="toggle" role="switch" data-k="details" aria-labelledby="up-l-det" aria-describedby="up-l-det-h" style="margin-left:auto"></button><span class="sr" id="up-l-det-h">' + T.detailsHint + '</span></div></div>';
-    html += '</div>';
-    html += '<div class="section"><h3>Shortcut</h3><div class="row"><span class="hint" style="flex:1">Jump straight to ' + T.label + ', even with the panel closed</span><button type="button" class="bind' + (key ? '' : ' empty') + '" data-act="bind" data-bind="' + id + '" aria-label="Shortcut for ' + T.label + ': ' + (key ? prettyCombo(key) : 'none') + '. Press to change">' + (key ? prettyCombo(key) : 'Add') + '</button></div><div class="msg" data-msg="' + id + '"></div></div>';
-    html += '<div class="footer-actions"><button class="btn small" type="button" data-act="reset-theme">' + ICONS.reset + '<span>Reset preset</span></button>' +
-      '<button class="btn small" type="button" data-act="copy-config"><span class="swap">' + ICONS.copy + '<span>Copy configuration</span></span></button></div>';
-    html += '</div>';
+    var open = this.openSections = this.openSections || {};
+    function swatches(keys) {
+      return '<div class="swatches">' + keys.map(function (k) {
+        return '<label class="sw"><span class="c"></span><input type="color" data-k="palette.' + k + '" aria-label="' + PALETTE_LABELS[k] + ' color">' + PALETTE_LABELS[k] + '</label>';
+      }).join('') + '</div>';
+    }
+    function section(key, title, hint, body) {
+      return '<details class="sec" data-sec="' + key + '"' + (open[key] ? ' open' : '') + '><summary><span>' + title + '</span><span class="hint">' + hint + '</span>' + ICONS.chev + '</summary><div class="sec-body">' + body + '</div></details>';
+    }
+    var keys = Object.keys(s.palette);
+    var status = ['danger', 'success', 'warning'];
+    var core = keys.filter(function (k) { return status.indexOf(k) < 0 && !/^block/.test(k); });
+    var blocks = keys.filter(function (k) { return /^block/.test(k); });
+    var colorBody = swatches(core) + (blocks.length ? '<div class="sub">Color blocks</div>' + swatches(blocks) : '') +
+      '<details class="more" data-sec="status"' + (open.status ? ' open' : '') + '><summary>Status colors' + ICONS.chev + '</summary>' + swatches(status) + '</details>';
+    var typeBody = '<div class="field"><span class="label" id="up-l-type">Typography</span><select data-k="typography" aria-labelledby="up-l-type">' +
+      TYPE_OPTIONS.map(function (o) { return '<option value="' + o[0] + '">' + o[1] + '</option>'; }).join('') + '</select></div>' +
+      '<div class="field"><span class="label" id="up-l-bw">Border</span><div class="row"><input type="range" min="0" max="4" step="0.25" data-k="border.weight" aria-labelledby="up-l-bw"><span class="val" data-bw-val></span></div></div>' +
+      seg('Lines', 'border.style', BORDER_STYLES) + seg('Corners', 'radius', RADIUS_OPTIONS) + seg('Shadows', 'shadows', SHADOW_OPTIONS);
+    var imgBody = seg('Images', 'images', IMAGE_OPTIONS) +
+      '<div class="field"><span class="label" id="up-l-det">Details</span><div class="row"><span class="hint">' + T.detailsHint + '</span><button type="button" class="toggle" role="switch" data-k="details" aria-labelledby="up-l-det" aria-describedby="up-l-det-h" style="margin-left:auto"></button><span class="sr" id="up-l-det-h">' + T.detailsHint + '</span></div></div>';
+    var keyBody = '<div class="row"><span class="hint" style="flex:1">Jump straight to ' + T.label + ', even with the panel closed</span><button type="button" class="bind' + (key ? '' : ' empty') + '" data-act="bind" data-bind="' + id + '" aria-label="Shortcut for ' + T.label + ': ' + (key ? prettyCombo(key) : 'none') + '. Press to change">' + (key ? prettyCombo(key) : 'Add') + '</button></div><div class="msg" data-msg="' + id + '"></div>';
+    var html = '<div class="group editor">' +
+      section('color', 'Color', T.label, colorBody) +
+      section('type', 'Type &amp; lines', '', typeBody) +
+      section('images', 'Images &amp; details', '', imgBody) +
+      section('key', 'Shortcut', key ? prettyCombo(key) : '', keyBody) +
+      '<div class="footer-actions editor-actions"><button class="btn small" type="button" data-act="reset-theme">' + ICONS.reset + '<span>Reset preset</span></button>' +
+      '<button class="btn small" type="button" data-act="copy-config"><span class="swap">' + ICONS.copy + '<span>Copy configuration</span></span></button></div>' +
+      '</div>';
     ed.innerHTML = html;
+    ed.querySelectorAll('details[data-sec]').forEach(function (d) {
+      d.addEventListener('toggle', function () { open[d.getAttribute('data-sec')] = d.open; });
+    });
     function seg(label, k, opts) {
       var lid = 'up-l-' + k.replace('.', '-');
       return '<div class="field"><span class="label" id="' + lid + '">' + label + '</span><div class="seg" role="radiogroup" aria-labelledby="' + lid + '">' +
@@ -2293,40 +2358,60 @@
     btn._t = setTimeout(function () { if (btn.isConnected) swap.innerHTML = btn._orig; btn._orig = null; }, 1800);
   };
 
-  UI.prototype.hideShareWarn = function (instant) {
-    var w = this.q('[data-share-warn]');
-    if (w && !w.hidden) reveal(w, false, instant);
-    var i = this.q('[data-share-info]');
-    if (instant && i && !i.hidden) reveal(i, false, true);
-  };
-
   UI.prototype.announce = function (text) {
     var live = this.q('[data-live]');
     live.textContent = '';
     setTimeout(function () { live.textContent = text; }, 30);
   };
 
-  UI.prototype.share = function (force, message) {
-    var app = this.app, self = this;
-    var w = this.q('[data-share-warn]');
-    if (!force && app.unsavedForLink()) {
-      var label = THEMES[app.state.active].label;
-      w.querySelector('.note').innerHTML = '<b>Save before sharing.</b> Review links use the saved project preset, so your local ' + label + ' edits won\'t appear. Copy the configuration into the repo and redeploy, then share.' +
-        '<div class="row"><button class="btn small primary" type="button" data-act="copy-config"><span class="swap">' + ICONS.copy + '<span>Copy configuration</span></span></button>' +
-        '<button class="btn small ghost" type="button" data-act="share-anyway">Copy link anyway</button></div>';
-      reveal(w, true);
-      return;
+  UI.prototype.setShare = function (on, instant) {
+    var box = this.q('[data-share]');
+    if (on && this.editOpen) this.setEdit(false);
+    this.shareOpen = on;
+    this.q('[data-act="share"]').setAttribute('aria-expanded', String(on));
+    this.render();
+    reveal(box, on, instant);
+  };
+
+  /* What a copied link would contain right now; copy feedback is only valid while this holds. */
+  UI.prototype.shareSig = function () {
+    var app = this.app, id = app.state.active;
+    return [id, !!this.hideForViewers, app.unsavedForLink(), JSON.stringify(id === 'original' ? null : app.settingsFor(id))].join('|');
+  };
+
+  /* Recomputed on every render, so the view always describes the current theme and saved state. */
+  UI.prototype.syncShare = function () {
+    if (!this.panel) return;
+    var app = this.app, id = app.state.active, label = id === 'original' ? 'Original' : THEMES[id].label;
+    var unsaved = app.unsavedForLink();
+    var copied = this.copiedSig && this.copiedSig === this.shareSig();
+    if (!copied) this.copiedSig = null;
+    this.q('[data-share-theme]').textContent = label;
+    this.q('[data-hide-ui]').checked = !!this.hideForViewers;
+    this.q('[data-share-desc]').textContent = id === 'original'
+      ? 'Opens this page with its original design.'
+      : 'Opens this page in ' + label + ' using the saved project preset' + (this.hideForViewers ? ', with Unpolish hidden.' : '.');
+    var warn = this.q('[data-share-warn]');
+    warn.hidden = !unsaved;
+    if (unsaved) warn.innerHTML = '<b>' + label + ' has unsaved edits.</b> Viewers will see the saved preset, not your edits. Copy the configuration to your coding agent and redeploy before sharing.';
+    var html = (unsaved ? '<button class="btn small primary" type="button" data-act="copy-config"><span class="swap">' + ICONS.copy + '<span>Copy configuration</span></span></button>' : '') +
+      '<button class="btn small' + (unsaved ? '' : ' primary') + '" type="button" data-act="copy-link">' +
+      (copied ? '<span class="ok">' + ICONS.check + '</span>Link copied' : ICONS.link + (unsaved ? 'Copy link without edits' : 'Copy link')) + '</button>';
+    var actions = this.q('[data-share-actions]');
+    if (actions._html !== html) {
+      var hadFocus = this.root.activeElement && actions.contains(this.root.activeElement) ? this.root.activeElement.getAttribute('data-act') : null;
+      actions.innerHTML = html; actions._html = html;
+      if (hadFocus) { var f = actions.querySelector('[data-act="' + hadFocus + '"]'); if (f) f.focus(); }
     }
-    this.hideShareWarn();
-    var url = app.reviewLink({ hideUI: this.hideForViewers });
-    var info = this.q('[data-share-info]');
+  };
+
+  UI.prototype.copyLink = function () {
+    var self = this, url = this.app.reviewLink({ hideUI: this.hideForViewers }), sig = this.shareSig();
     copyText(url, this.root).then(function (ok) {
       if (!ok) { self.manualCopy(url, 'Copy this review link'); return; }
-      self.markCopied(self.q('[data-act="share"]'), 'Link copied');
-      self.q('[data-share-text]').textContent = message || 'Review link copied';
-      self.q('[data-hide-ui]').checked = !!self.hideForViewers;
-      if (info.hidden) reveal(info, true);
-      self.announce(message || 'Review link copied');
+      self.copiedSig = sig;
+      self.syncShare();
+      self.announce('Review link copied');
     });
   };
 

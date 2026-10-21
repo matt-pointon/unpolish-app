@@ -17,8 +17,10 @@ test('copy installation prompt: real file links, visible feedback', async ({ pag
   for (const href of ['unpolish/unpolish.js', 'unpolish/unpolish.config.json']) expect((await request.get('/' + href)).ok()).toBe(true);
 });
 
-test('demo controls drive the real harness inside the prototype frame', async ({ page }) => {
+test('the demo is visible on the first screen and drives the real harness', async ({ page }) => {
   await page.goto('/');
+  const top = await page.locator('#demo-frame').boundingBox();
+  expect(top.y).toBeLessThan(860);
   const frame = page.frameLocator('#demo-frame');
   await page.waitForFunction(() => document.getElementById('demo-frame').contentWindow?.Unpolish?.state);
   await page.locator('#demo-themes [data-theme="blueprint"]').click();
@@ -41,4 +43,10 @@ test('site works on small screens without horizontal scrolling', async ({ page }
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
   expect(overflow).toBeLessThanOrEqual(0);
   await expect(page.locator('.hero [data-copy-prompt]')).toBeVisible();
+  // Narrow screens get a dropdown instead of the clipped segmented control, plus a full-screen demo link.
+  await expect(page.locator('#demo-themes')).toBeHidden();
+  await page.waitForFunction(() => document.getElementById('demo-frame').contentWindow?.Unpolish?.state);
+  await page.locator('#demo-select').selectOption('blueprint');
+  await expect(page.frameLocator('#demo-frame').locator('html')).toHaveAttribute('data-unpolish', 'blueprint');
+  await expect(page.locator('#demo-full')).toHaveAttribute('href', 'site/demo/');
 });

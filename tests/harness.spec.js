@@ -125,6 +125,12 @@ test.describe('panel', () => {
     await expect(shadow(page, '[data-editor]')).toBeHidden();
     await shadow(page, '[data-act="edit"]').click();
     await expect(shadow(page, '[data-editor]')).toBeVisible();
+    // Groups start collapsed; status colors sit behind their own disclosure.
+    await expect(shadow(page, '[data-k="typography"]')).toBeHidden();
+    for (const sec of ['color', 'type', 'images']) await shadow(page, `[data-sec="${sec}"] > summary`).click();
+    await expect(shadow(page, '[data-k="palette.danger"]')).toBeHidden();
+    await shadow(page, '[data-sec="status"] > summary').click();
+    await expect(shadow(page, '[data-k="palette.danger"]')).toBeAttached();
     await shadow(page, '[data-k="images"][data-v="placeholder"]').click();
     await shadow(page, '[data-k="border.style"][data-v="dashed"]').click();
     await shadow(page, '.toggle').click();
@@ -222,6 +228,24 @@ test.describe('panel', () => {
     expect(unnamed).toEqual([]);
   });
 
+  test('on phones the controls stay reachable even when the host page overflows', async ({ browser }) => {
+    const ctx = await browser.newContext({ viewport: { width: 390, height: 664 }, isMobile: true, hasTouch: true, deviceScaleFactor: 3 });
+    const page = await ctx.newPage();
+    await open(page, EXAMPLES.demo);
+    // Simulate a sloppy host layout that is wider than the screen
+    await page.evaluate(() => { const d = document.createElement('div'); d.style.cssText = 'width:470px;height:4px'; document.body.prepend(d); });
+    await page.waitForTimeout(200);
+    await shadow(page, '.launcher').tap();
+    expect(await isOpen(page)).toBe(true);
+    const box = await shadow(page, '.panel').boundingBox();
+    const vv = await page.evaluate(() => ({ w: visualViewport.width, h: visualViewport.height, x: visualViewport.offsetLeft }));
+    expect(box.x).toBeGreaterThanOrEqual(vv.x);
+    expect(box.x + box.width).toBeLessThanOrEqual(vv.x + vv.w + 1);
+    await shadow(page, '.tile[data-theme="sketch"]').tap();
+    expect(await theme(page)).toBe('sketch');
+    await ctx.close();
+  });
+
   test('small screens get a bottom sheet that fits the viewport', async ({ page }) => {
     await page.setViewportSize({ width: 375, height: 720 });
     await open(page, EXAMPLES.demo);
@@ -288,30 +312,54 @@ test.describe('review links', () => {
     expect(warnings.some((w) => w.includes('Unknown theme'))).toBe(true);
   });
 
-  test('Copy review link keeps route, app query and hash; warns about unsaved edits', async ({ page }) => {
+  test('Review link: options are chosen before copying; link keeps route, app query and hash', async ({ page }) => {
     await open(page, EXAMPLES.vue + '?view=compact#/about');
     await setTheme(page, 'pastel');
     await page.keyboard.press('\\');
+    const clip = () => page.evaluate(() => navigator.clipboard.readText());
+    await page.evaluate(() => navigator.clipboard.writeText('unchanged'));
+    // Opening the view copies nothing yet
     await shadow(page, '[data-act="share"]').click();
-    let link = await page.evaluate(() => navigator.clipboard.readText());
-    let u = new URL(link);
+    await expect(shadow(page, '[data-share]')).toBeVisible();
+    await expect(shadow(page, '[data-share-theme]')).toHaveText('Pastel Blocks');
+    expect(await clip()).toBe('unchanged');
+    await shadow(page, '[data-hide-ui]').check();
+    expect(await clip()).toBe('unchanged');
+    await shadow(page, '[data-act="copy-link"]').click();
+    await expect(shadow(page, '[data-act="copy-link"]')).toHaveText('Link copied');
+    const u = new URL(await clip());
     expect(u.pathname).toBe('/examples/vue/dist/');
     expect(u.searchParams.get('view')).toBe('compact');
     expect(u.hash).toBe('#/about');
     expect(u.searchParams.get('unpolish')).toBe('pastel');
-    expect(u.searchParams.has('unpolish-roughness')).toBe(false);
-    // Hide controls option re-copies
-    await shadow(page, '[data-hide-ui]').check();
-    link = await page.evaluate(() => navigator.clipboard.readText());
-    expect(new URL(link).searchParams.get('unpolish-ui')).toBe('hidden');
-    // Local edits can't travel in a link: ask to save first
-    await page.evaluate(() => window.Unpolish.update({ radius: 0 }));
-    await page.evaluate(() => navigator.clipboard.writeText('unchanged'));
+    expect(u.searchParams.get('unpolish-ui')).toBe('hidden');
+    // Changing an option invalidates the "copied" state instead of leaving it stale
+    await shadow(page, '[data-hide-ui]').uncheck();
+    await expect(shadow(page, '[data-act="copy-link"]')).toHaveText('Copy link');
+  });
+
+  test('Review link warns about unsaved edits and never goes stale', async ({ page }) => {
+    await open(page, EXAMPLES.demo);
+    await page.keyboard.press('\\');
+    await shadow(page, '.tile[data-theme="sketch"]').click();
+    await page.evaluate(() => window.Unpolish.update({ images: 'placeholder' }));
+    await settle(page);
     await shadow(page, '[data-act="share"]').click();
     await expect(shadow(page, '[data-share-warn]')).toBeVisible();
-    await expect(shadow(page, '[data-share-warn]')).toContainText('Save before sharing');
-    expect(await page.evaluate(() => navigator.clipboard.readText())).toBe('unchanged');
-    await shadow(page, '[data-act="share-anyway"]').click();
-    expect(await page.evaluate(() => navigator.clipboard.readText())).toContain('unpolish=pastel');
+    await expect(shadow(page, '[data-share-warn]')).toContainText('Sketch has unsaved edits');
+    await expect(shadow(page, '[data-share] [data-act="copy-config"]')).toBeVisible();
+    await shadow(page, '[data-act="copy-link"]').click();
+    expect(await page.evaluate(() => navigator.clipboard.readText())).toContain('unpolish=sketch');
+    // The reported bug: discard, switch theme — the warning must not linger.
+    await page.evaluate(() => window.Unpolish.discardLocalChanges());
+    await shadow(page, '.tile[data-theme="blueprint"]').click();
+    await expect(shadow(page, '.source')).toHaveText('Project');
+    await expect(shadow(page, '[data-share-warn]')).toBeHidden();
+    await expect(shadow(page, '[data-share-theme]')).toHaveText('Blueprint');
+    await expect(shadow(page, '[data-act="copy-link"]')).toHaveText('Copy link');
+    // Closing the panel resets the share view
+    await page.keyboard.press('Escape');
+    await page.keyboard.press('\\');
+    await expect(shadow(page, '[data-share]')).toBeHidden();
   });
 });
