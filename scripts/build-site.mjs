@@ -10,6 +10,7 @@ import { execFileSync } from 'node:child_process';
 import { dirname, join, relative, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { applyRelease } from './release.mjs';
+import { applySiteSeo } from './site-seo.mjs';
 
 const root = fileURLToPath(new URL('..', import.meta.url));
 const out = join(root, 'public');
@@ -44,9 +45,13 @@ rmSync(out, { recursive: true, force: true });
 mkdirSync(out, { recursive: true });
 
 applyRelease();
+applySiteSeo();
 
 copyFile(join(root, 'index.html'), join(out, 'index.html'));
 copyDir(join(root, 'site'), join(out, 'site'));
+for (const f of ['og.png', 'apple-touch-icon.png', 'robots.txt', 'sitemap.xml']) {
+  copyFile(join(root, f), join(out, f));
+}
 copyDir(join(root, 'examples', 'plain-html'), join(out, 'examples', 'plain-html'));
 copyDir(join(root, 'examples', 'assets'), join(out, 'examples', 'assets'));
 copyDir(join(root, 'unpolish'), join(out, 'unpolish'));
@@ -85,6 +90,10 @@ for (const rel of files) {
 
 const required = [
   'index.html',
+  'og.png',
+  'apple-touch-icon.png',
+  'robots.txt',
+  'sitemap.xml',
   'site/site.js',
   'site/release.js',
   'site/demo/index.html',
