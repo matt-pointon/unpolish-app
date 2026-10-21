@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Unpolish churn fixture</title>
+  <style>
+    body { margin: 0; font: 14px/1.4 sans-serif; background: #f6f6f4; color: #1a1a1a; }
+    #grid { display: flex; flex-wrap: wrap; gap: 4px; padding: 8px; }
+    .card { width: 72px; height: 36px; background: #fff; border: 1px solid #d0d0cc; border-radius: 6px; padding: 4px; overflow: hidden; }
+    .card b { display: block; font-size: 11px; }
+    #feed { display: flex; flex-wrap: wrap; gap: 6px; padding: 8px; }
+    .row { background: #eef2ff; border: 1px solid #c7d2fe; padding: 4px 8px; border-radius: 4px; }
+    gmp-map { display: block; width: 240px; height: 120px; background: #dbeafe; }
+    gmp-advanced-marker { display: inline-block; width: 10px; height: 10px; background: #2563eb; border-radius: 50%; }
+  </style>
+  <script>
+    window.UnpolishConfig = { version: 1, id: 'churn', defaultTheme: 'original', ui: 'hidden', webFonts: false, exclude: [] };
+  </script>
+  <script src="/unpolish/unpolish.js" defer></script>
+</head>
+<body>
+  <gmp-map id="map">
+    <gmp-advanced-marker id="m1"></gmp-advanced-marker>
+    <gmp-advanced-marker id="m2"></gmp-advanced-marker>
+  </gmp-map>
+  <div id="feed"></div>
+  <div id="grid"></div>
+  <script>
+    const grid = document.getElementById('grid');
+    const feed = document.getElementById('feed');
+    const frag = document.createDocumentFragment();
+    for (let i = 0; i < 3000; i++) {
+      const el = document.createElement('div');
+      el.className = 'card';
+      el.dataset.i = String(i);
+      el.innerHTML = '<b>Item ' + i + '</b>';
+      frag.appendChild(el);
+    }
+    grid.appendChild(frag);
+    const cards = [...grid.children];
+    const movers = cards.slice(0, 50);
+    const markers = [...document.querySelectorAll('gmp-advanced-marker')];
+    let n = 0;
+    let inserted = 0;
+    window.__churnInserted = 0;
+    function tick() {
+      n++;
+      const t = n % 400;
+      movers.forEach((el, i) => {
+        el.style.transform = 'translate(' + ((t + i) % 12) + 'px,' + ((t + i * 3) % 8) + 'px)';
+        el.style.opacity = String(0.85 + ((n + i) % 10) / 80);
+        if (n % 7 === i % 7) el.setAttribute('data-tick', String(n));
+        if (n % 11 === i % 11) el.querySelector('b').textContent = 'Item ' + el.dataset.i + ' · ' + n;
+      });
+      markers.forEach((m, i) => {
+        m.style.transform = 'translate(' + ((n * 3 + i * 17) % 80) + 'px,' + ((n * 2 + i * 9) % 40) + 'px)';
+      });
+      if (n % 8 === 0) {
+        const row = document.createElement('div');
+        row.className = 'row';
+        row.dataset.testid = 'inserted';
+        row.textContent = 'New ' + (++inserted);
+        feed.appendChild(row);
+        window.__churnInserted = inserted;
+        if (feed.children.length > 40) feed.firstChild.remove();
+      }
+      requestAnimationFrame(tick);
+    }
+    requestAnimationFrame(tick);
+  </script>
+</body>
+</html>

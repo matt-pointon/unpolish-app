@@ -1,1 +1,5 @@
-export default { basePath: '/atlas' };
+import { dirname } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const root = dirname(fileURLToPath(import.meta.url));
+export default { basePath: '/atlas', outputFileTracingRoot: root };

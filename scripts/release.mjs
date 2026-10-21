@@ -17,7 +17,7 @@
 // 2. Copies the self-host files into unpolish/ and releases/<version>/.
 // 3. Packs the npm tarball to unpolish/<name>-<version>.tgz.
 // 4. Writes site/release.js — every command, download link and the agent prompt is derived from it.
-import { existsSync, readFileSync, writeFileSync, copyFileSync, readdirSync, rmSync, renameSync, mkdirSync } from 'node:fs';
+import { existsSync, readFileSync, writeFileSync, copyFileSync, renameSync, mkdirSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import { join, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
@@ -97,12 +97,9 @@ export function applyRelease({ print = false, config = join(root, 'release.confi
 
   // Never rewrite a tarball that already exists for this version — 0.1.0 on npm
   // is byte-identical to the committed file. Bump version (or delete the .tgz)
-  // to pack a new one.
+  // to pack a new one. Previously published tarballs stay in unpolish/.
   const dest = join(out, release.tarball);
   const keepTarball = existsSync(dest);
-  for (const f of readdirSync(out)) {
-    if (/^unpolish-.*\.tgz$/.test(f) && f !== release.tarball) rmSync(join(out, f));
-  }
   if (keepTarball) {
     console.log(`keeping existing unpolish/${release.tarball}`);
   } else {

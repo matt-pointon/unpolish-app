@@ -114,7 +114,7 @@ Precedence: **review link → local draft (this browser) → project config → 
 
 ```jsonc
 {
-  "exclude": [".brand-logo", "#map"],  // never restyle these (or add data-unpolish-ignore)
+  "exclude": [".brand-logo", "#map"],  // extra regions; maps, data-unpolish-ignore and gmp-* are already skipped
   "roles": { ".my-chip": "fill" },     // classifier hints: surface | fill | media | icon | plain
   "launcher": "bottom-left",           // or top-right | top-left | false
   "webFonts": false,                   // system fonts instead of Google Fonts
@@ -126,6 +126,8 @@ Precedence: **review link → local draft (this browser) → project config → 
   "overrides": { "blueprint": ".hero { background-color: var(--up-paper) !important; }" }
 }
 ```
+
+`exclude` is additive. Unpolish already skips `[data-unpolish-ignore]`, its own UI, Google Maps containers (`gmp-map`, `gmp-advanced-marker`, `.gm-style`, and any `gmp-*` custom element), and does not walk into `canvas` / `video` / `iframe` internals. Put a `data-unpolish-ignore` attribute on a region, or list a selector here, when something else must keep its look.
 
 The schema (`schema/unpolish.config.schema.json`) documents every field and gives editors autocomplete.
 
