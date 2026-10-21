@@ -125,6 +125,9 @@ test.describe('panel', () => {
     await expect(shadow(page, '[data-editor]')).toBeHidden();
     await shadow(page, '[data-act="edit"]').click();
     await expect(shadow(page, '[data-editor]')).toBeVisible();
+    // Details is the one control shown up front in Edit theme.
+    await expect(shadow(page, '[data-k="details"]')).toBeVisible();
+    expect(await shadow(page, '[data-k="details"]').inputValue()).toBe('50');
     // Groups start collapsed; status colors sit behind their own disclosure.
     await expect(shadow(page, '[data-k="typography"]')).toBeHidden();
     for (const sec of ['color', 'type', 'images']) await shadow(page, `[data-sec="${sec}"] > summary`).click();
@@ -133,22 +136,23 @@ test.describe('panel', () => {
     await expect(shadow(page, '[data-k="palette.danger"]')).toBeAttached();
     await shadow(page, '[data-k="images"][data-v="placeholder"]').click();
     await shadow(page, '[data-k="border.style"][data-v="dashed"]').click();
-    await shadow(page, '.toggle').click();
+    await shadow(page, '[data-k="details"]').fill('0');
+    await expect(shadow(page, '[data-details-val]')).toHaveText('Off');
     await shadow(page, '[data-k="palette.ink"]').evaluate((i) => { i.value = '#7a1f1f'; i.dispatchEvent(new Event('input', { bubbles: true })); });
     await shadow(page, '[data-k="typography"]').selectOption('neutral');
     await settle(page);
     const s = await page.evaluate(() => window.Unpolish.getSettings());
-    expect(s).toMatchObject({ images: 'placeholder', border: { style: 'dashed' }, details: false, typography: 'neutral', palette: { ink: '#7a1f1f' } });
+    expect(s).toMatchObject({ images: 'placeholder', border: { style: 'dashed' }, details: 0, typography: 'neutral', palette: { ink: '#7a1f1f' } });
     await expect(shadow(page, '.source')).toHaveText('Local draft');
     expect(await page.locator('h1').evaluate((e) => getComputedStyle(e).color)).toBe('rgb(122, 31, 31)');
     // Per-theme memory: Blueprint stays at its defaults, Sketch keeps the edits
     await shadow(page, '.tile[data-theme="blueprint"]').click();
-    expect((await page.evaluate(() => window.Unpolish.getSettings())).images).toBe('original');
+    expect((await page.evaluate(() => window.Unpolish.getSettings())).images).toBe('theme');
     await shadow(page, '.tile[data-theme="sketch"]').click();
     expect((await page.evaluate(() => window.Unpolish.getSettings())).images).toBe('placeholder');
     // Reset preset
     await shadow(page, '[data-act="reset-theme"]').click();
-    expect((await page.evaluate(() => window.Unpolish.getSettings())).images).toBe('original');
+    expect((await page.evaluate(() => window.Unpolish.getSettings())).images).toBe('theme');
     await expect(shadow(page, '.source')).toHaveText('Project');
     // Discard local changes
     await shadow(page, '[data-k="radius"][data-v="0"]').click();
@@ -285,7 +289,7 @@ test.describe('review links', () => {
     await page.goto(EXAMPLES.plain + '?unpolish=sketch');
     await page.waitForFunction(() => document.documentElement.getAttribute('data-unpolish') === 'sketch');
     const s = await page.evaluate(() => window.Unpolish.getSettings());
-    expect(s.images).toBe('simplified'); // project config value
+    expect(s.images).toBe('mono'); // project config value
     expect(s.typography).toBe('hand');
     expect(s.border.weight).toBe(2);
     // Session continues across full page loads (multi-page site)

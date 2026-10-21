@@ -5,6 +5,13 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Fieldtrip — Offsite planner (demo prototype)</title>
   <link rel="stylesheet" href="demo.css">
+  <script>
+    // The landing page's configurator embeds this prototype as its own live preview:
+    // separate saved settings, no launcher, so the page's controls do the talking.
+    if (new URLSearchParams(location.search).get('embed') === 'configure') {
+      window.UnpolishConfig = { version: 1, id: 'site-configurator', defaultTheme: 'sketch', ui: 'hidden' };
+    }
+  </script>
   <script src="../../unpolish/unpolish.js" data-config="../site/demo/unpolish.config.json" defer></script>
 </head>
 <body>

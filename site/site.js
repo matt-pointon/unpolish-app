@@ -98,59 +98,86 @@
   window.addEventListener('scroll', onScroll, { passive: true });
   onScroll();
 
-  /* ---------------- Live demo ---------------- */
-  var frame = $('#demo-frame');
-  var seg = $('#demo-themes');
-  var badge = $('#demo-badge');
-  var select = $('#demo-select');
-  var labels = { original: 'Original', 'black-white': 'Black & White', sketch: 'Sketch', blueprint: 'Blueprint', pastel: 'Pastel Blocks' };
-  var api = null;
-
-  function sync(state) {
-    var t = state.theme;
-    $$('button', seg).forEach(function (b) {
-      var on = b.getAttribute('data-theme') === t;
+  /* ---------------- Live harness in a frame ---------------- */
+  function whenApi(frame, cb) {
+    var tries = 0;
+    function poll() {
+      var w = frame.contentWindow;
+      if (w && w.Unpolish && w.document.querySelector('unpolish-harness')) { cb(w.Unpolish); return; }
+      if (++tries < 150) setTimeout(poll, 100);
+    }
+    frame.addEventListener('load', function () { tries = 0; poll(); });
+    poll();
+  }
+  function radios(group, onPick) {
+    group.addEventListener('click', function (e) {
+      var b = e.target.closest('button[role="radio"]');
+      if (b) onPick(b);
+    });
+    group.addEventListener('keydown', function (e) {
+      var d = { ArrowRight: 1, ArrowDown: 1, ArrowLeft: -1, ArrowUp: -1 }[e.key];
+      if (!d) return;
+      e.preventDefault();
+      var bs = $$('button[role="radio"]', group), i = bs.indexOf(document.activeElement);
+      var n = bs[(i + d + bs.length) % bs.length];
+      onPick(n); n.focus();
+    });
+  }
+  function check(group, value) {
+    $$('button[role="radio"]', group).forEach(function (b) {
+      var on = (b.getAttribute('data-theme') || b.getAttribute('data-v')) === String(value);
       b.setAttribute('aria-checked', String(on));
       b.tabIndex = on ? 0 : -1;
     });
-    select.value = t;
-    badge.textContent = labels[t];
-    badge.setAttribute('data-theme', t);
   }
 
-  function connect() {
-    var w = frame.contentWindow;
-    if (!w || !w.Unpolish) return false;
-    if (!w.document.querySelector('unpolish-harness')) return false;
-    api = w.Unpolish;
-    api.on('change', sync);
-    api.on('ready', sync);
-    sync(api.state());
-    return true;
-  }
-  function waitForApi() {
-    var tries = 0;
-    (function poll() {
-      if (connect() || ++tries > 100) return;
-      setTimeout(poll, 100);
-    })();
-  }
-  frame.addEventListener('load', waitForApi);
-  if (frame.contentDocument && frame.contentDocument.readyState === 'complete') waitForApi();
+  /* Hero demo */
+  var seg = $('#demo-themes'), select = $('#demo-select'), demo = null;
+  function syncDemo(state) { check(seg, state.theme); select.value = state.theme; }
+  whenApi($('#demo-frame'), function (api) {
+    if (demo === api) return;
+    demo = api;
+    api.on('change', syncDemo);
+    syncDemo(api.state());
+  });
+  radios(seg, function (b) { if (demo) demo.setTheme(b.getAttribute('data-theme')); });
+  select.addEventListener('change', function () { if (demo) demo.setTheme(select.value); });
 
-  seg.addEventListener('click', function (e) {
-    var b = e.target.closest('button');
-    if (!b || !api) return;
-    api.setTheme(b.getAttribute('data-theme'));
+  /* Configurator: a slice of the panel driving its own preview */
+  var hints = { 'black-white': 'Status patterns and contrast', sketch: 'Stroke wobble and shading', blueprint: 'Drafting grid and corner marks', pastel: 'Color fields' };
+  var cfg = null, details = $('#cfg-details'), detailsVal = $('#cfg-details-val');
+  var groups = {};
+  $$('[data-cfg]').forEach(function (g) { groups[g.getAttribute('data-cfg')] = g; });
+  function syncCfg() {
+    if (!cfg) return;
+    var st = cfg.state();
+    if (st.theme === 'original') { cfg.setTheme('sketch'); return; }
+    var s = st.settings;
+    check(groups.theme, st.theme);
+    check(groups.images, s.images);
+    check(groups.lines, s.border.style);
+    check(groups.radius, s.radius);
+    check(groups.typography, s.typography);
+    if (document.activeElement !== details) details.value = s.details;
+    details.style.setProperty('--p', s.details + '%');
+    detailsVal.textContent = s.details === 0 ? 'Off' : s.details;
+    $('#cfg-details-hint').textContent = hints[st.theme];
+  }
+  whenApi($('#cfg-frame'), function (api) {
+    if (cfg === api) return;
+    cfg = api;
+    api.on('change', syncCfg);
+    syncCfg();
   });
-  select.addEventListener('change', function () { if (api) api.setTheme(select.value); });
-  seg.addEventListener('keydown', function (e) {
-    var d = { ArrowRight: 1, ArrowDown: 1, ArrowLeft: -1, ArrowUp: -1 }[e.key];
-    if (!d || !api) return;
-    e.preventDefault();
-    var bs = $$('button', seg), i = bs.indexOf(document.activeElement);
-    var n = bs[(i + d + bs.length) % bs.length];
-    api.setTheme(n.getAttribute('data-theme'));
-    n.focus();
+  radios(groups.theme, function (b) { if (cfg) cfg.setTheme(b.getAttribute('data-v')); });
+  radios(groups.images, function (b) { if (cfg) cfg.update({ images: b.getAttribute('data-v') }); });
+  radios(groups.lines, function (b) { if (cfg) cfg.update({ border: { style: b.getAttribute('data-v') } }); });
+  radios(groups.radius, function (b) { var v = b.getAttribute('data-v'); if (cfg) cfg.update({ radius: v === 'keep' ? 'keep' : +v }); });
+  radios(groups.typography, function (b) { if (cfg) cfg.update({ typography: b.getAttribute('data-v') }); });
+  details.addEventListener('input', function () {
+    details.style.setProperty('--p', details.value + '%');
+    detailsVal.textContent = details.value === '0' ? 'Off' : details.value;
+    if (cfg) cfg.update({ details: +details.value });
   });
+  $('#cfg-reset').addEventListener('click', function () { if (cfg) cfg.resetTheme(); });
 })();

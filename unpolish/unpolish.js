@@ -30,38 +30,34 @@
   var THEMES = {
     'black-white': {
       label: 'Black & White', short: 'B&W', scheme: 'light',
-      intensity: 0.45,
-      detailsHint: 'Status patterns',
+      detailsHint: 'Status patterns and contrast',
       defaults: {
         palette: { paper: '#ffffff', surface: '#ffffff', ink: '#141414', muted: '#5c5c5c', line: '#1c1c1c', accent: '#141414', danger: '#141414', success: '#141414', warning: '#141414' },
-        typography: 'neutral', border: { weight: 1.25, style: 'solid' }, radius: 4, shadows: 'none', details: true, images: 'original'
+        typography: 'neutral', border: { weight: 1.25, style: 'solid' }, radius: 4, shadows: 'none', details: 45, images: 'theme'
       }
     },
     sketch: {
       label: 'Sketch', short: 'Sketch', scheme: 'light',
-      intensity: 0.5,
-      detailsHint: 'Pencil shading',
+      detailsHint: 'Stroke wobble and shading',
       defaults: {
         palette: { paper: '#fbfaf5', surface: '#ffffff', ink: '#232323', muted: '#646464', line: '#2a2a2a', accent: '#2563c9', danger: '#c8423b', success: '#2f7d45', warning: '#b7791f' },
-        typography: 'hand', border: { weight: 1.6, style: 'hand' }, radius: 4, shadows: 'none', details: true, images: 'original'
+        typography: 'hand', border: { weight: 1.6, style: 'hand' }, radius: 4, shadows: 'none', details: 50, images: 'theme'
       }
     },
     blueprint: {
       label: 'Blueprint', short: 'Blueprint', scheme: 'dark',
-      intensity: 0.45,
-      detailsHint: 'Grid and corner marks',
+      detailsHint: 'Drafting grid and corner marks',
       defaults: {
         palette: { paper: '#1d4b8f', surface: '#235aa3', ink: '#f2f7ff', muted: '#b7cff0', line: '#d4e4fb', accent: '#ffffff', danger: '#ffb4a8', success: '#a8e6bd', warning: '#ffe08f' },
-        typography: 'technical', border: { weight: 1, style: 'solid' }, radius: 2, shadows: 'none', details: true, images: 'original'
+        typography: 'technical', border: { weight: 1, style: 'solid' }, radius: 2, shadows: 'none', details: 45, images: 'theme'
       }
     },
     pastel: {
       label: 'Pastel Blocks', short: 'Pastel', scheme: 'light',
-      intensity: 0.5,
-      detailsHint: 'Rotating color blocks',
+      detailsHint: 'Color fields',
       defaults: {
         palette: { paper: '#fbf8f3', surface: '#ffffff', ink: '#2b2733', muted: '#665f70', line: '#e4dbcf', accent: '#cbc0ff', danger: '#ffc4ba', success: '#c3eacc', warning: '#ffe2a3', block1: '#ffe0d3', block2: '#d6e9ff', block3: '#d9f1df', block4: '#ebe1ff', block5: '#fff0c2' },
-        typography: 'rounded', border: { weight: 0, style: 'none' }, radius: 8, shadows: 'none', details: true, images: 'original'
+        typography: 'rounded', border: { weight: 0, style: 'none' }, radius: 8, shadows: 'none', details: 50, images: 'theme'
       }
     }
   };
@@ -94,7 +90,8 @@
   var BORDER_STYLES = [['solid', 'Solid'], ['dashed', 'Dashed'], ['hand', 'Hand'], ['none', 'None']];
   var RADIUS_OPTIONS = [['keep', 'Keep'], [0, '0'], [4, '4'], [8, '8'], [14, '14']];
   var SHADOW_OPTIONS = [['none', 'None'], ['soft', 'Soft'], ['flat', 'Flat']];
-  var IMAGE_OPTIONS = [['original', 'Original'], ['simplified', 'Simplify'], ['placeholder', 'Placeholder']];
+  var IMAGE_OPTIONS = [['original', 'Original'], ['mono', 'B&amp;W'], ['theme', 'Match theme'], ['placeholder', 'Placeholder']];
+  var IMAGE_ALIASES = { simplified: 'theme', themed: 'theme', match: 'theme', bw: 'mono', grayscale: 'mono', greyscale: 'mono', 'black-white': 'mono' };
 
   var DEFAULT_CONFIG = {
     version: 1,
@@ -269,7 +266,11 @@
     out.border = { weight: clamp(+out.border.weight || 0, 0, 4), style: BORDER_STYLES.some(function (o) { return o[0] === out.border.style; }) ? out.border.style : d.border.style };
     if (out.radius !== 'keep') out.radius = isFinite(+out.radius) ? clamp(+out.radius, 0, 40) : d.radius;
     if (!SHADOW_OPTIONS.some(function (o) { return o[0] === out.shadows; })) out.shadows = d.shadows;
-    out.details = out.details !== false;
+    // Details is a 0–100 strength (older configs used true/false).
+    if (out.details === true) out.details = d.details;
+    else if (out.details === false) out.details = 0;
+    out.details = isFinite(+out.details) && out.details !== null && out.details !== '' ? clamp(Math.round(+out.details), 0, 100) : d.details;
+    if (IMAGE_ALIASES[out.images]) out.images = IMAGE_ALIASES[out.images];
     if (!IMAGE_OPTIONS.some(function (o) { return o[0] === out.images; })) out.images = d.images;
     return out;
   }
@@ -374,8 +375,8 @@
   }
 
   function derive(id, s, lite) {
-    // Each theme's treatment strength is fixed (0–1); it tunes wobble, grid density, tints, etc.
-    var p = s.palette, T = THEMES[id], r = T.intensity;
+    // Details (0–100) sets the strength of each theme's own treatment: wobble, patterns, grid, fields.
+    var p = s.palette, T = THEMES[id], r = s.details / 100, on = s.details > 0;
     var v = { id: id, r: r, scheme: T.scheme };
     v.paper = p.paper;
     v.surface = id === 'blueprint' ? mix(p.surface, p.paper, r * 0.65) : p.surface;
@@ -441,14 +442,15 @@
 
     // Image treatment
     v.images = s.images;
-    v.imgFilter = id === 'black-white' ? 'grayscale(1) contrast(' + round(1 + r * 0.35, 2) + ')' : 'url(#up-f-' + id + ')';
-    v.imgTint = id === 'black-white' ? '#ffffff' : id === 'blueprint' ? v.paper : id === 'pastel' ? p.block4 : '#ffffff';
+    var mono = 'grayscale(1) contrast(' + round(1.05 + r * 0.3, 2) + ')';
+    v.imgFilter = s.images === 'mono' || id === 'black-white' ? mono : 'url(#up-f-' + id + ')';
+    v.imgTint = s.images === 'mono' || id === 'black-white' ? '#ffffff' : id === 'blueprint' ? v.paper : id === 'pastel' ? p.block4 : '#ffffff';
     v.ph = placeholderSvg(id, v);
     v.phBg = id === 'blueprint' ? mix(v.paper, '#000000', 0.12) : id === 'pastel' ? p.block2 : id === 'sketch' ? mix(v.surface, v.ink, 0.04) : mix(v.surface, v.ink, 0.05);
     v.phIcon = placeholderIcon(id === 'blueprint' ? v.line : mix(v.ink, v.surface, 0.45));
 
-    v.blocks = id === 'pastel' ? [1, 2, 3, 4, 5].map(function (n) { return mix(v.surface, p['block' + n], 0.55); }) : null;
-    if (id === 'pastel' && !s.details) v.blocks = v.blocks.map(function () { return mix(v.surface, p.block2, 0.35 + r * 0.65); });
+    v.blocks = id === 'pastel' ? [1, 2, 3, 4, 5].map(function (n) { return mix(v.surface, p['block' + n], 0.3 + r * 0.5); }) : null;
+    if (id === 'pastel' && !on) v.blocks = v.blocks.map(function () { return mix(v.surface, p.block2, 0.35 + r * 0.65); });
     if (lite) return v;
 
     // Details per theme
@@ -456,7 +458,7 @@
     var mode = v.strokeStyle;
     if (mode === 'hand' || mode === 'dashed') {
       var amp = mode === 'hand' ? round(0.25 + r * 2.1, 2) : 0;
-      var doubled = mode === 'hand' && s.details && r > 0.45;
+      var doubled = mode === 'hand' && r > 0.45;
       var w = Math.max(0.6, v.stroke);
       v.strips = {};
       var colors = { line: v.line, rule: v.rule, danger: tones.danger.text, accent: id === 'black-white' ? v.ink : tones.accent.text };
@@ -467,25 +469,25 @@
       v.stripLen = v.strips.line[0].len;
     }
     v.patterns = {};
-    if (id === 'black-white' && s.details) {
+    if (id === 'black-white' && on) {
       var pa = round(0.14 + r * 0.16, 3);
       v.patterns.danger = ['repeating-linear-gradient(-45deg, ' + alpha(v.ink, pa) + ' 0 1.2px, transparent 1.2px 6px)', 'auto'];
       v.patterns.warning = ['radial-gradient(' + alpha(v.ink, pa + 0.06) + ' 0.9px, transparent 1.3px)', '6px 6px'];
       v.patterns.dangerFill = ['repeating-linear-gradient(-45deg, ' + alpha('#ffffff', 0.22) + ' 0 1.2px, transparent 1.2px 6px)', 'auto'];
       v.patterns.warningFill = ['radial-gradient(' + alpha('#ffffff', 0.35) + ' 1px, transparent 1.4px)', '6px 6px'];
     }
-    if (id === 'sketch' && s.details && r > 0.15) {
+    if (id === 'sketch' && r > 0.15) {
       var ha = round(0.05 + r * 0.12, 3);
       v.patterns.shade = ['repeating-linear-gradient(-50deg, ' + alpha(v.ink, ha) + ' 0 0.8px, transparent 0.8px ' + round(7 - r * 2.5, 1) + 'px)', 'auto'];
     }
-    if (id === 'blueprint' && s.details) {
-      // One faint grid and small corner marks: drafting character without visual noise.
-      var g1 = alpha(v.line, 0.08);
+    if (id === 'blueprint' && on) {
+      // A faint grid and small corner marks; Details scales both.
+      var g1 = alpha(v.line, round(0.03 + r * 0.11, 3));
       v.page = {
         image: 'linear-gradient(' + g1 + ' 1px, transparent 1px), linear-gradient(90deg, ' + g1 + ' 1px, transparent 1px)',
         size: '24px 24px, 24px 24px'
       };
-      var ts = 9;
+      var ts = Math.round(6 + r * 8);
       v.tick = { size: ts, tl: tickSvg('tl', v.line, ts), tr: tickSvg('tr', v.line, ts), bl: tickSvg('bl', v.line, ts), br: tickSvg('br', v.line, ts) };
     }
     v.underlineTones = id === 'black-white';
@@ -740,7 +742,7 @@
     rule(S('dialog::backdrop'), 'background-color:' + alpha(v.ink, 0.35) + I + ';backdrop-filter:none' + I);
 
     // Media
-    if (v.images === 'simplified') {
+    if (v.images === 'theme' || v.images === 'mono') {
       rule(S('[data-up~="media"]'), 'filter:' + v.imgFilter + I);
       rule(S('[data-up~="media-bg"][data-up~="solo"]'), 'filter:' + v.imgFilter + I);
       rule(S('[data-up~="media-bg"]:not([data-up~="solo"])'), 'background-color:' + v.imgTint + I + ';background-blend-mode:luminosity' + I);
@@ -769,7 +771,7 @@
     var k = round(1.6 + r * 2.6, 2);
     var lift = round(0.55 - r * 0.15, 2);
     var a = ch(mix(p.paper, '#000000', 0.25)), b = ch(p.line);
-    var blk = v.blocks ? ch(v.blocks[1]) : [1, 1, 1], ink = ch(mix(p.ink, '#ffffff', 0.25));
+    var blk = v.blocks ? ch(v.blocks[1]) : [1, 1, 1], ink = ch(mix(p.ink, '#ffffff', 0.4));
     function duo(lo, hi) {
       return ['R', 'G', 'B'].map(function (c, i) { return '<feFunc' + c + ' type="table" tableValues="' + lo[i] + ' ' + hi[i] + '"/>'; }).join('');
     }
@@ -1571,7 +1573,7 @@
       var stroke = v.strokeStyle === 'none' ? 'none' : v.line, sw = Math.max(0.8, Math.min(1.6, v.stroke));
       var rad = v.radius == null ? 4 : Math.min(6, v.radius / 2);
       svg += '<rect width="56" height="38" fill="' + p.paper + '"/>';
-      if (id === 'blueprint' && s.details) {
+      if (id === 'blueprint' && s.details > 0) {
         for (var gx = 0; gx <= 56; gx += 7) svg += '<path d="M' + gx + ' 0V38" stroke="' + v.line + '" stroke-opacity="0.16" stroke-width="0.5"/>';
         for (var gy = 0; gy <= 38; gy += 7) svg += '<path d="M0 ' + gy + 'H56" stroke="' + v.line + '" stroke-opacity="0.16" stroke-width="0.5"/>';
       }
@@ -1586,13 +1588,13 @@
       } else {
         svg += '<rect x="8.5" y="7.5" width="39" height="24" rx="' + rad + '" fill="' + cardFill + '" stroke="' + stroke + '" stroke-width="' + (stroke === 'none' ? 0 : sw) + '"' + (v.strokeStyle === 'dashed' ? ' stroke-dasharray="3 2"' : '') + '/>';
       }
-      if (id === 'blueprint' && s.details) svg += '<path d="M10 13V9.5h3.5M46 13V9.5h-3.5M10 26v3.5h3.5M46 26v3.5h-3.5" stroke="' + v.line + '" stroke-width="0.7" fill="none"/>';
+      if (id === 'blueprint' && s.details > 0) svg += '<path d="M10 13V9.5h3.5M46 13V9.5h-3.5M10 26v3.5h3.5M46 26v3.5h-3.5" stroke="' + v.line + '" stroke-width="0.7" fill="none"/>';
       svg += '<rect x="13" y="12" width="18" height="3" rx="' + (id === 'pastel' ? 1.5 : 0.5) + '" fill="' + v.ink + '"/>' +
         '<rect x="13" y="18" width="26" height="2" rx="' + (id === 'pastel' ? 1 : 0.5) + '" fill="' + v.muted + '" fill-opacity="0.7"/>';
       var bFill = v.tones.accent.fill;
       svg += '<rect x="13" y="23.5" width="13" height="5" rx="' + Math.min(2.5, rad) + '" fill="' + bFill + '"' + (v.fillRing && stroke !== 'none' ? ' stroke="' + v.line + '" stroke-width="0.8"' : '') + '/>';
       if (id === 'pastel') svg += '<rect x="30" y="23.5" width="13" height="5" rx="2.5" fill="' + v.blocks[2] + '"/>';
-      if (id === 'black-white' && s.details) svg += '<rect x="30" y="23.5" width="13" height="5" fill="none" stroke="' + v.ink + '" stroke-width="0.8"/><path d="M31 28.5l4-5M34 28.5l4-5M37 28.5l4-5M40 28.5l3-3.7" stroke="' + v.ink + '" stroke-width="0.5"/>';
+      if (id === 'black-white' && s.details > 0) svg += '<rect x="30" y="23.5" width="13" height="5" fill="none" stroke="' + v.ink + '" stroke-width="0.8"/><path d="M31 28.5l4-5M34 28.5l4-5M37 28.5l4-5M40 28.5l3-3.7" stroke="' + v.ink + '" stroke-width="0.5"/>';
     }
     return svg + '</svg>';
   }
@@ -1715,6 +1717,9 @@
     '.sec[open]>summary .chev,.more[open]>summary .chev{transform:rotate(180deg)}',
     '.sec-body{padding:0 0 14px;display:flex;flex-direction:column;gap:10px}',
     '.sub{font-size:11px;font-weight:600;color:var(--text2);margin-top:2px}',
+    '.details-row{padding:12px 0 10px;border-bottom:1px solid var(--line)}',
+    '.details-row .label{font-weight:600}',
+    '.stack{display:flex;flex-direction:column;gap:8px}',
     '.more>summary{font-size:11.5px;font-weight:600;color:var(--text2);padding:4px 0}',
     '.more[open]>summary{margin-bottom:10px}',
     '.editor-actions{position:sticky;bottom:-10px;margin:0 -12px;padding:10px 12px 12px;background:var(--bg2);border-top:1px solid var(--line);border-radius:0 0 14px 14px}',
@@ -2180,13 +2185,15 @@
       TYPE_OPTIONS.map(function (o) { return '<option value="' + o[0] + '">' + o[1] + '</option>'; }).join('') + '</select></div>' +
       '<div class="field"><span class="label" id="up-l-bw">Border</span><div class="row"><input type="range" min="0" max="4" step="0.25" data-k="border.weight" aria-labelledby="up-l-bw"><span class="val" data-bw-val></span></div></div>' +
       seg('Lines', 'border.style', BORDER_STYLES) + seg('Corners', 'radius', RADIUS_OPTIONS) + seg('Shadows', 'shadows', SHADOW_OPTIONS);
-    var imgBody = seg('Images', 'images', IMAGE_OPTIONS) +
-      '<div class="field"><span class="label" id="up-l-det">Details</span><div class="row"><span class="hint">' + T.detailsHint + '</span><button type="button" class="toggle" role="switch" data-k="details" aria-labelledby="up-l-det" aria-describedby="up-l-det-h" style="margin-left:auto"></button><span class="sr" id="up-l-det-h">' + T.detailsHint + '</span></div></div>';
+    var imgBody = '<div class="stack"><span class="hint" id="up-l-images">Photos, illustrations and background images</span>' +
+      '<div class="seg" role="radiogroup" aria-labelledby="up-l-images">' + IMAGE_OPTIONS.map(function (o) { return '<button type="button" role="radio" data-k="images" data-v="' + o[0] + '">' + o[1] + '</button>'; }).join('') + '</div></div>';
+    var detailsBody = '<div class="details-row"><div class="row"><label class="label" for="up-details">Details</label><span class="hint" id="up-details-hint">' + T.detailsHint + '</span><output class="val" for="up-details" data-details-val></output></div>' +
+      '<input id="up-details" type="range" min="0" max="100" step="1" data-k="details" aria-describedby="up-details-hint"></div>';
     var keyBody = '<div class="row"><span class="hint" style="flex:1">Jump straight to ' + T.label + ', even with the panel closed</span><button type="button" class="bind' + (key ? '' : ' empty') + '" data-act="bind" data-bind="' + id + '" aria-label="Shortcut for ' + T.label + ': ' + (key ? prettyCombo(key) : 'none') + '. Press to change">' + (key ? prettyCombo(key) : 'Add') + '</button></div><div class="msg" data-msg="' + id + '"></div>';
-    var html = '<div class="group editor">' +
+    var html = '<div class="group editor">' + detailsBody +
       section('color', 'Color', T.label, colorBody) +
       section('type', 'Type &amp; lines', '', typeBody) +
-      section('images', 'Images &amp; details', '', imgBody) +
+      section('images', 'Images', '', imgBody) +
       section('key', 'Shortcut', key ? prettyCombo(key) : '', keyBody) +
       '<div class="footer-actions editor-actions"><button class="btn small" type="button" data-act="reset-theme">' + ICONS.reset + '<span>Reset preset</span></button>' +
       '<button class="btn small" type="button" data-act="copy-config"><span class="swap">' + ICONS.copy + '<span>Copy configuration</span></span></button></div>' +
@@ -2232,8 +2239,11 @@
         n.click(); n.focus();
       });
     });
-    ed.querySelector('.toggle').addEventListener('click', function (e) {
-      app.updateSettings({ details: e.currentTarget.getAttribute('aria-checked') !== 'true' });
+    var det = ed.querySelector('[data-k="details"]');
+    det.addEventListener('input', function () {
+      det.style.setProperty('--p', det.value + '%');
+      ed.querySelector('[data-details-val]').textContent = det.value;
+      app.updateSettings({ details: +det.value });
     });
   };
 
@@ -2257,7 +2267,10 @@
       b.setAttribute('aria-checked', String(on));
       b.tabIndex = on ? 0 : -1;
     });
-    ed.querySelector('.toggle').setAttribute('aria-checked', String(s.details));
+    var det = ed.querySelector('[data-k="details"]');
+    if (det !== active) det.value = s.details;
+    det.style.setProperty('--p', s.details + '%');
+    ed.querySelector('[data-details-val]').textContent = s.details === 0 ? 'Off' : s.details;
   };
 
   function toHex(c) { var x = parseColor(c); return x ? hex(x) : '#000000'; }

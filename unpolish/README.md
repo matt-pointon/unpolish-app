@@ -53,7 +53,8 @@ To ship a build without it, set `"enabled": false` in the config or leave the ta
 
 - Press **`\`** (or the launcher in the corner) to open the panel.
 - **1–4** pick Black & White, Sketch, Blueprint, Pastel Blocks while the panel is open. **0** restores Original. **Esc** closes.
-- **Edit theme** reveals collapsible groups — Color (status colors behind their own disclosure), Type & lines, Images & details, Shortcut — with Reset preset and Copy configuration always at the bottom.
+- **Edit theme** opens with the **Details** dial (0–100: how strongly the theme's own character shows — stroke wobble and shading in Sketch, patterns in Black & White, grid and marks in Blueprint, colour fields in Pastel Blocks; it never moves anything). Below it are collapsible groups — Color (status colors behind their own disclosure), Type & lines, Images, Shortcut — with Reset preset and Copy configuration always at the bottom.
+- **Images** default to *Match theme* (grayscale in Black & White, pencil in Sketch, blue duotone in Blueprint, soft duotone in Pastel Blocks). *B&W* makes every image black and white; *Original* leaves them alone; *Placeholder* swaps in wireframe boxes that keep size and alt text.
 - **Review link** opens a small share view: the theme being shared, *Hide controls for viewers*, any unsaved-edit warning, and an explicit **Copy link** button.
 - **Shortcuts** shows every binding and lets you reassign them. Shortcuts never fire while typing in inputs, textareas, selects or contenteditable regions.
 
@@ -80,8 +81,8 @@ Precedence for a page view: **review-link URL → local draft (this browser) →
       "border": { "weight": 1.6, "style": "hand" },  // solid | dashed | hand | none
       "radius": 4,                     // number (px) or "keep"
       "shadows": "none",               // none | soft | flat
-      "details": true,                 // theme-specific details (patterns, shading, grid, colour blocks)
-      "images": "original"             // original | simplified | placeholder
+      "details": 50,                   // 0 (off)–100: wobble, patterns, grid, colour fields — per theme
+      "images": "theme"                // theme (match the theme) | mono (black & white) | original | placeholder
     }
   },
   "overrides": {

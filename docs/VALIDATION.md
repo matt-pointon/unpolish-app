@@ -16,7 +16,7 @@ Automated with Playwright (`npm test`) in Chromium 141 (Playwright 1.56), agains
 | --- | --- |
 | Each preset applies a coherent, visibly distinct treatment | `themes.spec` — every theme on every app classifies elements and produces a different render from every other theme and Original; screenshots reviewed by eye during development |
 | Original restores cleanly | `themes.spec` — after visiting all themes: no `data-up`/`data-unpolish` attributes, no Unpolish nodes, and the computed styles of every element equal the pre-Unpolish values |
-| Detailed controls never move elements | `themes.spec` — element boxes identical across all themes (typography kept), placeholder/simplified images, 4px hand strokes, radius 0, flat shadows, details off |
+| Detailed controls never move elements | `themes.spec` — element boxes identical across all themes (typography kept), placeholder, black-and-white and theme-matched images, 4px hand strokes, radius 0, flat shadows, Details 0 and 100 |
 | Typography swaps keep shifts small | `themes.spec` — on the demo page the largest block shift with theme fonts was 0px (B&W), 22px (Sketch), 18px (Blueprint), 18px (Pastel), from text rewrapping. Choose *Keep original* type for pixel-tight layouts |
 | Controls work and reset correctly | `harness.spec` "pointer flow" — editor groups start collapsed, status colors sit behind a disclosure; palette, typography, lines, images, details edited via the panel; per-theme memory; Reset preset; Discard local changes |
 | Dynamic content gets the active treatment | `integrity.spec` — React portal dialog/toast/new rows, Vue added list items and Teleport dialog, Svelte loaded cards and menus, plain-HTML appended rows, demo activity feed |

@@ -79,8 +79,8 @@
         },
         "radius": { "anyOf": [{ "const": "keep" }, { "type": "number", "minimum": 0, "maximum": 40 }] },
         "shadows": { "enum": ["none", "soft", "flat"] },
-        "details": { "type": "boolean" },
-        "images": { "enum": ["original", "simplified", "placeholder"] }
+        "details": { "description": "Strength of the theme's own treatment, 0 (off) to 100. Older configs may use true/false.", "anyOf": [{ "type": "integer", "minimum": 0, "maximum": 100 }, { "type": "boolean" }] },
+        "images": { "description": "theme matches images to the theme (default); mono is black and white. simplified is an older name for theme.", "enum": ["original", "mono", "theme", "placeholder", "simplified"] }
       },
       "additionalProperties": false
     }

@@ -42,7 +42,7 @@ for (const [name, url] of Object.entries(EXAMPLES)) {
         await page.evaluate(() => window.Unpolish.update({ typography: 'original' }));
         await settle(page);
         expect(await rects(page), `${id} with original type`).toEqual(base);
-        for (const partial of [{ images: 'placeholder' }, { images: 'simplified' }, { border: { weight: 4, style: 'hand' } }, { radius: 0 }, { shadows: 'flat' }, { details: false }]) {
+        for (const partial of [{ images: 'placeholder' }, { images: 'theme' }, { images: 'mono' }, { border: { weight: 4, style: 'hand' } }, { radius: 0 }, { shadows: 'flat' }, { details: 0 }, { details: 100 }]) {
           await page.evaluate((p) => window.Unpolish.update(p), partial);
           await settle(page);
           expect(await rects(page), `${id} ${JSON.stringify(partial)}`).toEqual(base);
@@ -79,11 +79,17 @@ test('exempt regions, canvas and project overrides are respected', async ({ page
   // Canvas pixels are left alone.
   expect(await page.getByTestId('canvas').getAttribute('data-up')).toBe('media-opaque');
   expect(await page.getByTestId('canvas').evaluate((e) => getComputedStyle(e).filter)).toBe('none');
-  // Project config: sketch with 2px strokes + simplified images.
+  // Project config: sketch with 2px strokes + black-and-white images.
   const s = await page.evaluate(() => window.Unpolish.getSettings('sketch'));
   expect(s.border.weight).toBe(2);
-  expect(s.images).toBe('simplified');
+  expect(s.images).toBe('mono');
+  expect(await page.locator('img[data-up~="media"]').first().evaluate((e) => getComputedStyle(e).filter)).toContain('grayscale(1)');
+  // Match theme is the default: Sketch draws images with its pencil filter
+  await page.evaluate(() => window.Unpolish.update({ images: 'theme' }));
+  await settle(page);
   expect(await page.locator('img[data-up~="media"]').first().evaluate((e) => getComputedStyle(e).filter)).toContain('url');
+  // Older configs: "simplified" means Match theme, details true/false map to the default/0
+  expect(await page.evaluate(() => window.Unpolish._internal.normalizeSettings('sketch', { images: 'simplified', details: false }))).toMatchObject({ images: 'theme', details: 0 });
 
   // Vue: exclude + role hint + per-theme CSS override from its config
   await open(page, EXAMPLES.vue);

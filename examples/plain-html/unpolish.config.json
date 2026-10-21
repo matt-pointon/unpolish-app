@@ -6,6 +6,6 @@
   "exclude": [".keep-brand"],
   "shortcuts": { "toggle": "\\", "themes": { "blueprint": "Alt+B" } },
   "themes": {
-    "sketch": { "images": "simplified", "border": { "weight": 2 } }
+    "sketch": { "images": "mono", "border": { "weight": 2 } }
   }
 }
