@@ -3,8 +3,9 @@ import { test, expect } from '@playwright/test';
 import { readFileSync } from 'node:fs';
 import { buildRelease, loadReleaseSettings } from '../scripts/release-config.mjs';
 
-const TGZ = 'http://localhost:4174/unpolish/unpolish-0.1.0.tgz';
 const PKG = JSON.parse(readFileSync(new URL('../packages/unpolish/package.json', import.meta.url), 'utf8'));
+const TGZ = `http://localhost:4174/unpolish/unpolish-${PKG.version}.tgz`;
+const VER = PKG.version;
 const CONFIG = JSON.parse(readFileSync(new URL('../release.config.json', import.meta.url), 'utf8'));
 const clip = (page) => page.evaluate(() => navigator.clipboard.readText());
 
@@ -22,7 +23,7 @@ async function withRelease(page, release) {
 test('install with your agent copies a prompt that matches the local release', async ({ page, request }) => {
   await page.goto('/');
   expect(await page.evaluate(() => window.UNPOLISH_RELEASE)).toEqual(releaseFrom());
-  await expect(page.locator('#version')).toHaveText('0.1.0');
+  await expect(page.locator('#version')).toHaveText(VER);
   const btn = page.locator('.hero [data-copy-prompt]');
   await btn.click();
   await expect(btn).toHaveText('Prompt copied');
@@ -30,11 +31,11 @@ test('install with your agent copies a prompt that matches the local release', a
   await expect(btn).toHaveText('Install with your agent', { timeout: 4000 });
   const text = await clip(page);
   expect(text.startsWith('Install Unpolish in this prototype.')).toBe(true);
-  expect(text).toContain('npx unpolish@0.1.0 init --dry-run');
-  expect(text).toContain('npx unpolish@0.1.0 init');
-  expect(text).toContain('npx unpolish@0.1.0 remove');
+  expect(text).toContain(`npx unpolish@${VER} init --dry-run`);
+  expect(text).toContain(`npx unpolish@${VER} init`);
+  expect(text).toContain(`npx unpolish@${VER} remove`);
   expect(text).not.toContain('npx unpolish@latest init --dry-run');
-  expect(text).toContain('Package: unpolish 0.1.0 on npm.');
+  expect(text).toContain(`Package: unpolish ${VER} on npm.`);
   expect(text).toContain('The installer needs Node.js 18 or later.');
   expect(text).toMatch(/restart the dev server/i);
   expect(text).toMatch(/rebuilt and redeployed/);
@@ -61,7 +62,7 @@ test('the command copies exactly what is shown, and the page has no release comm
   await expect(page.locator('.hero [data-local-note]')).toHaveCount(0);
   await expect(page.locator('.install-lede')).toContainText('No need to rewrite your prototype');
   await expect(page.locator('[data-cmd-remove]')).toHaveText('npx unpolish@latest remove');
-  await expect(page.locator('[data-npm-install]')).toHaveText('npm install --save-exact unpolish@0.1.0');
+  await expect(page.locator('[data-npm-install]')).toHaveText(`npm install --save-exact unpolish@${VER}`);
   const visible = await page.locator('body').innerText();
   for (const gone of ['Preview build', 'not on npm yet', 'installs v0.1.0 from this site', 'All options', 'pinned dependency', '4-line block', 'Nothing to rebuild', 'inspects the repo', 'Recommended', '$ npx'])
     expect(visible, gone).not.toContain(gone);
@@ -128,7 +129,7 @@ test('a public HTTPS distribution location changes every command, link and the p
   const dist = 'https://downloads.example.org/unpolish/';
   await withRelease(page, releaseFrom({ published: false, siteUrl: null, distUrl: dist }));
   await page.goto('/');
-  const tgz = `${dist}unpolish-0.1.0.tgz`;
+  const tgz = `${dist}unpolish-${VER}.tgz`;
   await expect(page.locator('.hero [data-cmd]')).toHaveText(`npx ${tgz} init`);
   await expect(page.locator('[data-cmd-remove]')).toHaveText(`npx ${tgz} remove`);
   await expect(page.locator('[data-npm-install]')).toHaveText(`npm install --save-exact ${tgz}`);
@@ -159,13 +160,13 @@ test('once published, the site switches to the npm package everywhere', async ({
   await page.goto('/');
   await expect(page.locator('.hero [data-cmd]')).toHaveText('npx unpolish@latest init');
   await expect(page.locator('[data-cmd-remove]')).toHaveText('npx unpolish@latest remove');
-  await expect(page.locator('[data-npm-install]')).toHaveText('npm install --save-exact unpolish@0.1.0');
+  await expect(page.locator('[data-npm-install]')).toHaveText(`npm install --save-exact unpolish@${VER}`);
   await expect(page.locator('[data-local-note]')).toBeHidden();
   const text = await page.locator('#prompt-text').textContent();
-  expect(text).toContain('npx unpolish@0.1.0 init --dry-run');
-  expect(text).toContain('npx unpolish@0.1.0 init');
+  expect(text).toContain(`npx unpolish@${VER} init --dry-run`);
+  expect(text).toContain(`npx unpolish@${VER} init`);
   expect(text).not.toContain('npx unpolish@latest init --dry-run');
-  expect(text).toContain('Package: unpolish 0.1.0 on npm.');
+  expect(text).toContain(`Package: unpolish ${VER} on npm.`);
   expect(text).toContain('https://github.com/matt-pointon/unpolish-app');
   expect(text).not.toMatch(/\.tgz|not on the npm registry|only works on that machine|localhost|127\.0\.0\.1|Preview build|not on npm yet/i);
   const visible = await page.locator('body').innerText();
@@ -181,7 +182,7 @@ test('published mode with a production URL keeps the prompt off localhost', asyn
   await page.goto('/');
   await expect(page.locator('.hero [data-cmd]')).toHaveText('npx unpolish@latest init');
   const text = await page.locator('#prompt-text').textContent();
-  expect(text).toContain('npx unpolish@0.1.0 init --dry-run');
+  expect(text).toContain(`npx unpolish@${VER} init --dry-run`);
   expect(text).toContain('https://unpolishdesign.vercel.app/unpolish/README.md');
   expect(text).not.toMatch(/localhost|\.tgz|not on the npm registry|Preview build/i);
 });

@@ -131,8 +131,8 @@ test('committed release files match a fresh build of the package', () => {
   const pkg = JSON.parse(execFileSync('tar', ['-xzOf', TGZ, 'package/package.json'], { encoding: 'utf8' }));
   expect(pkg.version).toBe(PKG.version);
   expect(pkg.homepage).toBe('https://unpolishdesign.vercel.app');
-  // 0.1.0 is on npm; do not repack it. Unpublished mode still requires a fresh pack.
-  if (!settings.published) {
+  // 0.1.0 on npm is frozen. Later versions must match a fresh `npm pack`.
+  if (PKG.version !== '0.1.0') {
     const d = fresh('repack');
     sh(join(ROOT, 'packages/unpolish'), 'npm', ['pack', '--silent', '--pack-destination', d]);
     const a = fresh('repack/a'), b = fresh('repack/b');

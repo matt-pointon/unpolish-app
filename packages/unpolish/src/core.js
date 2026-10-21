@@ -144,6 +144,34 @@ function createUnpolish() {
     return id === 'original' || THEMES[id] ? id : null;
   }
   function raf(fn) { return (window.requestAnimationFrame || setTimeout)(fn); }
+  function now() { return (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now(); }
+  var WORK_BUDGET_MS = 8;
+  // Regions that churn or must keep their own look. data-unpolish-ignore is always honoured;
+  // Google Maps (gmp-* / .gm-style) is skipped even without a project exclude.
+  var BUILTIN_EXEMPT = ['[data-unpolish-ignore]', 'unpolish-harness', '#unpolish-filters', 'gmp-map', 'gmp-advanced-marker', '.gm-style'];
+  var MEDIA_LEAF = { CANVAS: 1, VIDEO: 1, IFRAME: 1, EMBED: 1, OBJECT: 1 };
+  var ANIM_STYLE = /^(transform|translate|rotate|scale|offset|opacity|filter|perspective|perspective-origin|transform-origin|will-change|left|top|right|bottom|x|y|cx|cy|d|points|transition|animation|offset-path|offset-distance|offset-rotate|contain|content-visibility)$/i;
+  function styleDecls(s) {
+    var out = {};
+    String(s || '').split(';').forEach(function (part) {
+      var i = part.indexOf(':');
+      if (i < 0) return;
+      var k = part.slice(0, i).trim().toLowerCase();
+      if (k) out[k] = part.slice(i + 1).trim();
+    });
+    return out;
+  }
+  function styleAffectsTheme(oldVal, newVal) {
+    var a = styleDecls(oldVal), b = styleDecls(newVal), seen = {};
+    function changed(k) {
+      if (seen[k]) return false;
+      seen[k] = 1;
+      return a[k] !== b[k] && !ANIM_STYLE.test(k);
+    }
+    for (var k in a) if (changed(k)) return true;
+    for (var k2 in b) if (changed(k2)) return true;
+    return false;
+  }
   var isMac = /Mac|iPhone|iPad/.test(navigator.platform || navigator.userAgent || '');
 
   var storage = {
@@ -806,6 +834,8 @@ function createUnpolish() {
   }
 
   Classifier.prototype.isExempt = function (el) {
+    if (!el || el.nodeType !== 1) return true;
+    if (/^GMP-/.test(el.tagName)) return true;
     try { return el.matches(this.engine.exemptSelector); } catch (e) { return false; }
   };
 
@@ -818,7 +848,7 @@ function createUnpolish() {
       if (self.isExempt(el)) { if (self.exemptRoots) self.exemptRoots.push(el); return; }
       if (tag !== 'HTML' && tag !== 'BODY') out.push(el);
       if (el.shadowRoot && roots) roots.push(el.shadowRoot);
-      if (tag === 'svg' || tag === 'SVG' || el instanceof SVGElement) return;
+      if (tag === 'svg' || tag === 'SVG' || MEDIA_LEAF[tag] || el instanceof SVGElement) return;
       var kids = el.children;
       for (var i = 0; i < kids.length; i++) walk(kids[i]);
       if (el.shadowRoot && roots) {
@@ -1147,9 +1177,10 @@ function createUnpolish() {
     this.observer = null;
     this.shadowRoots = new Set();
     this.shadowSheets = new Map();
-    this.pendingAttr = new Set();
-    this.attrScheduled = false;
-    this.exemptSelector = '[data-unpolish-ignore], unpolish-harness, #unpolish-filters';
+    this.pendingRoots = new Set();
+    this.pendingNodes = new Set();
+    this.workScheduled = false;
+    this.exemptSelector = BUILTIN_EXEMPT.join(', ');
     this.roleSelectors = {};
     this.lastCSS = '';
     this.fontsLoaded = {};
@@ -1158,7 +1189,7 @@ function createUnpolish() {
   }
 
   Engine.prototype.configure = function (cfg) {
-    var ex = ['[data-unpolish-ignore]', 'unpolish-harness', '#unpolish-filters'].concat(cfg.exclude || []);
+    var ex = BUILTIN_EXEMPT.concat(cfg.exclude || []);
     this.exemptSelector = ex.join(', ');
     this.overrides = cfg.overrides || {};
     this.webFonts = cfg.webFonts !== false;
@@ -1224,6 +1255,7 @@ function createUnpolish() {
     });
     if (window.scrollX !== sx || window.scrollY !== sy) window.scrollTo(sx, sy);
     if (exempts.length) this.writeExempt();
+    if (this.observer) this.observer.takeRecords();
     void self;
   };
 
@@ -1244,6 +1276,7 @@ function createUnpolish() {
     var els = this.classifier.collect(document.body, [], roots);
     this.classifier.info = new WeakMap();
     this.classify(els);
+    if (this.observer) this.observer.takeRecords();
     var self = this;
     roots.forEach(function (r) { self.attachShadow(r); });
   };
@@ -1342,6 +1375,9 @@ function createUnpolish() {
     this.suppressTransitions();
     this.active = null;
     if (this.observer) { this.observer.disconnect(); this.observer = null; }
+    this.pendingRoots.clear();
+    this.pendingNodes.clear();
+    this.workScheduled = false;
     document.documentElement.removeAttribute('data-unpolish');
     if (this.style) this.style.remove();
     if (this.filters) this.filters.remove();
@@ -1367,6 +1403,47 @@ function createUnpolish() {
 
   var ATTRS = ['class', 'style', 'open', 'hidden', 'disabled', 'checked', 'selected', 'aria-selected', 'aria-current', 'aria-pressed', 'aria-checked', 'aria-expanded', 'aria-invalid', 'aria-disabled', 'aria-busy', 'data-state', 'data-active', 'data-selected', 'data-highlighted', 'data-disabled', 'data-up', 'data-unpolish', 'data-unpolish-role'];
 
+  Engine.prototype.isOwnNode = function (el) {
+    if (!el || el.nodeType !== 1) return true;
+    if (el === this.style || el === this.filters || el === this.guard || el === this.exemptStyle) return true;
+    if (el.id && el.id.indexOf('unpolish-') === 0) return true;
+    if (el.tagName === 'UNPOLISH-HARNESS') return true;
+    return !!(el.closest && el.closest('unpolish-harness, #unpolish-filters, #unpolish-theme, #unpolish-guard, #unpolish-exempt'));
+  };
+
+  Engine.prototype.inExemptTree = function (el) {
+    if (!el || el.nodeType !== 1) return true;
+    if (/^GMP-/.test(el.tagName)) return true;
+    try { return !!(el.closest && el.closest(this.exemptSelector)); } catch (e) { return false; }
+  };
+
+  Engine.prototype.scheduleFullPass = function () {
+    var self = this;
+    clearTimeout(this.resizeTimer);
+    this.resizeTimer = setTimeout(function () { if (self.active) self.fullPass(); }, 250);
+  };
+
+  Engine.prototype.scheduleWork = function () {
+    if (this.workScheduled) return;
+    this.workScheduled = true;
+    var self = this;
+    raf(function () { self.flushWork(); });
+  };
+
+  Engine.prototype.queueRoot = function (el) {
+    if (!el || el.nodeType !== 1 || !el.isConnected) return;
+    if (this.isOwnNode(el) || this.inExemptTree(el)) return;
+    this.pendingRoots.add(el);
+    this.scheduleWork();
+  };
+
+  Engine.prototype.queueNode = function (el) {
+    if (!el || el.nodeType !== 1 || !el.isConnected) return;
+    if (this.isOwnNode(el) || this.inExemptTree(el)) return;
+    this.pendingNodes.add(el);
+    this.scheduleWork();
+  };
+
   Engine.prototype.observe = function () {
     var self = this;
     this.observeOpts = { childList: true, subtree: true, attributes: true, attributeFilter: ATTRS, attributeOldValue: true };
@@ -1387,52 +1464,103 @@ function createUnpolish() {
       document.addEventListener('click', function (e) { raf(function () { recheck(e); }); }, true);
       window.addEventListener('resize', function () {
         if (!self.active) return;
-        clearTimeout(self.resizeTimer);
-        self.resizeTimer = setTimeout(function () { if (self.active) self.fullPass(); }, 250);
+        self.scheduleFullPass();
       });
     }
   };
 
   Engine.prototype.queueAttr = function (el, subtree) {
-    this.pendingAttr.add(el);
-    if (subtree) (this.pendingSubtree = this.pendingSubtree || new Set()).add(el);
-    if (this.attrScheduled) return;
-    this.attrScheduled = true;
-    var self = this;
-    raf(function () {
-      self.attrScheduled = false;
-      if (!self.active) { self.pendingAttr.clear(); return; }
-      var list = [], seen = new Set();
-      var subs = self.pendingSubtree || new Set();
-      if (subs.has(document.body)) { self.pendingAttr.clear(); self.pendingSubtree = null; self.fullPass(); return; }
-      self.pendingAttr.forEach(function (el) {
-        if (!el.isConnected || self.classifier.isExempt(el) || (el.closest && el.closest(self.exemptSelector))) return;
-        var batch = subs.has(el) ? self.classifier.collect(el, []) : [el];
-        batch.forEach(function (n) { if (!seen.has(n)) { seen.add(n); list.push(n); } });
-      });
-      self.pendingAttr.clear();
-      self.pendingSubtree = null;
-      list.sort(function (a, b) { return a === b ? 0 : (a.compareDocumentPosition(b) & 4 ? -1 : 1); });
-      self.classify(list);
+    if (subtree) this.queueRoot(el);
+    else this.queueNode(el);
+  };
+
+  Engine.prototype.flushWork = function () {
+    this.workScheduled = false;
+    if (!this.active) {
+      this.pendingRoots.clear();
+      this.pendingNodes.clear();
+      return;
+    }
+    var roots = this.pendingRoots;
+    var nodes = this.pendingNodes;
+    this.pendingRoots = new Set();
+    this.pendingNodes = new Set();
+    var list = [], seen = new Set(), shadowRoots = [], self = this;
+
+    roots.forEach(function (el) {
+      if (!el.isConnected || self.isOwnNode(el) || self.inExemptTree(el)) return;
+      var p = parentEl(el);
+      while (p && p !== document.documentElement && p !== document.body) {
+        if (roots.has(p)) return;
+        p = parentEl(p);
+      }
+      self.classifier.collect(el, list, shadowRoots);
     });
+    list.forEach(function (el) { seen.add(el); });
+    nodes.forEach(function (el) {
+      if (!el.isConnected || seen.has(el) || self.isOwnNode(el) || self.inExemptTree(el)) return;
+      var p = parentEl(el), covered = false;
+      while (p && p !== document.documentElement) {
+        if (roots.has(p) || seen.has(p)) { covered = true; break; }
+        p = parentEl(p);
+      }
+      if (covered) return;
+      seen.add(el);
+      list.push(el);
+    });
+    list = list.filter(function (el) { return el.isConnected && !self.isOwnNode(el) && !self.inExemptTree(el); });
+    list.sort(function (a, b) { return a === b ? 0 : (a.compareDocumentPosition(b) & 4 ? -1 : 1); });
+    this.flushClassify(list, 0, shadowRoots, now());
+  };
+
+  Engine.prototype.flushClassify = function (list, start, shadowRoots, t0) {
+    this.workScheduled = false;
+    if (!this.active) return;
+    var i = start;
+    while (i < list.length) {
+      if (i > start && now() - t0 >= WORK_BUDGET_MS) {
+        var later = this;
+        this.workScheduled = true;
+        raf(function () { later.flushClassify(list, i, shadowRoots, now()); });
+        return;
+      }
+      var end = Math.min(list.length, i + 40);
+      this.classify(list.slice(i, end));
+      if (this.observer) this.observer.takeRecords();
+      i = end;
+    }
+    var eng = this;
+    shadowRoots.forEach(function (r) { eng.attachShadow(r); });
+    if ((this.classifier.exemptRoots || []).length) {
+      this.classify([]);
+      if (this.observer) this.observer.takeRecords();
+    }
+    if (this.pendingRoots.size || this.pendingNodes.size) this.scheduleWork();
   };
 
   Engine.prototype.onMutations = function (recs) {
     if (!this.active) return;
-    var added = [], self = this, roots = [];
     var html = document.documentElement;
     for (var i = 0; i < recs.length; i++) {
       var rec = recs[i], t = rec.target;
+      if (t.nodeType === 1 && this.isOwnNode(t)) continue;
       if (rec.type === 'childList') {
+        if (t.nodeType === 1 && MEDIA_LEAF[t.tagName]) continue;
         for (var j = 0; j < rec.addedNodes.length; j++) {
           var n = rec.addedNodes[j];
-          if (n.nodeType !== 1 || SKIP[n.tagName] || n === this.style || n === this.filters || n === this.guard) continue;
-          if (n.closest && n.closest(this.exemptSelector)) {
-            if (n.matches(this.exemptSelector) && n.parentElement && !n.parentElement.closest(this.exemptSelector)) (this.classifier.exemptRoots = this.classifier.exemptRoots || []).push(n);
+          if (n.nodeType !== 1 || SKIP[n.tagName]) continue;
+          if (this.isOwnNode(n)) continue;
+          if (this.inExemptTree(n)) {
+            try {
+              if (n.matches(this.exemptSelector) && n.parentElement && !this.inExemptTree(n.parentElement)) {
+                (this.classifier.exemptRoots = this.classifier.exemptRoots || []).push(n);
+                this.scheduleWork();
+              }
+            } catch (e) { /* invalid */ }
             continue;
           }
           if (n.getRootNode && n.getRootNode() instanceof ShadowRoot && n.getRootNode() === this.app.ui.root) continue;
-          added.push(n);
+          this.queueRoot(n);
         }
         if (t === document.head || t === html) {
           if (this.style && !this.style.isConnected) this.ensureNodes();
@@ -1444,25 +1572,16 @@ function createUnpolish() {
           if (html.getAttribute('data-unpolish') !== this.active) html.setAttribute('data-unpolish', this.active);
           continue;
         }
-        if (name === 'data-up') {
-          var mine = this.classifier.tags.get(t);
-          if (mine !== undefined && t.getAttribute('data-up') !== (mine || null)) this.queueAttr(t, false);
+        if (name === 'data-up' || name === 'data-unpolish-x') continue;
+        if (t === html || t === document.body) {
+          if (name === 'class' || name === 'data-state') this.scheduleFullPass();
           continue;
         }
-        if (t === html || t === document.body) { if (name === 'class' || name === 'style' || name === 'data-state') this.queueAttr(document.body, true); continue; }
-        if (name === 'style') {
-          var a = (rec.oldValue || '') + ' ' + (t.getAttribute('style') || '');
-          if (!/background|border|color|shadow|fill/i.test(a)) continue;
-        }
+        if (this.inExemptTree(t) || MEDIA_LEAF[t.tagName]) continue;
+        if (name === 'style' && !styleAffectsTheme(rec.oldValue, t.getAttribute('style'))) continue;
         this.queueAttr(t, name === 'class' || name === 'open' || name === 'hidden' || name === 'data-state');
       }
     }
-    if (!added.length && !(this.classifier.exemptRoots || []).length) return;
-    var els = [];
-    added.forEach(function (n) { if (n.isConnected) self.classifier.collect(n, els, roots); });
-    // Classify synchronously, before the next paint, so new content never flashes unthemed.
-    this.classify(els);
-    roots.forEach(function (r) { self.attachShadow(r); });
   };
 
   /* ------------------------------------------------------------------ *
