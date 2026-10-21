@@ -7,6 +7,7 @@
     body { margin: 0; font: 14px/1.4 sans-serif; background: #f6f6f4; color: #1a1a1a; }
     #grid { display: flex; flex-wrap: wrap; gap: 4px; padding: 8px; }
     .card { width: 72px; height: 36px; background: #fff; border: 1px solid #d0d0cc; border-radius: 6px; padding: 4px; overflow: hidden; }
+    .card.hot { background: #fde68a; border-color: #f59e0b; }
     .card b { display: block; font-size: 11px; }
     #feed { display: flex; flex-wrap: wrap; gap: 6px; padding: 8px; }
     .row { background: #eef2ff; border: 1px solid #c7d2fe; padding: 4px 8px; border-radius: 4px; }
@@ -39,6 +40,7 @@
     grid.appendChild(frag);
     const cards = [...grid.children];
     const movers = cards.slice(0, 50);
+    const togglers = cards.slice(50, 60);
     const markers = [...document.querySelectorAll('gmp-advanced-marker')];
     let n = 0;
     let inserted = 0;
@@ -51,6 +53,9 @@
         el.style.opacity = String(0.85 + ((n + i) % 10) / 80);
         if (n % 7 === i % 7) el.setAttribute('data-tick', String(n));
         if (n % 11 === i % 11) el.querySelector('b').textContent = 'Item ' + el.dataset.i + ' · ' + n;
+      });
+      togglers.forEach((el, i) => {
+        el.classList.toggle('hot', ((n + i) % 2) === 0);
       });
       markers.forEach((m, i) => {
         m.style.transform = 'translate(' + ((n * 3 + i * 17) % 80) + 'px,' + ((n * 2 + i * 9) % 40) + 'px)';

@@ -1,6 +1,6 @@
 # Releasing Unpolish
 
-The package `unpolish@0.1.0` is on npm (`latest`, public). The website is `https://unpolishdesign.vercel.app`. This repo does not store npm or Vercel credentials.
+The package `unpolish@0.1.1` is on npm (`latest`, public). `0.1.2` is packed in this repo and not published yet. The website is `https://unpolishdesign.vercel.app`. This repo does not store npm or Vercel credentials.
 
 ## One source of truth
 
@@ -60,7 +60,7 @@ Projects update with `npx unpolish@latest init --upgrade`; their config is kept.
 
 ## Publishing to npm
 
-The package name is `unpolish` (unscoped, public, MIT). npm user `mattpointon`. `unpolish@0.1.0` is on npm with dist-tag `latest`. **0.1.1 is packed in this repo and not published yet** — publish `unpolish/unpolish-0.1.1.tgz` when this release is merged.
+The package name is `unpolish` (unscoped, public, MIT). npm user `mattpointon`. `unpolish@0.1.1` is on npm with dist-tag `latest`. **0.1.2 is packed in this repo and not published yet** — publish `unpolish/unpolish-0.1.2.tgz` when this release is merged.
 
 npm’s staged-publish flow also created a **`0.0.0-stage` placeholder** version. It is not a real Unpolish release. Do not install it, and do not move the `latest` dist-tag onto it.
 
@@ -137,6 +137,6 @@ No npm client is required at runtime. Download `unpolish.js` and `unpolish.confi
   data-config="unpolish.config.json" defer></script>
 ```
 
-Pin a version: the bundle’s first line names it (`/*! Unpolish v0.1.0 …`). jsDelivr and unpkg serve every npm version at `https://cdn.jsdelivr.net/npm/unpolish@<version>/dist/unpolish.js` — use an exact version, never `latest`, for a prototype others review.
+Pin a version: the bundle’s first line names it (`/*! Unpolish v0.1.2 …`). jsDelivr and unpkg serve every npm version at `https://cdn.jsdelivr.net/npm/unpolish@<version>/dist/unpolish.js` — use an exact version, never `latest`, for a prototype others review.
 
 Full installer, configuration, update and removal notes: [`packages/unpolish/README.md`](../packages/unpolish/README.md).
