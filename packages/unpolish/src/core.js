@@ -1280,7 +1280,7 @@ function createUnpolish() {
     return probe;
   };
 
-  Engine.prototype.classifyFresh = function (els, reuseLayout) {
+  Engine.prototype.classifyFresh = function (els) {
     var c = this.classifier, probe = this.ensureProbe();
     if (!els.length) return;
     var htmlClass = document.documentElement.className || '';
@@ -1303,27 +1303,19 @@ function createUnpolish() {
       return r;
     });
     reads.forEach(function (r) { c.parentInfo(r.el); });
-    this.finishClassify(reads, false, reuseLayout);
+    this.finishClassify(reads, false);
   };
 
-  Engine.prototype.finishClassify = function (reads, wroteExempt, reuseLayout) {
+  Engine.prototype.finishClassify = function (reads, wroteExempt) {
     var c = this.classifier, vw = window.innerWidth, vh = window.innerHeight;
-    var rects = reads.map(function (r) {
-      if (reuseLayout) {
-        var memo = c.memo.get(r.el);
-        if (memo) {
-          for (var k in memo) if (memo[k] && memo[k].rect) return memo[k].rect;
-        }
-      }
-      return r.el.getBoundingClientRect();
-    });
+    var rects = reads.map(function (r) { return r.el.getBoundingClientRect(); });
     reads.forEach(function (r, i) {
       if (!r.el.isConnected) return;
       try {
         var tokens = c.decide(r, rects[i], vw, vh);
         c.write(r.el, tokens);
         var bag = c.memo.get(r.el) || Object.create(null);
-        bag[attrSig(r.el)] = { tokens: tokens, rect: rects[i] };
+        bag[attrSig(r.el)] = { tokens: tokens, rect: rects[i], read: r };
         c.memo.set(r.el, bag);
       } catch (e) { warn('classify', e); }
     });
@@ -1592,6 +1584,7 @@ function createUnpolish() {
     this.workScheduled = false;
     if (!this.active) return;
     var fresh = [], known = [], i = start, c = this.classifier;
+    var vw = window.innerWidth, vh = window.innerHeight;
     for (; i < list.length; i++) {
       if (i > start && now() - t0 >= WORK_BUDGET_MS) {
         var later = this;
@@ -1601,8 +1594,21 @@ function createUnpolish() {
         return;
       }
       var el = list[i], sig = attrSig(el), bag = c.memo.get(el), hit = bag && bag[sig];
-      if (hit) {
-        if (c.tags.get(el) !== hit.tokens) c.write(el, hit.tokens);
+      if (hit && hit.read) {
+        var tagged = c.tags.get(el);
+        var cached = hit.rect;
+        var tiny = !cached || cached.width < 10 || cached.height < 10;
+        if (!tiny && tagged === hit.tokens) continue;
+        var rect = el.getBoundingClientRect();
+        if (!tiny && cached && Math.abs(rect.width - cached.width) < 1 && Math.abs(rect.height - cached.height) < 1) {
+          if (tagged !== hit.tokens) c.write(el, hit.tokens);
+          continue;
+        }
+        try {
+          var tokens = c.decide(hit.read, rect, vw, vh);
+          if (tagged !== tokens) c.write(el, tokens);
+          bag[sig] = { tokens: tokens, rect: rect, read: hit.read };
+        } catch (e) { warn('classify', e); }
         continue;
       }
       if (c.tags.get(el)) known.push(el);
@@ -1614,9 +1620,10 @@ function createUnpolish() {
   Engine.prototype.tagBatch = function (fresh, known, shadowRoots, moreComing) {
     // Mutation-path tagging never disables the theme sheet: that would force a
     // full-document style recalc. New nodes and first-seen class/state signatures
-    // are read from the ignore probe; repeats hit Classifier.memo.
-    if (fresh.length) this.classifyFresh(fresh, false);
-    if (known.length) this.classifyFresh(known, true);
+    // are read from the ignore probe; repeats hit Classifier.memo. A cached
+    // 0×0 rect (e.g. a closed <details> child) is remeasured when it appears.
+    if (fresh.length) this.classifyFresh(fresh);
+    if (known.length) this.classifyFresh(known);
     if ((this.classifier.exemptRoots || []).length) this.classify([]);
     if (moreComing) return;
     var eng = this;
