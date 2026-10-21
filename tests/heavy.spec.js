@@ -39,11 +39,12 @@ test('Sketch skips the heavy map and stays interactive', async ({ page }) => {
 
   await setTheme(page, 'sketch');
   await settle(page);
-  await page.waitForTimeout(1100);
+  await page.waitForTimeout(400);
 
   const map = page.getByTestId('map');
   await expect(map).toHaveAttribute('data-unpolish-skip', 'map');
   expect(await map.getAttribute('data-up')).toBeNull();
+  expect(await map.getAttribute('data-unpolish-busy')).toBeNull();
   const marker = page.locator('#map .marker').first();
   expect(await marker.getAttribute('data-up')).toBeNull();
   expect(await marker.evaluate((el) => getComputedStyle(el).visibility)).not.toBe('hidden');
@@ -52,7 +53,8 @@ test('Sketch skips the heavy map and stays interactive', async ({ page }) => {
     blend: getComputedStyle(el, '::before').mixBlendMode,
     before: getComputedStyle(el, '::before').content
   }));
-  expect(mapFx.filter).toMatch(/grayscale/);
+  expect(mapFx.filter).toMatch(/up-f-skip-edge/);
+  expect(mapFx.filter).not.toMatch(/grayscale/);
   expect(mapFx.before === 'none' || mapFx.before === '' || mapFx.blend === 'normal').toBeTruthy();
   const mapLabel = await map.evaluate((el) => getComputedStyle(el, '::after').content);
   expect(mapLabel).toMatch(/Map/i);
@@ -65,18 +67,18 @@ test('Sketch skips the heavy map and stays interactive', async ({ page }) => {
   const photo = page.getByTestId('photo');
   await expect(photo).toHaveAttribute('data-unpolish-skip', 'image');
   expect(await photo.locator('img').getAttribute('data-up')).toBeNull();
-  expect(await photo.evaluate((el) => getComputedStyle(el).filter)).toMatch(/grayscale|url\(/);
+  expect(await photo.evaluate((el) => getComputedStyle(el).filter)).toMatch(/up-f-skip-edge/);
   expect(await photo.locator('img').evaluate((el) => getComputedStyle(el).visibility)).not.toBe('hidden');
 
   const canvas = page.getByTestId('canvas');
   await expect(canvas).toHaveAttribute('data-unpolish-skip', 'canvas');
   expect(await canvas.getAttribute('data-up')).toBeNull();
-  expect(await canvas.evaluate((el) => getComputedStyle(el).filter)).toMatch(/grayscale|url\(/);
+  expect(await canvas.evaluate((el) => getComputedStyle(el).filter)).toMatch(/up-f-skip-edge/);
 
   const frame = page.getByTestId('frame');
   await expect(frame).toHaveAttribute('data-unpolish-skip', 'media');
   expect(await frame.getAttribute('data-up')).toBeNull();
-  expect(await frame.evaluate((el) => getComputedStyle(el).filter)).toMatch(/grayscale|sepia|hue-rotate/);
+  expect(await frame.evaluate((el) => getComputedStyle(el).filter)).toMatch(/up-f-skip-edge/);
 
   const keptImg = page.getByTestId('kept-image');
   expect(await keptImg.getAttribute('data-unpolish-skip')).toBeNull();
@@ -85,9 +87,9 @@ test('Sketch skips the heavy map and stays interactive', async ({ page }) => {
   await expect(page.getByTestId('ui-card')).toHaveAttribute('data-up', /bg|box|fill/);
 
   const sketch = await measure(page, 3000);
-  console.log('heavy-map 0.1.3', JSON.stringify(sketch));
-  expect(sketch.max, `longest Sketch task ${sketch.max}ms`).toBeLessThanOrEqual(50);
-  expect(sketch.fps, `Sketch ${sketch.fps.toFixed(1)} fps`).toBeGreaterThanOrEqual(50);
+  console.log('heavy-map 0.1.3 idle-edge', JSON.stringify(sketch));
+  expect(sketch.max, `longest Sketch idle task ${sketch.max}ms`).toBeLessThanOrEqual(50);
+  expect(sketch.fps, `Sketch idle ${sketch.fps.toFixed(1)} fps`).toBeGreaterThanOrEqual(50);
 
   mkdirSync('/opt/cursor/artifacts', { recursive: true });
   await page.setViewportSize({ width: 1280, height: 860 });
@@ -131,6 +133,139 @@ test('Sketch skips the heavy map and stays interactive', async ({ page }) => {
   expect(attrWrites, 'resize reclassify storm').toBeLessThan(200);
   expect(after.max, `resize long task ${after.max}ms`).toBeLessThanOrEqual(50);
   expect(after.fps).toBeGreaterThanOrEqual(50);
+});
+
+test('Sketch hybrid skip filter: gray while panning, edge when still', async ({ page }) => {
+  await page.goto('/tests/fixtures/heavy-map.html');
+  await page.waitForFunction(() => window.Unpolish && window.__heavy && window.__heavy.nodes >= 12000);
+  await setTheme(page, 'sketch');
+  await settle(page);
+  await page.waitForTimeout(400);
+
+  const map = page.getByTestId('map');
+  await expect(map).toHaveAttribute('data-unpolish-skip', 'map');
+  expect(await map.evaluate((el) => getComputedStyle(el).filter)).toMatch(/up-f-skip-edge/);
+  expect(await map.getAttribute('data-unpolish-busy')).toBeNull();
+
+  await page.evaluate(() => window.__heavy.startPan());
+  await page.waitForFunction(() => {
+    const el = document.getElementById('map');
+    return el.hasAttribute('data-unpolish-busy') && /grayscale/.test(getComputedStyle(el).filter);
+  }, { timeout: 2000 });
+  const panFilter = await map.evaluate((el) => getComputedStyle(el).filter);
+  expect(panFilter).toMatch(/grayscale/);
+  expect(panFilter).not.toMatch(/up-f-skip-edge/);
+
+  const pan = await measure(page, 3000);
+  console.log('heavy-map 0.1.3 pan-gray', JSON.stringify(pan));
+  expect(pan.max, `longest Sketch pan task ${pan.max}ms`).toBeLessThanOrEqual(50);
+  expect(pan.fps, `Sketch pan ${pan.fps.toFixed(1)} fps`).toBeGreaterThanOrEqual(50);
+
+  const switched = await page.evaluate(async () => {
+    const el = document.getElementById('map');
+    const longTasks = [];
+    let po = null;
+    try {
+      po = new PerformanceObserver((list) => {
+        for (const e of list.getEntries()) longTasks.push(e.duration);
+      });
+      po.observe({ type: 'longtask', buffered: false });
+    } catch (e) { /* noop */ }
+    window.__heavy.stopPan();
+    const t0 = performance.now();
+    await new Promise((resolve) => {
+      function tick() {
+        const f = getComputedStyle(el).filter;
+        if (/up-f-skip-edge/.test(f) && !el.hasAttribute('data-unpolish-busy')) {
+          resolve();
+          return;
+        }
+        if (performance.now() - t0 > 2000) resolve();
+        else requestAnimationFrame(tick);
+      }
+      requestAnimationFrame(tick);
+    });
+    if (po) po.disconnect();
+    return {
+      ms: performance.now() - t0,
+      max: longTasks.reduce((m, d) => Math.max(m, d), 0),
+      count: longTasks.length,
+      filter: getComputedStyle(el).filter,
+      busy: el.hasAttribute('data-unpolish-busy')
+    };
+  });
+  console.log('heavy-map 0.1.3 switchback', JSON.stringify(switched));
+  expect(switched.filter).toMatch(/up-f-skip-edge/);
+  expect(switched.busy).toBeFalsy();
+  expect(switched.ms, `switchback ${switched.ms}ms`).toBeGreaterThanOrEqual(180);
+  expect(switched.ms, `switchback ${switched.ms}ms`).toBeLessThanOrEqual(900);
+
+  const photo = page.getByTestId('photo');
+  expect(await photo.evaluate((el) => getComputedStyle(el).filter)).toMatch(/up-f-skip-edge/);
+  const imageIdle = await measure(page, 1500);
+  console.log('heavy-map 0.1.3 static-image', JSON.stringify(imageIdle));
+  expect(imageIdle.fps, `static image ${imageIdle.fps.toFixed(1)} fps`).toBeGreaterThanOrEqual(50);
+});
+
+test('Sketch hybrid on the Seattle Leaflet map', async ({ page }) => {
+  await page.goto('/tests/fixtures/leaflet-seattle.html');
+  await page.waitForFunction(() => window.Unpolish && window.__mapReady && window.__seattle, { timeout: 20_000 });
+  await setTheme(page, 'sketch');
+  await settle(page);
+  await page.waitForTimeout(400);
+  const map = page.getByTestId('map');
+  await expect(map).toHaveAttribute('data-unpolish-skip', 'map');
+  expect(await map.evaluate((el) => getComputedStyle(el).filter)).toMatch(/up-f-skip-edge/);
+
+  const idle = await measure(page, 2000);
+  console.log('seattle 0.1.3 idle-edge', JSON.stringify(idle));
+  expect(idle.fps).toBeGreaterThanOrEqual(50);
+
+  await page.evaluate(() => window.__seattle.startPan());
+  await page.waitForFunction(() => {
+    const el = document.getElementById('map');
+    return el.hasAttribute('data-unpolish-busy') && /grayscale/.test(getComputedStyle(el).filter);
+  }, { timeout: 3000 });
+  const pan = await measure(page, 2000);
+  console.log('seattle 0.1.3 pan-gray', JSON.stringify(pan));
+  expect(pan.fps).toBeGreaterThanOrEqual(50);
+
+  const switched = await page.evaluate(async () => {
+    const el = document.getElementById('map');
+    const longTasks = [];
+    let po = null;
+    try {
+      po = new PerformanceObserver((list) => {
+        for (const e of list.getEntries()) longTasks.push(e.duration);
+      });
+      po.observe({ type: 'longtask', buffered: false });
+    } catch (e) { /* noop */ }
+    window.__seattle.stopPan();
+    const t0 = performance.now();
+    await new Promise((resolve) => {
+      function tick() {
+        const f = getComputedStyle(el).filter;
+        if (/up-f-skip-edge/.test(f) && !el.hasAttribute('data-unpolish-busy')) {
+          resolve();
+          return;
+        }
+        if (performance.now() - t0 > 2000) resolve();
+        else requestAnimationFrame(tick);
+      }
+      requestAnimationFrame(tick);
+    });
+    if (po) po.disconnect();
+    return {
+      ms: performance.now() - t0,
+      max: longTasks.reduce((m, d) => Math.max(m, d), 0),
+      filter: getComputedStyle(el).filter,
+      busy: el.hasAttribute('data-unpolish-busy')
+    };
+  });
+  console.log('seattle 0.1.3 switchback', JSON.stringify(switched));
+  expect(switched.filter).toMatch(/up-f-skip-edge/);
+  expect(switched.ms).toBeGreaterThanOrEqual(180);
+  expect(switched.ms).toBeLessThanOrEqual(900);
 });
 
 test('0.1.2 baseline on the same fixture (logged)', async ({ page }) => {

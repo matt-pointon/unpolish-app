@@ -185,6 +185,7 @@ function createUnpolish() {
   var HEAVY_CHILD_MIN = 80;
   var CHURN_WINDOW_MS = 1000;
   var CHURN_MARK_MIN = 30;
+  var SKIP_BUSY_MS = 260;
   // Regions that must keep their own look. data-unpolish-ignore and project exclude
   // win over skip filters. Maps and media are skipped separately (filter on the root, no walk).
   var BUILTIN_EXEMPT = ['[data-unpolish-ignore]', 'unpolish-harness', '#unpolish-filters', '#unpolish-probe'];
@@ -523,18 +524,22 @@ function createUnpolish() {
     var mono = 'grayscale(1) contrast(' + round(1.05 + r * 0.3, 2) + ')';
     v.imgFilter = s.images === 'mono' || id === 'black-white' ? mono : 'url(#up-f-' + id + ')';
     v.imgTint = s.images === 'mono' || id === 'black-white' ? '#ffffff' : id === 'blueprint' ? v.paper : id === 'pastel' ? p.block4 : '#ffffff';
-    // One CSS filter on each skipped root. Live maps use filter functions only —
-    // SVG displacement on a 12k-node animating subtree tanks fps. Stills may add
-    // a cheap SVG posterize / blueprint matrix on that one replaced element.
-    v.skipFilter = id === 'sketch'
+    // One CSS filter on each skipped root. Sketch is hybrid: SVG pencil-edge
+    // while the region is still, cheap grayscale while it is moving (one
+    // attribute toggle on the skip root). Blueprint stays a cheap ink wash —
+    // the same edge swap does not read as a blueprint line drawing.
+    v.skipFilterBusy = id === 'sketch'
       ? 'grayscale(1) contrast(1.35) brightness(1.05)'
+      : '';
+    v.skipFilter = id === 'sketch'
+      ? 'url(#up-f-skip-edge)'
       : id === 'blueprint'
         ? 'grayscale(1) sepia(0.9) hue-rotate(185deg) saturate(2.8) brightness(0.9) contrast(1.15)'
         : id === 'black-white'
           ? 'grayscale(1) contrast(1.4)'
           : 'grayscale(0.4) saturate(0.7) contrast(1.08) brightness(1.04)';
     v.skipFilterStill = id === 'sketch'
-      ? v.skipFilter + ' url(#up-f-skip-still)'
+      ? 'url(#up-f-skip-edge)'
       : id === 'blueprint'
         ? 'url(#up-f-blueprint)'
         : v.skipFilter;
@@ -878,6 +883,10 @@ function createUnpolish() {
     var skipStill = ':is(img, picture, canvas, input[type="image"], [data-unpolish-skip="image"], [data-unpolish-skip="canvas"])' + NOTKEEP + NOTEX;
     rule(S(skipStill), 'filter:' + v.skipFilterStill + I);
     rule(S(skipReplaced + ', ' + skipLive), 'filter:' + v.skipFilter + I);
+    if (v.skipFilterBusy && v.skipFilterBusy !== v.skipFilter) {
+      rule(S(skipStill + '[data-unpolish-busy], ' + skipReplaced + '[data-unpolish-busy], ' + skipLive + '[data-unpolish-busy]'),
+        'filter:' + v.skipFilterBusy + I);
+    }
     rule(S(skipLive), 'position:relative' + I);
     rule(S(':is(' + MAP_WIDGET_SEL + ', [data-unpolish-skip="map"])' + NOTKEEP + NOTEX + '::after'),
       'content:"Map"' + I + ';position:absolute' + I + ';top:6px' + I + ';left:6px' + I +
@@ -916,7 +925,7 @@ function createUnpolish() {
       '<feComponentTransfer>' + duo(ink, blk) + '</feComponentTransfer></filter>' +
       '<filter id="up-f-skip-still" color-interpolation-filters="sRGB" x="0" y="0" width="100%" height="100%">' +
       '<feComponentTransfer><feFuncR type="discrete" tableValues="0 0.22 0.45 0.68 1"/><feFuncG type="discrete" tableValues="0 0.22 0.45 0.68 1"/><feFuncB type="discrete" tableValues="0 0.22 0.45 0.68 1"/></feComponentTransfer></filter>' +
-      // Comparison-only: edge/pencil lines for skipped maps. Not the default skip filter.
+      // Sketch idle skip filter: pencil-line edges. Swapped off while the region moves.
       '<filter id="up-f-skip-edge" color-interpolation-filters="sRGB" x="-2%" y="-2%" width="104%" height="104%">' +
       '<feColorMatrix type="saturate" values="0" result="g"/>' +
       '<feComponentTransfer in="g" result="paper"><feFuncR type="linear" slope="0.22" intercept="0.78"/><feFuncG type="linear" slope="0.20" intercept="0.76"/><feFuncB type="linear" slope="0.16" intercept="0.72"/></feComponentTransfer>' +
@@ -970,6 +979,7 @@ function createUnpolish() {
     if (!el || el.nodeType !== 1) return;
     kind = kind || skipKind(el);
     if (el.getAttribute('data-unpolish-skip') !== kind) el.setAttribute('data-unpolish-skip', kind);
+    this.engine.watchSkip(el);
   };
 
   /* Collect elements under `root` in document order, skipping exempt and heavy subtrees. */
@@ -1326,6 +1336,10 @@ function createUnpolish() {
     this.exemptCount = 0;
     this.heavy = new WeakSet();
     this.churn = new WeakMap();
+    this.skipBusyTimers = new WeakMap();
+    this.skipWatched = new WeakSet();
+    this.skipTransformWatch = 0;
+    this.skipTransformLast = new WeakMap();
   }
 
   Engine.prototype.configure = function (cfg) {
@@ -1596,6 +1610,7 @@ function createUnpolish() {
       this.observe();
     }
     if (html.getAttribute('data-unpolish') !== id) html.setAttribute('data-unpolish', id);
+    if (id !== 'sketch') this.clearSkipBusy();
   };
 
   Engine.prototype.teardown = function () {
@@ -1621,12 +1636,14 @@ function createUnpolish() {
     });
     this.shadowSheets.clear();
     this.shadowRoots.clear();
+    this.clearSkipBusy();
     function strip(root) {
-      var nodes = root.querySelectorAll('[data-up], [data-unpolish-x], [data-unpolish-skip]');
+      var nodes = root.querySelectorAll('[data-up], [data-unpolish-x], [data-unpolish-skip], [data-unpolish-busy]');
       for (var i = 0; i < nodes.length; i++) {
         nodes[i].removeAttribute('data-up');
         nodes[i].removeAttribute('data-unpolish-x');
         nodes[i].removeAttribute('data-unpolish-skip');
+        nodes[i].removeAttribute('data-unpolish-busy');
       }
       var all = root.querySelectorAll('*');
       for (var j = 0; j < all.length; j++) if (all[j].shadowRoot) strip(all[j].shadowRoot);
@@ -1661,6 +1678,99 @@ function createUnpolish() {
       if (el.closest && el.closest(MAP_WIDGET_SEL + ', [data-unpolish-skip], ' + SKIP_MEDIA_SEL)) return true;
     } catch (e) { return false; }
     return false;
+  };
+
+  Engine.prototype.skipRootOf = function (el) {
+    if (!el || el.nodeType !== 1) return null;
+    if (this.isOwnNode(el) || this.isKept(el) || this.inExemptTree(el)) return null;
+    try {
+      var root = el.closest && el.closest(MAP_WIDGET_SEL + ', [data-unpolish-skip], ' + SKIP_MEDIA_SEL);
+      if (!root || this.isOwnNode(root) || this.isKept(root) || this.inExemptTree(root)) return null;
+      return root;
+    } catch (e) { return null; }
+  };
+
+  Engine.prototype.skipStillBusy = function (root) {
+    if (!root || !root.isConnected) return false;
+    var tag = root.tagName;
+    if (tag === 'VIDEO' && !root.paused && !root.ended) return true;
+    var vid = root.querySelector && root.querySelector('video');
+    if (vid && !vid.paused && !vid.ended) return true;
+    if (typeof root.getAnimations === 'function') {
+      try {
+        var anims = root.getAnimations();
+        for (var i = 0; i < anims.length; i++) {
+          if (anims[i].playState === 'running') return true;
+        }
+      } catch (e) { /* getAnimations can throw on disconnected */ }
+    }
+    return false;
+  };
+
+  Engine.prototype.skipMotionKey = function (root) {
+    var pane = null;
+    try { pane = root.querySelector && root.querySelector('.leaflet-map-pane, .leaflet-proxy, .mapboxgl-canvas-container, .maplibregl-canvas-container'); } catch (e) { pane = null; }
+    var cs = getComputedStyle(pane || root);
+    return cs.transform + '\0' + cs.translate + '\0' + (pane ? pane.style.cssText : root.style.cssText);
+  };
+
+  Engine.prototype.armSkipTransformWatch = function () {
+    if (this.skipTransformWatch) return;
+    var self = this;
+    function tick() {
+      if (!self.active || self.active !== 'sketch') { self.skipTransformWatch = 0; return; }
+      var nodes;
+      try { nodes = document.querySelectorAll('[data-unpolish-skip], [data-unpolish-busy], ' + MAP_WIDGET_SEL); } catch (e) { self.skipTransformWatch = 0; return; }
+      var anyBusy = false;
+      for (var i = 0; i < nodes.length; i++) {
+        var el = nodes[i];
+        if (self.isKept(el) || self.inExemptTree(el)) continue;
+        var key = self.skipMotionKey(el);
+        var prev = self.skipTransformLast.get(el);
+        if (prev != null && prev !== key) self.skipBusy(el);
+        self.skipTransformLast.set(el, key);
+        if (el.hasAttribute('data-unpolish-busy')) anyBusy = true;
+      }
+      self.skipTransformWatch = anyBusy ? raf(tick) : 0;
+    }
+    this.skipTransformWatch = raf(tick);
+  };
+
+  Engine.prototype.skipBusy = function (el) {
+    if (!this.active || this.active !== 'sketch') return;
+    var root = this.skipRootOf(el);
+    if (!root) return;
+    if (!root.hasAttribute('data-unpolish-busy')) root.setAttribute('data-unpolish-busy', '');
+    this.armSkipTransformWatch();
+    var self = this;
+    var prev = this.skipBusyTimers.get(root);
+    if (prev) clearTimeout(prev);
+    this.skipBusyTimers.set(root, setTimeout(function () {
+      self.skipBusyTimers.delete(root);
+      if (!self.active || self.active !== 'sketch' || !root.isConnected) {
+        if (root.removeAttribute) root.removeAttribute('data-unpolish-busy');
+        return;
+      }
+      if (self.skipStillBusy(root)) { self.skipBusy(root); return; }
+      root.removeAttribute('data-unpolish-busy');
+    }, SKIP_BUSY_MS));
+  };
+
+  Engine.prototype.clearSkipBusy = function () {
+    var nodes = document.querySelectorAll('[data-unpolish-busy]');
+    for (var i = 0; i < nodes.length; i++) nodes[i].removeAttribute('data-unpolish-busy');
+  };
+
+  Engine.prototype.watchSkip = function (el) {
+    if (!el || this.skipWatched.has(el)) return;
+    this.skipWatched.add(el);
+    var self = this;
+    var onMove = function () { self.skipBusy(el); };
+    // Leaflet / Mapbox / MapLibre fire these on the map object; some builds
+    // also dispatch them as DOM events on the container. Cheap no-ops otherwise.
+    ['movestart', 'zoomstart', 'move', 'zoom', 'rotatestart', 'pitchstart', 'drag', 'viewreset', 'boxzoomstart'].forEach(function (type) {
+      try { el.addEventListener(type, onMove, true); } catch (e) { /* ignore */ }
+    });
   };
 
   Engine.prototype.noteChurn = function (el) {
@@ -1730,6 +1840,28 @@ function createUnpolish() {
       window.addEventListener('resize', function () {
         if (!self.active) return;
         self.scheduleFullPass();
+      });
+      var skipFromEvent = function (e) {
+        if (!self.active) return;
+        var t = null;
+        try { t = e.composedPath && e.composedPath()[0]; } catch (err) { t = e.target; }
+        if (!t) t = e.target;
+        if (t && t.nodeType !== 1) t = t.parentElement;
+        if (t) self.skipBusy(t);
+      };
+      var skipFromDrag = function (e) {
+        if (!self.active) return;
+        if (e.pointerType !== 'touch' && !e.buttons) return;
+        skipFromEvent(e);
+      };
+      document.addEventListener('pointermove', skipFromDrag, { capture: true, passive: true });
+      document.addEventListener('wheel', skipFromEvent, { capture: true, passive: true });
+      document.addEventListener('touchmove', skipFromEvent, { capture: true, passive: true });
+      document.addEventListener('animationstart', skipFromEvent, true);
+      document.addEventListener('transitionrun', skipFromEvent, true);
+      document.addEventListener('transitionstart', skipFromEvent, true);
+      ['play', 'playing', 'timeupdate', 'seeking', 'seeked'].forEach(function (ev) {
+        document.addEventListener(ev, skipFromEvent, true);
       });
     }
   };
@@ -1838,7 +1970,10 @@ function createUnpolish() {
       var rec = recs[i], t = rec.target;
       if (t.nodeType === 1 && this.isOwnNode(t)) continue;
       if (rec.type === 'childList') {
-        if (t.nodeType === 1 && (MEDIA_LEAF[t.tagName] || this.inSkipTree(t))) continue;
+        if (t.nodeType === 1 && (MEDIA_LEAF[t.tagName] || this.inSkipTree(t))) {
+          this.skipBusy(t);
+          continue;
+        }
         for (var j = 0; j < rec.addedNodes.length; j++) {
           var n = rec.addedNodes[j];
           if (n.nodeType !== 1 || SKIP[n.tagName]) continue;
@@ -1856,7 +1991,7 @@ function createUnpolish() {
             this.classifier.markSkip(n);
             continue;
           }
-          if (this.inSkipTree(n)) continue;
+          if (this.inSkipTree(n)) { this.skipBusy(n); continue; }
           if (n.getRootNode && n.getRootNode() instanceof ShadowRoot && n.getRootNode() === this.app.ui.root) continue;
           this.noteChurn(n);
           this.queueRoot(n);
@@ -1871,15 +2006,15 @@ function createUnpolish() {
           if (html.getAttribute('data-unpolish') !== this.active) html.setAttribute('data-unpolish', this.active);
           continue;
         }
-        if (name === 'data-up' || name === 'data-unpolish-x' || name === 'data-unpolish-skip') continue;
+        if (name === 'data-up' || name === 'data-unpolish-x' || name === 'data-unpolish-skip' || name === 'data-unpolish-busy') continue;
         if (t === html || t === document.body) {
           if (name === 'class' || name === 'data-state') this.scheduleFullPass();
           continue;
         }
-        if (this.inExemptTree(t) || this.inSkipTree(t) || MEDIA_LEAF[t.tagName]) continue;
+        if (this.inExemptTree(t)) continue;
+        if (this.inSkipTree(t) || MEDIA_LEAF[t.tagName]) { this.skipBusy(t); continue; }
         if (name === 'style' && !styleAffectsTheme(rec.oldValue, t.getAttribute('style'))) continue;
         this.noteChurn(t);
-        if (this.inSkipTree(t)) continue;
         this.queueAttr(t, name === 'class' || name === 'open' || name === 'hidden' || name === 'data-state');
       }
     }

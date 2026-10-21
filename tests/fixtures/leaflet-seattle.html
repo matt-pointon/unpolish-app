@@ -30,7 +30,7 @@
     <aside class="sidebar">
       <h1>Field visit</h1>
       <p>Space Needle, Seattle. Raster OSM tiles, one pin, popup open.</p>
-      <p class="lead">Zoom 14 · frozen for review.</p>
+      <p class="lead">Zoom 14 · OSM tiles, pan enabled.</p>
     </aside>
     <div id="map" class="leaflet-container" data-testid="map" role="application" aria-label="Seattle map"></div>
   </div>
@@ -66,12 +66,29 @@
     });
     const marker = L.marker(CENTER, { icon, keyboard: false }).addTo(map);
     marker.bindPopup('<b>Space Needle</b><br>Site pin', { autoClose: false, closeOnClick: false, autoPan: false }).openPopup();
-    map.dragging.disable();
-    map.scrollWheelZoom.disable();
     map.doubleClickZoom.disable();
     map.boxZoom.disable();
     map.keyboard.disable();
     if (map.tap) map.tap.disable();
+    let panRaf = 0;
+    function panTick() {
+      if (!window.__seattle.panning) return;
+      map.panBy([8, 0], { animate: false });
+      panRaf = requestAnimationFrame(panTick);
+    }
+    window.__seattle = {
+      map,
+      panning: false,
+      startPan() {
+        if (this.panning) return;
+        this.panning = true;
+        panTick();
+      },
+      stopPan() {
+        this.panning = false;
+        cancelAnimationFrame(panRaf);
+      }
+    };
 
     window.__mapReady = false;
     function tilesLoaded() {

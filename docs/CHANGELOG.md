@@ -2,11 +2,12 @@
 
 ## 0.1.3
 
-- Maps, images and other heavy widgets are never classified. One CSS `filter` is applied on the skipped container so the content stays visible (Sketch: grayscale + contrast; Blueprint: grayscale toward the blueprint ink). Descendants are not restyled. Detected automatically: `img`, `picture`, `video`, `canvas`, `iframe`, `svg` internals, `object`, `embed`; Leaflet, Mapbox, MapLibre, Google Maps, OpenLayers, deck.gl and `[role="application"]`; plus subtrees with a very high absolute-child count or mutation churn. Animated maps use only CSS filter functions; still images may add a cheap SVG posterize.
+- Maps, images and other heavy widgets are never classified. One CSS `filter` is applied on the skipped container so the content stays visible. Descendants are not restyled. Detected automatically: `img`, `picture`, `video`, `canvas`, `iframe`, `svg` internals, `object`, `embed`; Leaflet, Mapbox, MapLibre, Google Maps, OpenLayers, deck.gl and `[role="application"]`; plus subtrees with a very high absolute-child count or mutation churn.
+- Sketch skip regions are hybrid: SVG pencil-line edges while still, cheap CSS grayscale while moving (pointer drag, wheel, touch, Leaflet/Mapbox move, DOM/style/transform mutations, playing video). One `data-unpolish-busy` attribute on the skip root; back to edges after ~260ms idle. Video and animated canvas that keep changing stay gray. Blueprint stays a cheap ink wash.
 - Classifier no longer clones ancestor chains into the page to measure. Fresh reads use the live element (strip our tokens, read the batch, write the batch). The 8ms budget wraps those reads, batches are capped, disconnected nodes are dropped, and work is scheduled with `requestIdleCallback` (rAF fallback).
 - Resize no longer clears the classify cache: `fullPass` re-decides from stored reads and new boxes.
 - Config `include` and `data-unpolish="keep"` opt a skipped region back into classification. `exclude` / `data-unpolish-ignore` still keep the original look with no filter.
-- New ~12k-node map fixture asserts Sketch stays at ≥50 fps with no long task over 50ms after the first second, a filter (not a covering overlay) on map/media, and no reclassify storm on resize.
+- New ~12k-node map fixture asserts Sketch stays at ≥50 fps idle (edge) and while panning (gray), with no long task over 50ms, a filter (not a covering overlay) on map/media, and no reclassify storm on resize.
 
 ## 0.1.2
 

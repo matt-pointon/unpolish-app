@@ -20,15 +20,9 @@
     }
     /* Leaflet-like: pan the map root (the same node the skip filter is on) so
        the compositor can filter one layer. Per-marker class/transform updates
-       inside a filtered 12k-node tree re-flatten every frame and miss 50 fps. */
-    #map {
-      will-change: transform;
-      animation: map-drift 0.9s linear infinite alternate;
-    }
-    @keyframes map-drift {
-      from { transform: translate3d(0, 0, 0); }
-      to { transform: translate3d(4px, 3px, 0); }
-    }
+       inside a filtered 12k-node tree re-flatten every frame and miss 50 fps.
+       Pan is start/stop JS so Sketch hybrid can sit idle on the edge filter. */
+    #map { will-change: transform; }
     .leaflet-marker-pane { position: absolute; inset: 0; }
     .marker {
       position: absolute;
@@ -103,9 +97,28 @@
       kept.appendChild(el);
     }
 
+    let panRaf = 0;
+    let panT = 0;
+    function panTick() {
+      if (!window.__heavy.panning) return;
+      panT += 1;
+      map.style.transform = 'translate3d(' + ((panT % 8) - 4) + 'px,' + (((panT * 3) % 6) - 3) + 'px,0)';
+      panRaf = requestAnimationFrame(panTick);
+    }
     window.__heavy = {
       markers: MARKERS,
-      nodes: document.querySelectorAll('*').length
+      nodes: document.querySelectorAll('*').length,
+      panning: false,
+      startPan() {
+        if (this.panning) return;
+        this.panning = true;
+        panTick();
+      },
+      stopPan() {
+        this.panning = false;
+        cancelAnimationFrame(panRaf);
+        map.style.transform = '';
+      }
     };
   </script>
 </body>
