@@ -1387,25 +1387,32 @@
     };
 
     /* Mutation-path classify: read live styles without disabling the theme sheet
-     * (that would restyle the whole page) and without cloning into the document.
-     * Temporarily drop our own tokens so we see the prototype's colours. */
+     * (that would restyle the whole page, including skipped maps) and without
+     * cloning into the document. Drop our tokens and roll back @layer unpolish
+     * on just this batch so we see the prototype's colours. */
     Engine.prototype.classifyLive = function (els) {
       var c = this.classifier;
       els = (els || []).filter(function (el) { return el && el.isConnected; });
       if (!els.length) return;
       var stripped = [];
       els.forEach(function (el) {
-        if (el.hasAttribute('data-up')) {
-          stripped.push([el, el.getAttribute('data-up')]);
-          el.removeAttribute('data-up');
-        }
+        var up = el.hasAttribute('data-up') ? el.getAttribute('data-up') : null;
+        var prev = el.getAttribute('style');
+        if (up != null) el.removeAttribute('data-up');
+        el.style.cssText = 'all:revert-layer !important;' + (prev || '');
+        stripped.push([el, up, prev]);
       });
       var reads;
       try {
         reads = els.map(function (el) { return c.read(el); });
         reads.forEach(function (r) { c.parentInfo(r.el); });
       } finally {
-        stripped.forEach(function (pair) { pair[0].setAttribute('data-up', pair[1]); });
+        stripped.forEach(function (pair) {
+          var el = pair[0], up = pair[1], prev = pair[2];
+          if (prev == null || prev === '') el.removeAttribute('style');
+          else el.setAttribute('style', prev);
+          if (up != null) el.setAttribute('data-up', up);
+        });
       }
       this.finishClassify(reads, false);
     };
