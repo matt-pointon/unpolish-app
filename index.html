@@ -222,7 +222,7 @@ init({ configUrl: '/unpolish.config.json' });</code></pre>
               <path d="M2 12h40M34 4l10 8-10 8" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>
             </svg>
             <div class="fidelity-share">
-              <code class="url-line">/plan?tab=venues<mark>&amp;unpolish=blueprint&amp;unpolish-ui=hidden</mark>#schedule</code>
+              <code class="url-line">/plan?<wbr>tab=venues<mark><wbr>&amp;unpolish=blueprint<wbr>&amp;unpolish-ui=hidden</mark>#schedule</code>
               <p>Send the link. They land on Blueprint, controls hidden, your route intact.</p>
             </div>
           </div>
@@ -233,8 +233,8 @@ init({ configUrl: '/unpolish.config.json' });</code></pre>
     <section class="faq" id="faq" aria-labelledby="faq-title">
       <div class="wrap narrow">
         <div class="section-head">
-          <h2 id="faq-title">Questions, answered from the docs</h2>
-          <p>Short answers taken from the Unpolish README. Open one to read it.</p>
+          <h2 id="faq-title">Questions</h2>
+          <p>Short answers about how Unpolish works.</p>
         </div>
         <div class="faq-list">
           <details class="disclosure">
@@ -252,13 +252,13 @@ init({ configUrl: '/unpolish.config.json' });</code></pre>
           <details class="disclosure">
             <summary>Which frameworks are supported?<svg class="chev" viewBox="0 0 16 16" aria-hidden="true"><path d="M4.5 6.5L8 10l3.5-3.5" stroke="currentColor" stroke-width="1.6" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg></summary>
             <div class="disclosure-body">
-              <p><code>npx unpolish init</code> sets up Vite (React, Vue, Svelte, vanilla), Next.js App Router, and plain HTML automatically. Next.js Pages Router, SvelteKit, Nuxt, Astro, Remix, Angular, CRA and unfamiliar layouts are left unchanged; the CLI prints the exact integration to add (exit code 2).</p>
+              <p>Vite with React, Vue and Svelte is tested end to end. Other setups such as vanilla Vite are supported per the docs but not tested end to end.</p>
             </div>
           </details>
           <details class="disclosure">
             <summary>How do I remove it?<svg class="chev" viewBox="0 0 16 16" aria-hidden="true"><path d="M4.5 6.5L8 10l3.5-3.5" stroke="currentColor" stroke-width="1.6" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg></summary>
             <div class="disclosure-body">
-              <p>Run <code>npx unpolish remove</code> (add <code>--purge</code> to delete <code>unpolish.config.json</code> too). That takes out the marked install block, generated Next.js client, Unpolish script tags, the vendored bundle and the dependency. Lines you added by hand without markers are reported, not guessed at. A small <code>unpolish:*</code> entry may remain in <code>localStorage</code>; it does nothing without the script.</p>
+              <p>Run <code>npx unpolish@latest remove</code> (add <code>--purge</code> to delete <code>unpolish.config.json</code> too). That takes out the marked install block, generated Next.js client, Unpolish script tags, the vendored bundle and the dependency. Lines you added by hand without markers are reported, not guessed at. A small <code>unpolish:*</code> entry may remain in <code>localStorage</code>; it does nothing without the script.</p>
             </div>
           </details>
           <details class="disclosure">
@@ -311,7 +311,7 @@ init({ configUrl: '/unpolish.config.json' });</code></pre>
         MIT
         <span class="footer-ver">v<span id="version">0.1.0</span></span>
       </p>
-      <p class="footer-copy">© 2026</p>
+      <p class="footer-copy">© 2026 Matt Pointon</p>
     </div>
   </footer>
 
@@ -342,7 +342,7 @@ init({ configUrl: '/unpolish.config.json' });</code></pre>
         "name": "Which frameworks are supported?",
         "acceptedAnswer": {
           "@type": "Answer",
-          "text": "npx unpolish init sets up Vite (React, Vue, Svelte, vanilla), Next.js App Router, and plain HTML automatically. Next.js Pages Router, SvelteKit, Nuxt, Astro, Remix, Angular, CRA and unfamiliar layouts are left unchanged; the CLI prints the exact integration to add (exit code 2)."
+          "text": "Vite with React, Vue and Svelte is tested end to end. Other setups such as vanilla Vite are supported per the docs but not tested end to end."
         }
       },
       {
@@ -350,7 +350,7 @@ init({ configUrl: '/unpolish.config.json' });</code></pre>
         "name": "How do I remove it?",
         "acceptedAnswer": {
           "@type": "Answer",
-          "text": "Run npx unpolish remove (add --purge to delete unpolish.config.json too). That takes out the marked install block, generated Next.js client, Unpolish script tags, the vendored bundle and the dependency. Lines you added by hand without markers are reported, not guessed at. A small unpolish:* entry may remain in localStorage; it does nothing without the script."
+          "text": "Run npx unpolish@latest remove (add --purge to delete unpolish.config.json too). That takes out the marked install block, generated Next.js client, Unpolish script tags, the vendored bundle and the dependency. Lines you added by hand without markers are reported, not guessed at. A small unpolish:* entry may remain in localStorage; it does nothing without the script."
         }
       },
       {

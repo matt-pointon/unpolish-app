@@ -168,7 +168,7 @@ section { padding: 88px 0; }
 .disclosure-body { padding: 4px 0 24px; }
 .disclosure-body > p { color: var(--ink-2); margin-bottom: 14px; }
 @media (prefers-reduced-motion: reduce) { .disclosure > summary .chev { transition: none; } }
-.url-line { display: block; background: var(--bg-2); padding: 12px 14px; border-radius: 10px; word-break: break-all; line-height: 1.6; font-size: 13px; }
+.url-line { display: block; background: var(--bg-2); padding: 12px 14px; border-radius: 10px; overflow-wrap: break-word; word-break: normal; line-height: 1.6; font-size: 13px; }
 .url-line mark { background: rgba(230,243,106,.75); color: inherit; border-radius: 3px; padding: 1px 0; }
 
 .links .section-head { margin-bottom: 28px; }
@@ -244,12 +244,16 @@ section { padding: 88px 0; }
   .btn-lg { width: 100%; }
   .hero-cta { width: 100%; }
   .fidelity-flow { flex-direction: column; align-items: stretch; }
-  .fidelity-themes { justify-content: space-between; }
-  .mini { width: calc(33.333% - 6px); }
+  .fidelity-themes { flex-direction: column; align-items: center; gap: 14px; width: 100%; }
+  .mini { width: min(220px, 100%); }
   .mini-body { min-height: 96px; padding: 8px; }
   .mini-body strong { font-size: 11px; }
   .fidelity-arrow { align-self: center; transform: rotate(90deg); }
   .footer-inner { flex-direction: column; gap: 8px; }
+}
+@media (max-width: 360px) {
+  .nav-inner { gap: 8px; }
+  .nav .btn-sm { padding: 0 8px; font-size: 12.5px; }
 }
 
 /* Configurator: a slice of the real panel driving a live preview */
@@ -290,6 +294,8 @@ section { padding: 88px 0; }
   .browser-bar .select-wrap { flex: 1; }
   .browser-bar .select-wrap select { height: 36px; border-radius: 10px; font-size: 14px; }
   .cfg-preview iframe { height: 480px; }
+  .fidelity-flow { flex-wrap: nowrap; }
+  .fidelity-arrow { display: block; width: 24px; height: 40px; }
 }
 
 /* Install paths */
@@ -308,7 +314,7 @@ section { padding: 88px 0; }
 .manual-grid h4 { font-size: 15px; font-weight: 650; color: #f2f2f3; }
 .manual-grid p { color: #b4b4bb; font-size: 14.5px; margin: 6px 0 12px; }
 .manual-grid a, .manual-foot a { color: #f2f2f3; }
-.manual-grid .code { padding: 16px; font-size: 12.5px; border-radius: 14px; white-space: pre; }
+.manual-grid .code { padding: 16px; font-size: 12.5px; border-radius: 14px; white-space: pre-wrap; overflow-wrap: anywhere; max-width: 100%; }
 .manual-foot { margin: 0 0 22px; }
 @media (max-width: 860px) {
   .paths, .manual-grid { grid-template-columns: 1fr; }

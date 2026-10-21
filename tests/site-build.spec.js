@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { readdirSync, readFileSync, statSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { join, relative, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { cacheControl, compileVercel, spaDestination } from '../scripts/site-routing.mjs';
@@ -49,6 +49,15 @@ test('public/ contains only hosted files', () => {
     'unpolish/unpolish.js', `unpolish/${PKG.version}/unpolish.js`,
     'og.png', 'apple-touch-icon.png', 'robots.txt', 'sitemap.xml',
   ]) expect(files, need).toContain(need);
+});
+
+test('root LICENSE is MIT for Matt Pointon and is not a hosted file', () => {
+  const text = readFileSync(join(ROOT, 'LICENSE'), 'utf8');
+  expect(text).toMatch(/^MIT License/);
+  expect(text).toContain('Copyright (c) 2026 Matt Pointon');
+  expect(existsSync(join(ROOT, 'packages/unpolish/LICENSE'))).toBe(true);
+  expect(readFileSync(join(ROOT, 'packages/unpolish/LICENSE'), 'utf8')).toContain('Copyright (c) 2026 Unpolish contributors');
+  expect(listFiles(PUBLIC)).not.toContain('LICENSE');
 });
 
 test('homepage anchors, demo and downloads are reachable', async ({ page, request }) => {
