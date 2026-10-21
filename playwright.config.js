@@ -13,7 +13,7 @@ export default defineConfig({
   testDir: 'tests',
   timeout: 45_000,
   fullyParallel: true,
-  workers: 4,
+  workers: process.env.CI ? 2 : 4,
   reporter: [['list']],
   projects: [
     { name: 'app', testIgnore: /site-build\.spec\.js/, use: { ...use, baseURL: 'http://localhost:4174' } },

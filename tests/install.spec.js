@@ -396,12 +396,18 @@ test('Next.js App Router with basePath: client component after hydration, build,
   sh(dir, 'npx', ['next', 'build'], { NEXT_TELEMETRY_DISABLED: '1' });
   const port = 4190 + test.info().workerIndex;
   const log = [];
-  const server = spawn('npx', ['next', 'start', '-p', String(port)], { cwd: dir, env: { ...process.env, NEXT_TELEMETRY_DISABLED: '1' }, detached: true });
+  const nextBin = join(dir, 'node_modules', '.bin', 'next');
+  const server = spawn(nextBin, ['start', '-H', '127.0.0.1', '-p', String(port)], { cwd: dir, env: { ...process.env, NEXT_TELEMETRY_DISABLED: '1' }, detached: true });
   server.stdout.on('data', (d) => log.push(String(d)));
   server.stderr.on('data', (d) => log.push(String(d)));
+  server.on('exit', (code, signal) => log.push(`next start exited ${code} ${signal || ''}`));
   try {
-    const url = `http://localhost:${port}/atlas`;
-    await expect.poll(async () => { try { return (await fetch(url)).status; } catch { return 0; } }, { timeout: 60_000, message: () => log.join('') }).toBe(200);
+    const url = `http://127.0.0.1:${port}/atlas`;
+    try {
+      await expect.poll(async () => { try { return (await fetch(url)).status; } catch { return 0; } }, { timeout: 90_000 }).toBe(200);
+    } catch (e) {
+      throw new Error(`next start did not serve ${url}\n${log.join('')}\n${e.message}`);
+    }
     const problems = [];
     page.on('console', (m) => { if (m.type() === 'error') problems.push(m.text()); });
     page.on('pageerror', (e) => problems.push(e.message));
