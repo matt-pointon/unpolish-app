@@ -13,7 +13,7 @@
     "ui": { "enum": ["visible", "hidden"], "default": "visible", "description": "hidden removes the launcher; the toggle shortcut still opens the panel." },
     "launcher": { "anyOf": [{ "enum": ["bottom-right", "bottom-left", "top-right", "top-left"] }, { "const": false }], "default": "bottom-right" },
     "webFonts": { "type": "boolean", "default": true, "description": "Load Balsamiq Sans, IBM Plex and Nunito from Google Fonts when a theme uses them. When false, system fallbacks are used." },
-    "exclude": { "type": "array", "items": { "type": "string" }, "description": "CSS selectors for elements and regions Unpolish must not restyle. Elements with data-unpolish-ignore are always excluded." },
+    "exclude": { "type": "array", "items": { "type": "string" }, "description": "CSS selectors for elements and regions Unpolish must not restyle. Always excluded: data-unpolish-ignore, Google Maps (gmp-map, gmp-advanced-marker, .gm-style), and the Unpolish UI. Canvas, video and iframe internals are not walked." },
     "roles": {
       "type": "object",
       "description": "Selector → role hints for custom components the automatic classifier gets wrong.",

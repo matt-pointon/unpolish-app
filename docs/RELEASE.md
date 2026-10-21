@@ -30,7 +30,7 @@ The website builds every command, download link and the agent prompt from `site/
 | `"siteUrl": "https://unpolishdesign.vercel.app"` | Production website. Package `homepage` uses it |
 | `"distUrl": "https://unpolishdesign.vercel.app/unpolish/"` | Public folder of self-host files (bundle, schema, config, README, tarball). The prompt’s docs and download links use it; installs still come from npm while `published` is true |
 
-`npm run release` rejects a non-HTTPS `distUrl` or `siteUrl`. If `unpolish/<name>-<version>.tgz` already exists, it is **kept** (0.1.0 on npm is byte-identical to the committed file). Delete that tarball or bump `version` to pack a new one.
+`npm run release` rejects a non-HTTPS `distUrl` or `siteUrl`. If `unpolish/<name>-<version>.tgz` already exists, it is **kept** (0.1.0 on npm is byte-identical to the committed file). Previously published tarballs stay in `unpolish/` next to the current one. Delete a version’s tarball or bump `version` to pack a new one.
 
 ## Build and test
 
@@ -51,7 +51,7 @@ React and Svelte are built with an absolute Vite `base` (`/examples/react/`, `/e
 ## Bumping the version
 
 1. Set `version` in `packages/unpolish/package.json`.
-2. `npm run release` — packs a new tarball (the previous version’s `.tgz` is not reused), refreshes `unpolish/` and writes `releases/<new-version>/` (keep the old `releases/<version>/` folders so those URLs survive rebuilds).
+2. `npm run release` — packs a new tarball if this version’s `.tgz` is missing (previous version tarballs in `unpolish/` are kept; never rewrite `unpolish-0.1.0.tgz`), refreshes `unpolish/` and writes `releases/<new-version>/` (keep the old `releases/<version>/` folders so those URLs survive rebuilds).
 3. `npm test`.
 4. Publish and deploy (below).
 5. `npm run check:dist`.
@@ -60,7 +60,7 @@ Projects update with `npx unpolish@latest init --upgrade`; their config is kept.
 
 ## Publishing to npm
 
-The package name is `unpolish` (unscoped, public, MIT). npm user `mattpointon`. `unpolish@0.1.0` is on npm with dist-tag `latest`.
+The package name is `unpolish` (unscoped, public, MIT). npm user `mattpointon`. `unpolish@0.1.0` is on npm with dist-tag `latest`. **0.1.1 is packed in this repo and not published yet** — publish `unpolish/unpolish-0.1.1.tgz` when this release is merged.
 
 npm’s staged-publish flow also created a **`0.0.0-stage` placeholder** version. It is not a real Unpolish release. Do not install it, and do not move the `latest` dist-tag onto it.
 

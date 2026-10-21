@@ -195,7 +195,7 @@ test.describe('panel', () => {
     const without = await page.evaluate(() => [...document.querySelectorAll('body *')].map((e) => getComputedStyle(e).cssText || [getComputedStyle(e).color, getComputedStyle(e).font, getComputedStyle(e).margin].join()));
     await page.unroute('**/unpolish/unpolish.js');
     await open(page, EXAMPLES.plain);
-    const withIt = await page.evaluate(() => [...document.querySelectorAll('body *')].filter((e) => !e.closest('unpolish-harness, #unpolish-filters')).map((e) => getComputedStyle(e).cssText || [getComputedStyle(e).color, getComputedStyle(e).font, getComputedStyle(e).margin].join()));
+    const withIt = await page.evaluate(() => [...document.querySelectorAll('body *')].filter((e) => !e.closest('unpolish-harness, #unpolish-filters, #unpolish-probe')).map((e) => getComputedStyle(e).cssText || [getComputedStyle(e).color, getComputedStyle(e).font, getComputedStyle(e).margin].join()));
     expect(withIt).toEqual(without);
     // Aggressive host CSS cannot restyle the panel
     await page.keyboard.press('\\');

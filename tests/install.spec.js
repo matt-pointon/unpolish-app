@@ -5,6 +5,7 @@ import { test, expect } from '@playwright/test';
 import { execFileSync, spawn, spawnSync } from 'node:child_process';
 import { cpSync, existsSync, lstatSync, mkdirSync, readFileSync, readdirSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { createHash } from 'node:crypto';
+import { get as httpGet } from 'node:http';
 import { join, relative, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { open, setTheme, settle, shadow, styles } from './helpers.js';
@@ -72,6 +73,14 @@ function sh(cwd, cmd, args, env = {}) {
 
 const npmInstall = (dir) => sh(dir, 'npm', ['install', '--prefer-offline', '--no-audit', '--no-fund']);
 
+function ping(url) {
+  return new Promise((resolve) => {
+    const req = httpGet(url, { timeout: 2500 }, (res) => { res.resume(); resolve(res.statusCode || 0); });
+    req.on('error', () => resolve(0));
+    req.on('timeout', () => { req.destroy(); resolve(0); });
+  });
+}
+
 /** Renders in Original, themes, returns to Original: must look exactly as before. */
 async function checkInBrowser(page, url, act) {
   await open(page, url);
@@ -131,8 +140,8 @@ test('committed release files match a fresh build of the package', () => {
   const pkg = JSON.parse(execFileSync('tar', ['-xzOf', TGZ, 'package/package.json'], { encoding: 'utf8' }));
   expect(pkg.version).toBe(PKG.version);
   expect(pkg.homepage).toBe('https://unpolishdesign.vercel.app');
-  // 0.1.0 is on npm; do not repack it. Unpublished mode still requires a fresh pack.
-  if (!settings.published) {
+  // 0.1.0 on npm is frozen. Later versions must match a fresh `npm pack`.
+  if (PKG.version !== '0.1.0') {
     const d = fresh('repack');
     sh(join(ROOT, 'packages/unpolish'), 'npm', ['pack', '--silent', '--pack-destination', d]);
     const a = fresh('repack/a'), b = fresh('repack/b');
@@ -396,12 +405,17 @@ test('Next.js App Router with basePath: client component after hydration, build,
   sh(dir, 'npx', ['next', 'build'], { NEXT_TELEMETRY_DISABLED: '1' });
   const port = 4190 + test.info().workerIndex;
   const log = [];
-  const server = spawn('npx', ['next', 'start', '-p', String(port)], { cwd: dir, env: { ...process.env, NEXT_TELEMETRY_DISABLED: '1' }, detached: true });
+  const server = spawn('npx', ['next', 'start', '-p', String(port)], { cwd: dir, env: { ...process.env, NEXT_TELEMETRY_DISABLED: '1' }, detached: true, stdio: ['ignore', 'pipe', 'pipe'] });
   server.stdout.on('data', (d) => log.push(String(d)));
   server.stderr.on('data', (d) => log.push(String(d)));
+  server.on('exit', (code, signal) => log.push(`next start exited ${code} ${signal || ''}`));
   try {
-    const url = `http://localhost:${port}/atlas`;
-    await expect.poll(async () => { try { return (await fetch(url)).status; } catch { return 0; } }, { timeout: 60_000, message: () => log.join('') }).toBe(200);
+    const url = `http://127.0.0.1:${port}/atlas`;
+    try {
+      await expect.poll(() => ping(url), { timeout: 90_000 }).toBe(200);
+    } catch (e) {
+      throw new Error(`next start did not serve ${url}\n${log.join('')}\n${e.message}`);
+    }
     const problems = [];
     page.on('console', (m) => { if (m.type() === 'error') problems.push(m.text()); });
     page.on('pageerror', (e) => problems.push(e.message));
