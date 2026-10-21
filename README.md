@@ -26,12 +26,13 @@ Open the site, use the demo controls, or press `\` inside the demo prototype for
 
 ## Install into a prototype
 
-Copy the prompt from the website into your coding agent, or do it by hand:
+Copy the install command from the website and run it in your project folder:
 
-```html
-<!-- after copying unpolish/ into your static assets -->
-<script src="/unpolish/unpolish.js" data-config="unpolish.config.json" defer></script>
+```sh
+curl -fsSL <site>/unpolish/install.sh | sh -s -- <site>/unpolish/
 ```
+
+It copies `unpolish/` into your static assets and adds one script tag (or prints the line for Next.js-style layouts). The website also offers a coding-agent prompt and manual steps.
 
 Then press `\`. See [`unpolish/README.md`](unpolish/README.md) for framework-specific setup, configuration, review links, the JS API and removal.
 

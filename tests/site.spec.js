@@ -1,20 +1,26 @@
 import { test, expect } from '@playwright/test';
 
-test('copy installation prompt: real file links, visible feedback', async ({ page, request }) => {
+test('copy install command: a real one-liner, plus the agent prompt as an alternative', async ({ page, request }) => {
   await page.goto('/');
-  await page.locator('.hero [data-copy-prompt]').click();
-  await expect(page.locator('.hero [data-copy-prompt]')).toContainText('Copied');
+  await page.locator('.hero [data-copy-cmd]').click();
+  await expect(page.locator('.hero [data-copy-cmd]')).toContainText('Copied');
   await expect(page.locator('#toast')).toHaveClass(/show/);
-  await expect(page.locator('#toast')).toContainText('Installation prompt copied');
+  await expect(page.locator('#toast')).toContainText('Install command copied');
+  const cmd = await page.evaluate(() => navigator.clipboard.readText());
+  expect(cmd).toBe('curl -fsSL http://localhost:4174/unpolish/install.sh | sh -s -- http://localhost:4174/unpolish/');
+  await expect(page.locator('.hero [data-cmd]')).toHaveText(cmd);
+  for (const f of ['install.sh', 'unpolish.js', 'unpolish.config.json', 'unpolish.config.schema.json', 'README.md']) {
+    expect((await request.get('/unpolish/' + f)).status(), f).toBe(200);
+  }
+  // The coding-agent prompt is still there, and points at the installer
+  await page.locator('summary', { hasText: 'Prefer a coding agent?' }).click();
+  await page.locator('[data-copy-prompt]').click();
   const text = await page.evaluate(() => navigator.clipboard.readText());
   expect(text).toContain('Install Unpolish in this prototype.');
+  expect(text).toContain(cmd);
   expect(text).toMatch(/Inspect the repository first/);
-  expect(text).toMatch(/Verify:/);
-  const urls = text.match(/https?:\/\/\S+?\.(json|js|md)(?=\s|$)/gm);
-  expect(urls.length).toBeGreaterThanOrEqual(4);
+  const urls = text.match(/https?:\/\/\S+?\.(json|js|md|sh)(?=\s|$)/gm);
   for (const u of urls) expect((await request.get(u)).status(), u).toBe(200);
-  // Downloads on the page are real too
-  for (const href of ['unpolish/unpolish.js', 'unpolish/unpolish.config.json']) expect((await request.get('/' + href)).ok()).toBe(true);
 });
 
 test('the demo is visible on the first screen and drives the real harness', async ({ page }) => {
@@ -43,7 +49,7 @@ test('site works on small screens without horizontal scrolling', async ({ page }
   await page.goto('/');
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
   expect(overflow).toBeLessThanOrEqual(0);
-  await expect(page.locator('.hero [data-copy-prompt]')).toBeVisible();
+  await expect(page.locator('.hero [data-copy-cmd]')).toBeVisible();
   // Narrow screens get a dropdown instead of the clipped segmented control, plus a full-screen demo link.
   await expect(page.locator('#demo-themes')).toBeHidden();
   await page.waitForFunction(() => document.getElementById('demo-frame').contentWindow?.Unpolish?.state);

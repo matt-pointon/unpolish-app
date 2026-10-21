@@ -9,6 +9,10 @@
   base.search = ''; base.hash = '';
   var isLocal = location.protocol === 'file:' || /^(localhost|127\.|0\.0\.0\.0|\[::1\])/.test(location.hostname);
 
+  // One-line installer: works with any stack, no package manager.
+  function command() { return 'curl -fsSL ' + base.href + 'install.sh | sh -s -- ' + base.href; }
+  function uninstallCommand() { return 'curl -fsSL ' + base.href + 'install.sh | sh -s -- --uninstall'; }
+
   function prompt() {
     var js = new URL('unpolish.js', base).href;
     var cfg = new URL('unpolish.config.json', base).href;
@@ -28,8 +32,10 @@
       '',
       'Steps:',
       '1. Inspect the repository first: framework, build tool, where static assets are served from (public/, static/, assets/), the HTML entry point or root layout, whether pages are server-rendered, and how other third-party scripts are added. Follow those conventions.',
-      '2. Vendor the files into the static assets folder, e.g. public/unpolish/unpolish.js, public/unpolish/unpolish.config.json and public/unpolish/unpolish.config.schema.json (use the project\'s equivalent path).',
-      '3. Load the script with the smallest integration that fits:',
+      '2. Vendor the files into the static assets folder. Preferably run the installer from the project root, which copies them into public/, static/ or the site root and adds the script tag where there is an HTML entry:',
+      '   ' + command(),
+      '   Otherwise copy them by hand, e.g. public/unpolish/unpolish.js, public/unpolish/unpolish.config.json and public/unpolish/unpolish.config.schema.json (use the project\'s equivalent path).',
+      '3. Make sure the script loads with the smallest integration that fits (check what the installer did):',
       '   - Static HTML, Vite, Vue, Svelte, Astro, CRA: add <script src="/unpolish/unpolish.js" data-config="unpolish.config.json" defer></script> to the HTML entry or root layout <head>. data-config resolves relative to the script file.',
       '   - Next.js: use next/script with strategy="afterInteractive" in the root layout (app/layout or pages/_app), keeping the data-config attribute.',
       '   - Other server-rendered apps: load it on the client after hydration; never execute it on the server.',
@@ -37,16 +43,16 @@
       '   Respect the base path if the app is served from a sub-path.',
       '4. Configure unpolish.config.json (it is the shared, version-controlled project preset): keep "defaultTheme": "original" unless I say otherwise; set a short project "id"; add "exclude" selectors (or data-unpolish-ignore attributes) for regions that must keep their look, such as logos, maps, charts, video or canvas. Leave theme presets at their defaults.',
       '5. Verify: run the dev server, open the prototype and press \\ to open the Unpolish panel. Switch through Black & White, Sketch, Blueprint and Pastel Blocks; check that navigation, forms, menus, dialogs and any client-side routes still work; open ?unpolish=sketch and confirm Sketch loads; choose Original and confirm the app looks exactly as before. Run the project\'s existing tests, linters and type checks.',
-      '6. Report what you changed, anything that may need a role hint or override (see the guide), and how to remove Unpolish: delete the script tag (or import) and the unpolish folder — nothing else.',
+      '6. Report what you changed, anything that may need a role hint or override (see the guide), and how to remove Unpolish: ' + uninstallCommand() + ', or delete the script tag (or import) and the unpolish folder — nothing else.',
       ''
     ].join('\n');
   }
   $('#prompt-text').textContent = prompt();
-  if (isLocal) {
-    $('#origin-note').textContent = 'You are viewing this page locally, so the prompt points at ' + base.href + '. Publish this site (any static host) or share the files directly so your agent can reach them.';
-  } else {
-    $('#origin-note').textContent = 'Files are served from ' + base.href;
-  }
+  $$('[data-cmd]').forEach(function (el) { el.textContent = command(); });
+  $$('[data-cmd-uninstall]').forEach(function (el) { el.textContent = uninstallCommand(); });
+  $('#origin-note').textContent = isLocal
+    ? 'You are viewing this page locally, so the command downloads from ' + base.href + ' — great for trying it on projects on this machine. Publish the site to share it.'
+    : 'Files are served from ' + base.href;
 
   /* ---------------- Clipboard + feedback ---------------- */
   var CHECK = '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3.5 8.5l3 3 6-7" stroke="currentColor" stroke-width="1.8" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>';
@@ -71,6 +77,24 @@
     toastEl.classList.add('show');
     toastTimer = setTimeout(function () { toastEl.classList.remove('show'); }, 2600);
   }
+  function copied(btn) {
+    var swap = btn.querySelector('.swap');
+    if (!btn._orig) btn._orig = swap.innerHTML;
+    swap.innerHTML = CHECK + '<span>Copied</span>';
+    clearTimeout(btn._t);
+    btn._t = setTimeout(function () { swap.innerHTML = btn._orig; btn._orig = null; }, 1800);
+  }
+  $$('[data-copy-cmd]').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      copy(command()).then(function (ok) {
+        if (ok) { copied(btn); toast(CHECK + '<span>Install command copied. Run it in your project folder.</span>'); return; }
+        var code = $('[data-cmd]');
+        var range = document.createRange(); range.selectNodeContents(code);
+        var sel = getSelection(); sel.removeAllRanges(); sel.addRange(range);
+        toast('<span>Clipboard unavailable — the command is selected, press Ctrl/⌘ + C.</span>');
+      });
+    });
+  });
   $$('[data-copy-prompt]').forEach(function (btn) {
     btn.addEventListener('click', function () {
       copy(prompt()).then(function (ok) {

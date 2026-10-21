@@ -12,6 +12,23 @@ Unpolish is a reversible lo-fi visual layer for working web prototypes. It ships
 
 ## Install
 
+**One command, any stack.** From your project folder (macOS, Linux, WSL or Git Bash):
+
+```sh
+curl -fsSL https://<where-this-folder-is-served>/install.sh | sh -s -- https://<where-this-folder-is-served>/
+```
+
+The website's *Copy install command* button fills in the address. The installer:
+
+- copies `unpolish/` into `public/`, `static/` or the project root (override with `--dir <path>`);
+- adds one `<script>` tag before `</head>` in your HTML entry — `index.html`, SvelteKit's `src/app.html`, or every top-level page of a plain site;
+- for Next.js and other layouts without an HTML entry, prints the exact line to paste instead of editing app code;
+- is safe to re-run: it updates `unpolish.js` and never overwrites your `unpolish.config.json`.
+
+`--no-tag` copies files only; `--uninstall` removes the tag(s) and the folder.
+
+### Manual install
+
 Copy this folder to wherever the app serves static files (`public/unpolish/`, `static/unpolish/`, …), then pick the smallest integration that fits.
 
 **Script tag** — plain HTML, Vite, Vue, Svelte, Astro, CRA. Put it in the HTML entry or root layout `<head>`:
@@ -158,4 +175,4 @@ Unpolish.destroy();                   // remove treatment + panel
 
 ## Remove
 
-Delete the script tag (or import + `init` call) and this folder. Optionally delete `unpolish.config.json`. Nothing else in the app refers to Unpolish. Visitors may keep a small `unpolish:*` entry in `localStorage`; it does nothing without the script.
+Run the installer with `--uninstall` (`curl -fsSL …/install.sh | sh -s -- --uninstall`), or delete the script tag (or import + `init` call) and this folder by hand. Optionally delete `unpolish.config.json`. Nothing else in the app refers to Unpolish. Visitors may keep a small `unpolish:*` entry in `localStorage`; it does nothing without the script.

@@ -25,8 +25,8 @@
         <a href="#install">Install</a>
         <a href="#review-links">Review links</a>
       </nav>
-      <button class="btn btn-dark btn-sm" type="button" data-copy-prompt>
-        <span class="swap"><svg viewBox="0 0 16 16" aria-hidden="true"><rect x="5.5" y="5.5" width="7.5" height="7.5" rx="2" stroke="currentColor" stroke-width="1.4" fill="none"/><path d="M10.5 3.6V3.5A1.5 1.5 0 009 2H4a1.5 1.5 0 00-1.5 1.5V9A1.5 1.5 0 004 10.5h.1" stroke="currentColor" stroke-width="1.4" fill="none"/></svg><span>Copy prompt</span></span>
+      <button class="btn btn-dark btn-sm" type="button" data-copy-cmd>
+        <span class="swap"><svg viewBox="0 0 16 16" aria-hidden="true"><rect x="5.5" y="5.5" width="7.5" height="7.5" rx="2" stroke="currentColor" stroke-width="1.4" fill="none"/><path d="M10.5 3.6V3.5A1.5 1.5 0 009 2H4a1.5 1.5 0 00-1.5 1.5V9A1.5 1.5 0 004 10.5h.1" stroke="currentColor" stroke-width="1.4" fill="none"/></svg><span>Copy install command</span></span>
       </button>
     </div>
   </header>
@@ -36,12 +36,12 @@
       <div class="wrap hero-inner">
         <h1 id="hero-title">Less polish.<br><em>Better conversations.</em></h1>
         <p class="lede">A reversible lo-fi layer for working prototypes, so reviews focus on structure, content and flow — not pixels.</p>
-        <div class="hero-cta">
-          <button class="btn btn-accent btn-lg" type="button" data-copy-prompt>
-            <span class="swap"><svg viewBox="0 0 16 16" aria-hidden="true"><rect x="5.5" y="5.5" width="7.5" height="7.5" rx="2" stroke="currentColor" stroke-width="1.4" fill="none"/><path d="M10.5 3.6V3.5A1.5 1.5 0 009 2H4a1.5 1.5 0 00-1.5 1.5V9A1.5 1.5 0 004 10.5h.1" stroke="currentColor" stroke-width="1.4" fill="none"/></svg><span>Copy installation prompt</span></span>
-          </button>
-          <a class="btn btn-ghost btn-lg" href="#install">How it installs</a>
+        <div class="cmd cmd-hero" role="group" aria-label="Install command">
+          <span class="cmd-sigil" aria-hidden="true">$</span>
+          <code class="cmd-text" data-cmd tabindex="0"></code>
+          <button class="btn btn-accent cmd-copy" type="button" data-copy-cmd><span class="swap"><svg viewBox="0 0 16 16" aria-hidden="true"><rect x="5.5" y="5.5" width="7.5" height="7.5" rx="2" stroke="currentColor" stroke-width="1.4" fill="none"/><path d="M10.5 3.6V3.5A1.5 1.5 0 009 2H4a1.5 1.5 0 00-1.5 1.5V9A1.5 1.5 0 004 10.5h.1" stroke="currentColor" stroke-width="1.4" fill="none"/></svg><span>Copy</span></span></button>
         </div>
+        <p class="cmd-note">Run it in your project folder — any framework, no package manager. <a href="#install">How it works</a></p>
       </div>
 
       <div class="wrap demo" id="demo">
@@ -103,23 +103,23 @@
 
     <section class="install" id="install" aria-labelledby="install-title">
       <div class="wrap install-inner">
-        <h2 id="install-title">Your coding agent installs it</h2>
+        <h2 id="install-title">One command. Any stack.</h2>
         <ol class="steps">
-          <li><strong>Copy the prompt</strong> into your agent, in the prototype's repo.</li>
-          <li><strong>Review the change</strong> — an <code>unpolish/</code> folder and one script tag.</li>
+          <li><strong>Run it in your project folder.</strong> It copies <code>unpolish/</code> into <code>public/</code>, <code>static/</code> or your site root.</li>
+          <li><strong>It adds one script tag</strong> to your HTML entry. For Next.js and other layouts without one, it prints the line to paste.</li>
           <li><strong>Press <kbd>\</kbd></strong> in your prototype and pick a theme.</li>
         </ol>
-        <div class="install-actions">
-          <button class="btn btn-accent" type="button" data-copy-prompt>
-            <span class="swap"><svg viewBox="0 0 16 16" aria-hidden="true"><rect x="5.5" y="5.5" width="7.5" height="7.5" rx="2" stroke="currentColor" stroke-width="1.4" fill="none"/><path d="M10.5 3.6V3.5A1.5 1.5 0 009 2H4a1.5 1.5 0 00-1.5 1.5V9A1.5 1.5 0 004 10.5h.1" stroke="currentColor" stroke-width="1.4" fill="none"/></svg><span>Copy installation prompt</span></span>
-          </button>
-          <a class="btn btn-ghost" href="unpolish/README.md">Integration guide</a>
+        <div class="cmd cmd-dark" role="group" aria-label="Install command">
+          <span class="cmd-sigil" aria-hidden="true">$</span>
+          <code class="cmd-text" data-cmd tabindex="0"></code>
+          <button class="btn btn-accent cmd-copy" type="button" data-copy-cmd><span class="swap"><svg viewBox="0 0 16 16" aria-hidden="true"><rect x="5.5" y="5.5" width="7.5" height="7.5" rx="2" stroke="currentColor" stroke-width="1.4" fill="none"/><path d="M10.5 3.6V3.5A1.5 1.5 0 009 2H4a1.5 1.5 0 00-1.5 1.5V9A1.5 1.5 0 004 10.5h.1" stroke="currentColor" stroke-width="1.4" fill="none"/></svg><span>Copy</span></span></button>
         </div>
+        <p class="fine">macOS, Linux, WSL or Git Bash. Re-run to update; your <code>unpolish.config.json</code> is kept. To remove it: <code data-cmd-uninstall></code></p>
         <p class="fine" id="origin-note"></p>
         <details class="disclosure">
-          <summary>Read the prompt<svg class="chev" viewBox="0 0 16 16" aria-hidden="true"><path d="M4.5 6.5L8 10l3.5-3.5" stroke="currentColor" stroke-width="1.6" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg></summary>
+          <summary>Prefer a coding agent?<svg class="chev" viewBox="0 0 16 16" aria-hidden="true"><path d="M4.5 6.5L8 10l3.5-3.5" stroke="currentColor" stroke-width="1.6" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg></summary>
           <div class="prompt-card">
-            <div class="prompt-head"><span>Installation prompt</span><button class="btn btn-quiet btn-sm" type="button" data-copy-prompt><span class="swap"><span>Copy</span></span></button></div>
+            <div class="prompt-head"><span>Prompt for Claude Code, Cursor and others</span><button class="btn btn-quiet btn-sm" type="button" data-copy-prompt><span class="swap"><span>Copy prompt</span></span></button></div>
             <pre id="prompt-text" tabindex="0" aria-label="Installation prompt text"></pre>
           </div>
         </details>
@@ -145,8 +145,8 @@
     <section class="closing">
       <div class="wrap closing-inner">
         <h2>Bring the conversation back to the work.</h2>
-        <button class="btn btn-accent btn-lg" type="button" data-copy-prompt>
-          <span class="swap"><svg viewBox="0 0 16 16" aria-hidden="true"><rect x="5.5" y="5.5" width="7.5" height="7.5" rx="2" stroke="currentColor" stroke-width="1.4" fill="none"/><path d="M10.5 3.6V3.5A1.5 1.5 0 009 2H4a1.5 1.5 0 00-1.5 1.5V9A1.5 1.5 0 004 10.5h.1" stroke="currentColor" stroke-width="1.4" fill="none"/></svg><span>Copy installation prompt</span></span>
+        <button class="btn btn-accent btn-lg" type="button" data-copy-cmd>
+          <span class="swap"><svg viewBox="0 0 16 16" aria-hidden="true"><rect x="5.5" y="5.5" width="7.5" height="7.5" rx="2" stroke="currentColor" stroke-width="1.4" fill="none"/><path d="M10.5 3.6V3.5A1.5 1.5 0 009 2H4a1.5 1.5 0 00-1.5 1.5V9A1.5 1.5 0 004 10.5h.1" stroke="currentColor" stroke-width="1.4" fill="none"/></svg><span>Copy install command</span></span>
         </button>
       </div>
     </section>
