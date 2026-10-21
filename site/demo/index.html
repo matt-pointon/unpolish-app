@@ -1,0 +1,231 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Fieldtrip — Offsite planner (demo prototype)</title>
+  <link rel="stylesheet" href="demo.css">
+  <script src="../../unpolish/unpolish.js" data-config="../site/demo/unpolish.config.json" defer></script>
+</head>
+<body>
+  <svg width="0" height="0" style="position:absolute" aria-hidden="true">
+    <symbol id="i-home" viewBox="0 0 24 24"><path d="M3 10.5L12 3l9 7.5V20a1 1 0 01-1 1h-5v-6H9v6H4a1 1 0 01-1-1z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></symbol>
+    <symbol id="i-map" viewBox="0 0 24 24"><path d="M9 4L3 6v14l6-2 6 2 6-2V4l-6 2-6-2zM9 4v14M15 6v14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></symbol>
+    <symbol id="i-cal" viewBox="0 0 24 24"><rect x="3.5" y="5" width="17" height="15.5" rx="2.5" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M3.5 10h17M8 3v4M16 3v4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></symbol>
+    <symbol id="i-wallet" viewBox="0 0 24 24"><path d="M4 7.5A2.5 2.5 0 016.5 5H18v3M4 7.5V17a2.5 2.5 0 002.5 2.5H20V8H6.5A2.5 2.5 0 014 7.5z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><circle cx="16" cy="14" r="1.3" fill="currentColor"/></symbol>
+    <symbol id="i-users" viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.5" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M2.5 20c.8-3.5 3.4-5.5 6.5-5.5s5.7 2 6.5 5.5M16 4.8a3.5 3.5 0 010 6.5M18.5 14.8c1.6.8 2.6 2.6 3 5.2" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></symbol>
+    <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="6.5" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M16 16l4.5 4.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></symbol>
+    <symbol id="i-bell" viewBox="0 0 24 24"><path d="M6 16V11a6 6 0 0112 0v5l1.5 2h-15zM10 20.5a2 2 0 004 0" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></symbol>
+    <symbol id="i-star" viewBox="0 0 24 24"><path d="M12 3.5l2.6 5.4 5.9.8-4.3 4.1 1 5.8L12 16.9l-5.2 2.7 1-5.8-4.3-4.1 5.9-.8z" fill="currentColor"/></symbol>
+    <symbol id="i-info" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M12 11v5M12 8h.01" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></symbol>
+    <symbol id="i-alert" viewBox="0 0 24 24"><path d="M12 4l9 16H3z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M12 10v4M12 17h.01" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></symbol>
+    <symbol id="i-check" viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></symbol>
+    <symbol id="i-chev" viewBox="0 0 24 24"><path d="M7 10l5 5 5-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="i-x" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></symbol>
+  </svg>
+
+  <div class="app">
+    <aside class="sidebar">
+      <a class="logo" href="#overview"><span class="logo-mark"></span>Fieldtrip</a>
+      <nav class="nav" aria-label="Main">
+        <a href="#overview" class="nav-item is-active" aria-current="page"><svg><use href="#i-home"/></svg>Overview</a>
+        <a href="#venues" class="nav-item"><svg><use href="#i-map"/></svg>Venues<span class="count">3</span></a>
+        <a href="#schedule" class="nav-item"><svg><use href="#i-cal"/></svg>Schedule</a>
+        <a href="#budget" class="nav-item"><svg><use href="#i-wallet"/></svg>Budget</a>
+        <a href="#people" class="nav-item"><svg><use href="#i-users"/></svg>People</a>
+      </nav>
+      <div class="promo">
+        <strong>Plan together</strong>
+        <p>Invite finance and ops to approve the budget in one place.</p>
+        <button class="btn btn-light btn-sm" type="button">Invite team</button>
+      </div>
+    </aside>
+
+    <div class="main">
+      <header class="topbar">
+        <label class="search">
+          <svg><use href="#i-search"/></svg>
+          <input type="search" placeholder="Search venues, people, sessions…" aria-label="Search">
+          <kbd>/</kbd>
+        </label>
+        <div class="topbar-actions">
+          <button class="icon-btn" type="button" aria-label="Notifications"><svg><use href="#i-bell"/></svg><span class="badge-dot" aria-hidden="true"></span></button>
+          <div class="menu-wrap">
+            <button class="avatar-btn" type="button" aria-haspopup="menu" aria-expanded="false" aria-controls="account-menu" id="account-btn">
+              <img src="../../examples/assets/avatar-2.svg" alt="" width="32" height="32"><span>Maya Chen</span><svg class="chev"><use href="#i-chev"/></svg>
+            </button>
+            <div class="menu" role="menu" id="account-menu" aria-labelledby="account-btn" hidden>
+              <button role="menuitem" type="button">Profile</button>
+              <button role="menuitem" type="button">Notification settings</button>
+              <hr>
+              <button role="menuitem" type="button" class="danger">Sign out</button>
+            </div>
+          </div>
+        </div>
+      </header>
+
+      <section class="hero">
+        <div>
+          <p class="eyebrow">Q3 team offsite</p>
+          <h1>Lisbon, 14–16 September</h1>
+          <p class="lede">30 people, three days, one shared plan. Shortlist a venue, lock the schedule and keep the budget visible.</p>
+        </div>
+        <div class="hero-actions">
+          <span class="status status-success"><svg><use href="#i-check"/></svg>On track</span>
+          <button class="btn btn-secondary" type="button" id="share-btn">Share plan</button>
+          <button class="btn btn-primary" type="button" id="book-btn">Book venue</button>
+        </div>
+      </section>
+
+      <div class="tabs" role="tablist" aria-label="Plan sections">
+        <button role="tab" aria-selected="true" aria-controls="panel-overview" id="tab-overview">Overview</button>
+        <button role="tab" aria-selected="false" aria-controls="panel-schedule" id="tab-schedule" tabindex="-1">Schedule</button>
+        <button role="tab" aria-selected="false" aria-controls="panel-budget" id="tab-budget" tabindex="-1">Budget</button>
+      </div>
+
+      <div role="tabpanel" id="panel-overview" aria-labelledby="tab-overview" class="panel">
+        <div class="stats">
+          <article class="stat">
+            <span class="stat-label">Budget used</span>
+            <strong class="stat-value">€18,600 <small>of €30,000</small></strong>
+            <div class="progress" role="progressbar" aria-valuenow="62" aria-valuemin="0" aria-valuemax="100" aria-label="Budget used"><span style="width:62%"></span></div>
+          </article>
+          <article class="stat">
+            <span class="stat-label">Attendees confirmed</span>
+            <strong class="stat-value">24 <small>of 30</small></strong>
+            <div class="avatars">
+              <img src="../../examples/assets/avatar-1.svg" alt="Ana" width="28" height="28">
+              <img src="../../examples/assets/avatar-2.svg" alt="Maya" width="28" height="28">
+              <img src="../../examples/assets/avatar-3.svg" alt="Tomás" width="28" height="28">
+              <span class="more">+21</span>
+            </div>
+          </article>
+          <article class="stat stat-accent">
+            <span class="stat-label">Days to go</span>
+            <strong class="stat-value">18</strong>
+            <span class="trend">Flights booked for 20 of 24</span>
+          </article>
+        </div>
+
+        <div class="alert alert-warning" role="status">
+          <svg><use href="#i-alert"/></svg>
+          <div><strong>2 people haven't confirmed travel.</strong> Remind them before fares go up on Friday.</div>
+          <button class="btn btn-ghost btn-sm" type="button">Send reminder</button>
+        </div>
+
+        <div class="section-head">
+          <h2>Shortlisted venues</h2>
+          <span class="info" tabindex="0" aria-describedby="tip-venues"><svg><use href="#i-info"/></svg><span role="tooltip" id="tip-venues" class="tooltip">Prices include catering for 30 people.</span></span>
+        </div>
+        <div class="venues">
+          <article class="venue">
+            <img src="../../examples/assets/lake.svg" alt="Lakeside terrace at sunset" width="640" height="400">
+            <div class="venue-body">
+              <div class="venue-top"><h3>Casa Azul</h3><span class="status status-success">Confirmed</span></div>
+              <p>Lakeside terrace, 2 meeting rooms, 40 min from the airport.</p>
+              <div class="venue-meta"><span class="rating"><svg><use href="#i-star"/></svg>4.8</span><strong>€9,400</strong></div>
+            </div>
+          </article>
+          <article class="venue">
+            <img src="../../examples/assets/city.svg" alt="City rooftop at dusk" width="640" height="400">
+            <div class="venue-body">
+              <div class="venue-top"><h3>Atelier Norte</h3><span class="status status-warning">Pending</span></div>
+              <p>Rooftop loft in Baixa, walkable to hotels and dinner spots.</p>
+              <div class="venue-meta"><span class="rating"><svg><use href="#i-star"/></svg>4.6</span><strong>€11,200</strong></div>
+            </div>
+          </article>
+          <article class="venue">
+            <img src="../../examples/assets/forest.svg" alt="Forest estate with a footpath" width="640" height="400">
+            <div class="venue-body">
+              <div class="venue-top"><h3>Quinta Verde</h3><span class="status status-danger">Unavailable</span></div>
+              <p>Countryside estate with a vineyard. Fully booked for our dates.</p>
+              <div class="venue-meta"><span class="rating"><svg><use href="#i-star"/></svg>4.9</span><strong>€8,750</strong></div>
+            </div>
+          </article>
+        </div>
+
+        <div class="split">
+          <form class="card form" id="hold-form" novalidate>
+            <h2>Request a hold</h2>
+            <p class="muted">We'll ask the venue to keep the dates for 48 hours.</p>
+            <div class="grid-2">
+              <label class="field"><span>Your name</span><input name="name" value="Maya Chen" autocomplete="name"></label>
+              <label class="field"><span>Work email</span><input name="email" type="email" value="maya@fieldtrip" aria-invalid="true" aria-describedby="email-error"><small class="error" id="email-error">Enter a full email address, like maya@fieldtrip.co</small></label>
+            </div>
+            <div class="grid-2">
+              <label class="field"><span>Venue</span>
+                <select name="venue"><option>Casa Azul</option><option>Atelier Norte</option><option disabled>Quinta Verde</option></select>
+              </label>
+              <label class="field"><span>Guests</span><input name="guests" type="number" value="30" min="1" max="60"></label>
+            </div>
+            <label class="field"><span>Notes for the venue</span><textarea name="notes" rows="3" placeholder="Dietary needs, accessibility, AV…"></textarea></label>
+            <div class="checks">
+              <label class="check"><input type="checkbox" name="flex" checked> Our dates are flexible by a day</label>
+              <label class="switch"><input type="checkbox" role="switch" name="notify"><span class="switch-track"><span class="switch-thumb"></span></span> Notify the team</label>
+            </div>
+            <div class="form-actions">
+              <button class="btn btn-ghost" type="reset">Clear</button>
+              <button class="btn btn-secondary" type="button" disabled>Save draft</button>
+              <button class="btn btn-primary" type="submit" id="hold-submit">Send request</button>
+            </div>
+          </form>
+
+          <aside class="card activity">
+            <h2>Activity</h2>
+            <ul class="feed" id="feed">
+              <li><img src="../../examples/assets/avatar-1.svg" alt="" width="28" height="28"><div><strong>Ana</strong> confirmed flights <span class="time">2h</span></div></li>
+              <li><img src="../../examples/assets/avatar-3.svg" alt="" width="28" height="28"><div><strong>Tomás</strong> added Atelier Norte <span class="time">5h</span></div></li>
+              <li class="feed-system"><span class="dot dot-danger"></span><div>Quinta Verde declined our dates <span class="time">1d</span></div></li>
+            </ul>
+            <a class="link" href="#people">View all activity</a>
+          </aside>
+        </div>
+      </div>
+
+      <div role="tabpanel" id="panel-schedule" aria-labelledby="tab-schedule" class="panel" hidden>
+        <div class="section-head">
+          <h2>Day one</h2>
+          <button class="btn btn-secondary btn-sm" type="button" id="add-session"><svg><use href="#i-plus"/></svg>Add session</button>
+        </div>
+        <ol class="timeline" id="timeline">
+          <li><time>09:00</time><div><strong>Arrivals &amp; coffee</strong><span class="tag">Lobby</span></div></li>
+          <li><time>10:00</time><div><strong>Strategy kickoff</strong><span class="tag tag-accent">All hands</span></div></li>
+          <li><time>13:00</time><div><strong>Lunch by the lake</strong><span class="tag">Terrace</span></div></li>
+        </ol>
+      </div>
+
+      <div role="tabpanel" id="panel-budget" aria-labelledby="tab-budget" class="panel" hidden>
+        <table class="table">
+          <thead><tr><th>Item</th><th>Owner</th><th>Status</th><th class="num">Amount</th></tr></thead>
+          <tbody>
+            <tr><td>Venue deposit</td><td>Maya</td><td><span class="status status-success">Paid</span></td><td class="num">€2,800</td></tr>
+            <tr><td>Flights</td><td>Ana</td><td><span class="status status-warning">Partly booked</span></td><td class="num">€9,100</td></tr>
+            <tr><td>Catering</td><td>Tomás</td><td><span class="status status-neutral">Quoted</span></td><td class="num">€4,300</td></tr>
+            <tr><td>Boat trip</td><td>—</td><td><span class="status status-danger">Over budget</span></td><td class="num">€2,400</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <dialog id="book-dialog" aria-labelledby="book-title">
+    <form method="dialog" class="dialog">
+      <div class="dialog-head">
+        <h2 id="book-title">Book Casa Azul?</h2>
+        <button class="icon-btn" value="cancel" aria-label="Close"><svg><use href="#i-x"/></svg></button>
+      </div>
+      <p>We'll pay the €2,800 deposit and send the contract to finance. You can cancel free of charge until 1 September.</p>
+      <dl class="summary"><div><dt>Dates</dt><dd>14–16 Sep</dd></div><div><dt>Guests</dt><dd>30</dd></div><div><dt>Total</dt><dd>€9,400</dd></div></dl>
+      <div class="form-actions">
+        <button class="btn btn-ghost" value="cancel">Not yet</button>
+        <button class="btn btn-primary" value="confirm">Confirm booking</button>
+      </div>
+    </form>
+  </dialog>
+
+  <div class="toast-region" aria-live="polite" id="toasts"></div>
+
+  <script src="demo.js"></script>
+</body>
+</html>

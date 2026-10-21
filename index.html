@@ -1,0 +1,278 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Unpolish — Less polish. Better conversations.</title>
+  <meta name="description" content="Unpolish puts a reversible lo-fi layer over your working prototype, so stakeholder reviews focus on structure, content and flow.">
+  <link rel="icon" href="site/favicon.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Instrument+Serif:ital@0;1&display=swap">
+  <link rel="stylesheet" href="site/site.css">
+</head>
+<body>
+  <a class="skip" href="#main">Skip to content</a>
+  <header class="nav">
+    <div class="wrap nav-inner">
+      <a class="brand" href="#top" aria-label="Unpolish home">
+        <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><rect x="2.75" y="2.75" width="18.5" height="18.5" rx="6" stroke="currentColor" stroke-width="1.6"/><path d="M6.5 13.6c1.3-2.3 2.4-2.6 3.4-.9.9 1.6 1.9 1.7 3.1-.2 1.1-1.7 2.2-2 4.5-.4" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>
+        Unpolish
+      </a>
+      <nav aria-label="Sections" class="nav-links">
+        <a href="#demo">Demo</a>
+        <a href="#install">Install</a>
+        <a href="#customize">Customize</a>
+        <a href="#review-links">Review links</a>
+      </nav>
+      <button class="btn btn-dark btn-sm" type="button" data-copy-prompt>
+        <span class="swap"><svg viewBox="0 0 16 16" aria-hidden="true"><rect x="5.5" y="5.5" width="7.5" height="7.5" rx="2" stroke="currentColor" stroke-width="1.4" fill="none"/><path d="M10.5 3.6V3.5A1.5 1.5 0 009 2H4a1.5 1.5 0 00-1.5 1.5V9A1.5 1.5 0 004 10.5h.1" stroke="currentColor" stroke-width="1.4" fill="none"/></svg><span>Copy prompt</span></span>
+      </button>
+    </div>
+  </header>
+
+  <main id="main">
+    <section class="hero" id="top">
+      <div class="wrap hero-inner">
+        <p class="kicker"><span class="dot"></span>For design reviews with working prototypes</p>
+        <h1>Less polish.<br><em>Better conversations.</em></h1>
+        <p class="lede">Unpolish lays a reversible lo-fi theme over your working prototype. Stakeholders stop debating button colors and start talking about structure, content and flow — while every click, route and form still works.</p>
+        <div class="hero-cta">
+          <button class="btn btn-accent btn-lg" type="button" data-copy-prompt>
+            <span class="swap"><svg viewBox="0 0 16 16" aria-hidden="true"><rect x="5.5" y="5.5" width="7.5" height="7.5" rx="2" stroke="currentColor" stroke-width="1.4" fill="none"/><path d="M10.5 3.6V3.5A1.5 1.5 0 009 2H4a1.5 1.5 0 00-1.5 1.5V9A1.5 1.5 0 004 10.5h.1" stroke="currentColor" stroke-width="1.4" fill="none"/></svg><span>Copy installation prompt</span></span>
+          </button>
+          <a class="btn btn-ghost btn-lg" href="#demo">Try it below</a>
+        </div>
+        <p class="hero-note">Paste the prompt into Claude Code, Cursor or any coding agent. It installs one small script and a config file — no framework required.</p>
+      </div>
+    </section>
+
+    <section class="demo" id="demo" aria-labelledby="demo-title">
+      <div class="wrap">
+        <div class="section-head">
+          <h2 id="demo-title">Same prototype. Four ways to rough it up.</h2>
+          <p>This is a working prototype in a frame. Switch fidelity, drag roughness, then use it — open the menu, submit the form, book a venue. Press <kbd>\</kbd> inside it for the real Unpolish panel.</p>
+        </div>
+
+        <div class="demo-controls" role="group" aria-label="Demo controls">
+          <div class="seg" role="radiogroup" aria-label="Theme" id="demo-themes">
+            <button type="button" role="radio" aria-checked="true" data-theme="original"><span class="sw sw-original"></span>Original</button>
+            <button type="button" role="radio" aria-checked="false" data-theme="black-white" tabindex="-1"><span class="sw sw-bw"></span>Black &amp; White</button>
+            <button type="button" role="radio" aria-checked="false" data-theme="sketch" tabindex="-1"><span class="sw sw-sketch"></span>Sketch</button>
+            <button type="button" role="radio" aria-checked="false" data-theme="blueprint" tabindex="-1"><span class="sw sw-blueprint"></span>Blueprint</button>
+            <button type="button" role="radio" aria-checked="false" data-theme="pastel" tabindex="-1"><span class="sw sw-pastel"></span>Pastel Blocks</button>
+          </div>
+          <label class="rough" id="rough-wrap">
+            <span class="rough-label">Roughness <output id="rough-val">—</output></span>
+            <input type="range" id="rough" min="0" max="100" value="50" disabled aria-describedby="rough-hint">
+            <span class="rough-hint" id="rough-hint">Pick a theme to adjust</span>
+          </label>
+        </div>
+
+        <div class="browser">
+          <div class="browser-bar" aria-hidden="true">
+            <span class="lights"><i></i><i></i><i></i></span>
+            <span class="url"><span class="lock"></span><span id="demo-url">fieldtrip.app/plan/lisbon</span></span>
+            <span class="badge" id="demo-badge">Original</span>
+          </div>
+          <iframe id="demo-frame" src="site/demo/index.html" title="Fieldtrip — interactive prototype example" loading="eager"></iframe>
+        </div>
+        <p class="demo-foot">The page you're reading stays polished; only the prototype inside the frame changes. Choosing Original removes every Unpolish style.</p>
+      </div>
+    </section>
+
+    <section class="themes" aria-labelledby="themes-title">
+      <div class="wrap">
+        <div class="section-head">
+          <h2 id="themes-title">Presets that feel designed, not filtered</h2>
+          <p>Each theme maps your prototype's surfaces, lines, text roles and states to its own system. Roughness changes what's appropriate for that theme — never the layout.</p>
+        </div>
+        <div class="theme-grid">
+          <article class="theme-card">
+            <div class="tc-art tc-bw" aria-hidden="true"><div class="tc-card"><i></i><i></i><b></b><s></s></div></div>
+            <h3>Black &amp; White</h3>
+            <p>Neutral surfaces, clear outlines, simplified type. Status keeps meaning through hatching and dots instead of color.</p>
+            <span class="tc-rough">Roughness: contrast and simplification</span>
+          </article>
+          <article class="theme-card">
+            <div class="tc-art tc-sketch" aria-hidden="true"><div class="tc-card"><i></i><i></i><b></b><s></s></div></div>
+            <h3>Sketch</h3>
+            <p>Balsamiq-style hand-drawn strokes and restrained hand lettering. Text stays readable; click targets don't move.</p>
+            <span class="tc-rough">Roughness: stroke wobble and shading</span>
+          </article>
+          <article class="theme-card">
+            <div class="tc-art tc-blueprint" aria-hidden="true"><div class="tc-card"><i></i><i></i><b></b><s></s></div></div>
+            <h3>Blueprint</h3>
+            <p>Blue surfaces, light linework, technical type, a drafting grid and corner marks on major regions.</p>
+            <span class="tc-rough">Roughness: grid density and drafting marks</span>
+          </article>
+          <article class="theme-card">
+            <div class="tc-art tc-pastel" aria-hidden="true"><div class="tc-card"><i></i><i></i><b></b><s></s></div></div>
+            <h3>Pastel Blocks</h3>
+            <p>Soft color fields and flat surfaces. Regions read as blocks, so conversations stay on grouping and hierarchy.</p>
+            <span class="tc-rough">Roughness: surface simplification</span>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <section class="install" id="install" aria-labelledby="install-title">
+      <div class="wrap install-grid">
+        <div>
+          <p class="eyebrow">Install</p>
+          <h2 id="install-title">Let your coding agent do the integration</h2>
+          <p>Unpolish is one dependency-free script plus a JSON config. The prompt asks your agent to inspect your repository, choose the smallest integration that fits its conventions, add the config, and verify that everything still works.</p>
+          <ol class="steps">
+            <li><strong>Copy the prompt</strong> and paste it into your coding agent in the prototype's repository.</li>
+            <li><strong>Review the change.</strong> Usually a vendored <code>unpolish/</code> folder and one script tag.</li>
+            <li><strong>Open the prototype and press <kbd>\</kbd>.</strong> Pick a theme, tune it, copy the configuration back.</li>
+          </ol>
+          <div class="install-actions">
+            <button class="btn btn-accent" type="button" data-copy-prompt>
+              <span class="swap"><svg viewBox="0 0 16 16" aria-hidden="true"><rect x="5.5" y="5.5" width="7.5" height="7.5" rx="2" stroke="currentColor" stroke-width="1.4" fill="none"/><path d="M10.5 3.6V3.5A1.5 1.5 0 009 2H4a1.5 1.5 0 00-1.5 1.5V9A1.5 1.5 0 004 10.5h.1" stroke="currentColor" stroke-width="1.4" fill="none"/></svg><span>Copy installation prompt</span></span>
+            </button>
+            <a class="btn btn-ghost" href="unpolish/unpolish.js" download>Download unpolish.js</a>
+            <a class="btn btn-ghost" href="unpolish/unpolish.config.json" download>Example config</a>
+          </div>
+          <p class="fine" id="origin-note"></p>
+        </div>
+        <div class="prompt-card">
+          <div class="prompt-head">
+            <span>Installation prompt</span>
+            <button class="btn btn-quiet btn-sm" type="button" data-copy-prompt><span class="swap"><span>Copy</span></span></button>
+          </div>
+          <pre id="prompt-text" tabindex="0" aria-label="Installation prompt text"></pre>
+        </div>
+      </div>
+    </section>
+
+    <section class="manual" aria-labelledby="manual-title">
+      <div class="wrap two-col">
+        <div>
+          <p class="eyebrow">Prefer to do it by hand?</p>
+          <h2 id="manual-title">One tag, one file</h2>
+          <p>Copy the <code>unpolish/</code> folder into your static assets and load it after your app. Paths in <code>data-config</code> resolve relative to the script.</p>
+          <p>Bundled apps can import it instead: <code>import './vendor/unpolish.js'</code>, then <code>window.Unpolish.init({ config })</code>.</p>
+          <p><strong>Removing it</strong> is deleting that tag and the folder. Unpolish never edits your components, routes or styles.</p>
+        </div>
+        <pre class="code"><code>&lt;!-- index.html, after your app's scripts --&gt;
+&lt;script src="/unpolish/unpolish.js"
+        data-config="unpolish.config.json" defer&gt;&lt;/script&gt;
+
+<span class="c">// unpolish/unpolish.config.json</span>
+{
+  "version": 1,
+  "defaultTheme": "original",
+  "exclude": [".brand-logo", "#map"],
+  "shortcuts": { "toggle": "\\", "themes": {} },
+  "themes": {
+    "sketch": { "roughness": 60, "images": "simplified" }
+  }
+}</code></pre>
+      </div>
+    </section>
+
+    <section class="customize" id="customize" aria-labelledby="customize-title">
+      <div class="wrap">
+        <div class="section-head">
+          <h2 id="customize-title">Great defaults. Tune when it matters.</h2>
+          <p>The panel opens with themes and one Roughness dial. Everything else waits behind <em>Edit theme</em>.</p>
+        </div>
+        <div class="feature-grid">
+          <article class="feature">
+            <h3>Live theme settings</h3>
+            <p>Palette and neutrals, typography, border weight and style, corner radii, shadows, decorative details, and image treatment — original, simplified or placeholder.</p>
+          </article>
+          <article class="feature">
+            <h3>Saved per theme</h3>
+            <p>Each theme keeps its own adjustments. <em>Reset preset</em> returns that theme to the project's defaults.</p>
+          </article>
+          <article class="feature">
+            <h3>Draft vs. project</h3>
+            <p>Tweaks preview instantly and persist in your browser as a <strong>local draft</strong>. <em>Copy configuration</em> hands your agent the JSON and instructions to commit it.</p>
+          </article>
+          <article class="feature">
+            <h3>Leave things alone</h3>
+            <p>Exempt logos, maps or charts with <code>data-unpolish-ignore</code> or an <code>exclude</code> selector. Canvas, WebGL and cross-origin frames are always left as they are.</p>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <section class="keys" aria-labelledby="keys-title">
+      <div class="wrap two-col">
+        <div>
+          <p class="eyebrow">Keyboard</p>
+          <h2 id="keys-title">Made for presenting</h2>
+          <p>Switch fidelity mid-meeting without hunting for controls. Shortcuts never fire while you're typing in a field, and every action also has a pointer and touch equivalent.</p>
+          <p>Assign a direct key to any theme from <em>Shortcuts</em> in the panel. Unpolish shows what's bound, rejects duplicates, and steers you away from keys your browser or OS already own.</p>
+        </div>
+        <dl class="keytable">
+          <div><dt><kbd>\</kbd></dt><dd>Open or close the panel</dd></div>
+          <div><dt><kbd>1</kbd>–<kbd>4</kbd></dt><dd>Pick a theme while the panel is open</dd></div>
+          <div><dt><kbd>0</kbd></dt><dd>Restore Original while the panel is open</dd></div>
+          <div><dt><kbd>Esc</kbd></dt><dd>Dismiss the panel</dd></div>
+          <div><dt><kbd>Alt</kbd>+<kbd>S</kbd> <span class="opt">example</span></dt><dd>A direct theme shortcut you assign — recalls your tuned settings</dd></div>
+        </dl>
+      </div>
+    </section>
+
+    <section class="links" id="review-links" aria-labelledby="links-title">
+      <div class="wrap two-col">
+        <div>
+          <p class="eyebrow">Review links</p>
+          <h2 id="links-title">Send the exact fidelity you mean</h2>
+          <p><em>Copy review link</em> keeps the current route, your app's own query parameters and hash, and adds namespaced Unpolish parameters.</p>
+          <p>Links apply the <strong>saved project preset</strong> — never the recipient's local edits — and survive client-side navigation. If your theme has unsaved tweaks a link can't carry, Unpolish asks you to save them first.</p>
+          <p>Hidden controls are a presentation preference, not a lock: <kbd>\</kbd> still opens the panel.</p>
+        </div>
+        <div class="url-card">
+          <code class="url-line">/plan/lisbon?tab=venues<mark>&amp;unpolish=blueprint&amp;unpolish-roughness=60&amp;unpolish-ui=hidden</mark>#schedule</code>
+          <dl class="params">
+            <div><dt><code>unpolish</code></dt><dd><code>original</code>, <code>black-white</code>, <code>sketch</code>, <code>blueprint</code>, <code>pastel</code></dd></div>
+            <div><dt><code>unpolish-roughness</code></dt><dd><code>0</code>–<code>100</code></dd></div>
+            <div><dt><code>unpolish-ui</code></dt><dd><code>visible</code> or <code>hidden</code></dd></div>
+          </dl>
+          <p class="fine">Precedence: URL, then your local draft, then the project config. Invalid values fall back quietly.</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="limits" aria-labelledby="limits-title">
+      <div class="wrap two-col">
+        <div>
+          <p class="eyebrow">Honest about edges</p>
+          <h2 id="limits-title">Broad coverage, not magic</h2>
+          <p>Unpolish reads each element's rendered styles and restyles roles — surfaces, lines, fills, text, media, states — through one reversible stylesheet. It works with plain HTML, React, Vue, Svelte and most styling systems, including dynamic content, dialogs, menus and tooltips.</p>
+        </div>
+        <ul class="limit-list">
+          <li><strong>Canvas and WebGL</strong> draw their own pixels, so they keep their look.</li>
+          <li><strong>Cross-origin iframes and closed shadow roots</strong> are out of reach. Open shadow roots are themed.</li>
+          <li><strong>Custom components</strong> occasionally need a role hint or a small CSS override in the config.</li>
+          <li><strong>Typography</strong> swaps can nudge text widths slightly; pick <em>Keep original</em> for pixel-tight layouts.</li>
+          <li><strong>Modern browsers</strong> only: Chrome/Edge 111+, Safari 16.4+, Firefox 113+.</li>
+        </ul>
+      </div>
+    </section>
+
+    <section class="closing">
+      <div class="wrap closing-inner">
+        <h2>Bring the conversation back to the work.</h2>
+        <button class="btn btn-accent btn-lg" type="button" data-copy-prompt>
+          <span class="swap"><svg viewBox="0 0 16 16" aria-hidden="true"><rect x="5.5" y="5.5" width="7.5" height="7.5" rx="2" stroke="currentColor" stroke-width="1.4" fill="none"/><path d="M10.5 3.6V3.5A1.5 1.5 0 009 2H4a1.5 1.5 0 00-1.5 1.5V9A1.5 1.5 0 004 10.5h.1" stroke="currentColor" stroke-width="1.4" fill="none"/></svg><span>Copy installation prompt</span></span>
+        </button>
+      </div>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <div class="wrap footer-inner">
+      <span>Unpolish v<span id="version">0.1.0</span> · MIT</span>
+      <span><a href="unpolish/README.md">Integration &amp; removal guide</a> · <a href="docs/VALIDATION.md">What we validated</a></span>
+    </div>
+  </footer>
+
+  <div class="toast" role="status" aria-live="polite" id="toast"></div>
+  <script src="site/site.js"></script>
+</body>
+</html>

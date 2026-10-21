@@ -1,0 +1,89 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "unpolish.config.schema.json",
+  "title": "Unpolish configuration",
+  "description": "Shared, version-controlled project presets for Unpolish. Everything is optional; omitted values use built-in defaults.",
+  "type": "object",
+  "properties": {
+    "$schema": { "type": "string" },
+    "version": { "const": 1 },
+    "id": { "type": "string", "description": "Short project id. Namespaces local drafts in browser storage so prototypes on the same origin don't share them." },
+    "enabled": { "type": "boolean", "default": true, "description": "Set false to load the script without starting it (for example in production builds)." },
+    "defaultTheme": { "$ref": "#/$defs/themeOrOriginal", "default": "original" },
+    "ui": { "enum": ["visible", "hidden"], "default": "visible", "description": "hidden removes the launcher; the toggle shortcut still opens the panel." },
+    "launcher": { "anyOf": [{ "enum": ["bottom-right", "bottom-left", "top-right", "top-left"] }, { "const": false }], "default": "bottom-right" },
+    "webFonts": { "type": "boolean", "default": true, "description": "Load Balsamiq Sans, IBM Plex and Nunito from Google Fonts when a theme uses them. When false, system fallbacks are used." },
+    "exclude": { "type": "array", "items": { "type": "string" }, "description": "CSS selectors for elements and regions Unpolish must not restyle. Elements with data-unpolish-ignore are always excluded." },
+    "roles": {
+      "type": "object",
+      "description": "Selector → role hints for custom components the automatic classifier gets wrong.",
+      "additionalProperties": { "enum": ["surface", "fill", "media", "icon", "plain"] }
+    },
+    "shortcuts": {
+      "type": "object",
+      "properties": {
+        "toggle": { "type": "string", "default": "\\", "description": "Opens and closes the panel, e.g. \"\\\\\" or \"Alt+U\"." },
+        "themes": {
+          "type": "object",
+          "description": "Direct theme shortcuts that work with the panel closed, e.g. { \"sketch\": \"Alt+S\" }.",
+          "propertyNames": { "$ref": "#/$defs/themeOrOriginal" },
+          "additionalProperties": { "type": "string" }
+        }
+      },
+      "additionalProperties": false
+    },
+    "themes": {
+      "type": "object",
+      "description": "Tuned presets per theme. Unlisted settings use the built-in defaults.",
+      "properties": {
+        "black-white": { "$ref": "#/$defs/settings" },
+        "sketch": { "$ref": "#/$defs/settings" },
+        "blueprint": { "$ref": "#/$defs/settings" },
+        "pastel": { "$ref": "#/$defs/settings" }
+      },
+      "additionalProperties": false
+    },
+    "overrides": {
+      "type": "object",
+      "description": "Project-specific CSS, scoped to a theme (or \"*\" for all themes) and nested under html[data-unpolish]. Use !important to win over Unpolish rules. Variables such as --up-ink, --up-surface, --up-line and --up-accent are available.",
+      "propertyNames": { "enum": ["*", "black-white", "sketch", "blueprint", "pastel"] },
+      "additionalProperties": { "type": "string" }
+    }
+  },
+  "additionalProperties": false,
+  "$defs": {
+    "themeOrOriginal": { "enum": ["original", "black-white", "sketch", "blueprint", "pastel"] },
+    "color": { "type": "string", "description": "Any CSS color" },
+    "settings": {
+      "type": "object",
+      "properties": {
+        "roughness": { "type": "integer", "minimum": 0, "maximum": 100 },
+        "palette": {
+          "type": "object",
+          "properties": {
+            "paper": { "$ref": "#/$defs/color" }, "surface": { "$ref": "#/$defs/color" }, "ink": { "$ref": "#/$defs/color" },
+            "muted": { "$ref": "#/$defs/color" }, "line": { "$ref": "#/$defs/color" }, "accent": { "$ref": "#/$defs/color" },
+            "danger": { "$ref": "#/$defs/color" }, "success": { "$ref": "#/$defs/color" }, "warning": { "$ref": "#/$defs/color" },
+            "block1": { "$ref": "#/$defs/color" }, "block2": { "$ref": "#/$defs/color" }, "block3": { "$ref": "#/$defs/color" },
+            "block4": { "$ref": "#/$defs/color" }, "block5": { "$ref": "#/$defs/color" }
+          },
+          "additionalProperties": false
+        },
+        "typography": { "enum": ["original", "neutral", "hand", "technical", "rounded"] },
+        "border": {
+          "type": "object",
+          "properties": {
+            "weight": { "type": "number", "minimum": 0, "maximum": 4 },
+            "style": { "enum": ["solid", "dashed", "hand", "none"] }
+          },
+          "additionalProperties": false
+        },
+        "radius": { "anyOf": [{ "const": "keep" }, { "type": "number", "minimum": 0, "maximum": 40 }] },
+        "shadows": { "enum": ["none", "soft", "flat"] },
+        "details": { "type": "boolean" },
+        "images": { "enum": ["original", "simplified", "placeholder"] }
+      },
+      "additionalProperties": false
+    }
+  }
+}
