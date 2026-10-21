@@ -23,6 +23,7 @@ export default defineConfig({
       name: 'perf',
       testMatch: /perf\.spec\.js|heavy\.spec\.js/,
       fullyParallel: false,
+      workers: 1,
       timeout: 90_000,
       dependencies: ['app'],
       use: { ...use, baseURL: 'http://localhost:4174' },
