@@ -1,0 +1,14 @@
+{
+  "$schema": "./unpolish/unpolish.config.schema.json",
+  "version": 1,
+  "id": "my-prototype",
+  "defaultTheme": "original",
+  "ui": "visible",
+  "exclude": [],
+  "include": [],
+  "shortcuts": {
+    "toggle": "\\",
+    "themes": {}
+  },
+  "themes": {}
+}

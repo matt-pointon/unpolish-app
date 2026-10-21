@@ -13,7 +13,8 @@
     "ui": { "enum": ["visible", "hidden"], "default": "visible", "description": "hidden removes the launcher; the toggle shortcut still opens the panel." },
     "launcher": { "anyOf": [{ "enum": ["bottom-right", "bottom-left", "top-right", "top-left"] }, { "const": false }], "default": "bottom-right" },
     "webFonts": { "type": "boolean", "default": true, "description": "Load Balsamiq Sans, IBM Plex and Nunito from Google Fonts when a theme uses them. When false, system fallbacks are used." },
-    "exclude": { "type": "array", "items": { "type": "string" }, "description": "CSS selectors for elements and regions Unpolish must not restyle. Always excluded: data-unpolish-ignore, Google Maps (gmp-map, gmp-advanced-marker, .gm-style), and the Unpolish UI. Canvas, video and iframe internals are not walked." },
+    "exclude": { "type": "array", "items": { "type": "string" }, "description": "CSS selectors for extra regions Unpolish must not restyle (original look, no placeholder). Always ignored: data-unpolish-ignore and the Unpolish UI. Maps, images, canvas, video, iframe, svg internals, object and embed are skipped automatically and drawn as a wireframe placeholder." },
+    "include": { "type": "array", "items": { "type": "string" }, "description": "CSS selectors that opt a skipped region back into classification. Equivalent to data-unpolish=\"keep\" on the element. Do not include huge maps." },
     "roles": {
       "type": "object",
       "description": "Selector → role hints for custom components the automatic classifier gets wrong.",

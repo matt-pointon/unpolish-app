@@ -21,7 +21,7 @@ export default defineConfig({
     // After installer tests so the existing CI retry is not racing Next.js.
     {
       name: 'perf',
-      testMatch: /perf\.spec\.js/,
+      testMatch: /perf\.spec\.js|heavy\.spec\.js/,
       fullyParallel: false,
       timeout: 90_000,
       dependencies: ['app'],

@@ -1,0 +1,120 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Unpolish heavy map fixture</title>
+  <style>
+    html, body { margin: 0; height: 100%; font: 14px/1.4 ui-sans-serif, system-ui, sans-serif; background: #f3f1ea; color: #1c1914; }
+    #app { display: grid; grid-template-columns: 280px 1fr; min-height: 100%; }
+    .sidebar { padding: 16px; background: #fff; border-right: 1px solid #ddd6c8; }
+    .sidebar h1 { margin: 0 0 8px; font-size: 20px; }
+    .card { background: #faf8f3; border: 1px solid #e0d8c8; border-radius: 8px; padding: 8px 10px; margin: 0 0 8px; }
+    .card b { display: block; }
+    .media { display: block; width: 100%; height: 88px; margin: 0 0 10px; background: #dbeafe; }
+    .leaflet-container, .map-like {
+      position: relative;
+      height: 100%;
+      min-height: 640px;
+      overflow: hidden;
+      background: #9dbf8a;
+    }
+    .marker {
+      position: absolute;
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #c2410c;
+      box-shadow: 0 0 0 1px #fff;
+    }
+    .marker.hot { background: #1d4ed8; }
+    #kept-map { height: 72px; min-height: 72px; margin: 10px 0; border: 1px solid #bbb; }
+    #kept-map .marker { width: 10px; height: 10px; }
+  </style>
+  <script>
+    window.UnpolishConfig = {
+      version: 1,
+      id: 'heavy-map',
+      defaultTheme: 'original',
+      ui: 'hidden',
+      webFonts: false,
+      exclude: [],
+      include: ['#kept-map']
+    };
+    (function () {
+      var q = new URLSearchParams(location.search);
+      var src = q.get('bundle') === '0.1.2' ? '/releases/0.1.2/unpolish.js' : '/unpolish/unpolish.js';
+      var s = document.createElement('script');
+      s.src = src;
+      s.defer = true;
+      document.head.appendChild(s);
+    })();
+  </script>
+</head>
+<body>
+  <div id="app">
+    <aside class="sidebar">
+      <h1>Field sites</h1>
+      <p class="lead">A working map prototype with live markers.</p>
+      <div class="card" data-testid="ui-card"><b>North lake</b> 12 plots</div>
+      <div class="card"><b>River bend</b> 4 plots</div>
+      <div class="card"><b>Ridge</b> 9 plots</div>
+      <picture data-testid="photo">
+        <img class="media" width="240" height="88" alt="Lake"
+          src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='240' height='88'%3E%3Crect fill='%233b82f6' width='240' height='88'/%3E%3C/svg%3E">
+      </picture>
+      <canvas class="media" data-testid="canvas" width="240" height="88"></canvas>
+      <iframe class="media" data-testid="frame" title="Embed" srcdoc="<body style='margin:0;background:#f59e0b;font:16px sans-serif;display:grid;place-items:center;height:100%'>Live iframe</body>"></iframe>
+      <img data-testid="kept-image" data-unpolish="keep" class="media" width="240" height="88" alt="Kept"
+        src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='240' height='88'%3E%3Crect fill='%2316a34a' width='240' height='88'/%3E%3C/svg%3E">
+      <div id="kept-map" class="leaflet-container" data-testid="kept-map" data-unpolish="keep"></div>
+    </aside>
+    <div id="map" class="leaflet-container" data-testid="map" role="application" aria-label="Site map"></div>
+  </div>
+  <script>
+    const MARKERS = 11900;
+    const map = document.getElementById('map');
+    const kept = document.getElementById('kept-map');
+    const canvas = document.querySelector('[data-testid="canvas"]');
+    const ctx = canvas.getContext('2d');
+    ctx.fillStyle = '#ef4444';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.fillStyle = '#fff';
+    ctx.fillText('chart', 16, 48);
+
+    const frag = document.createDocumentFragment();
+    for (let i = 0; i < MARKERS; i++) {
+      const el = document.createElement('div');
+      el.className = 'marker';
+      el.style.cssText = 'position:absolute;left:' + ((i * 17) % 920) + 'px;top:' + ((i * 11) % 620) + 'px';
+      el.dataset.i = String(i);
+      frag.appendChild(el);
+    }
+    map.appendChild(frag);
+    for (let i = 0; i < 4; i++) {
+      const el = document.createElement('div');
+      el.className = 'marker';
+      el.style.cssText = 'position:absolute;left:' + (12 + i * 22) + 'px;top:28px';
+      kept.appendChild(el);
+    }
+
+    window.__heavy = {
+      markers: MARKERS,
+      nodes: document.querySelectorAll('*').length
+    };
+
+    const markers = map.children;
+    let n = 0;
+    function tick() {
+      n++;
+      const slice = 64;
+      for (let i = 0; i < slice; i++) {
+        const m = markers[(n * 3 + i * 97) % markers.length];
+        m.style.transform = 'translate(' + ((n + i) % 10) + 'px,' + ((n * 2 + i) % 8) + 'px)';
+        m.classList.toggle('hot', ((n + i) % 2) === 0);
+      }
+      requestAnimationFrame(tick);
+    }
+    requestAnimationFrame(tick);
+  </script>
+</body>
+</html>

@@ -93,6 +93,7 @@ function createUnpolish() {
     launcher: 'bottom-right',
     webFonts: true,
     exclude: [],
+    include: [],
     roles: {},
     shortcuts: { toggle: '\\', themes: {} },
     themes: {},
@@ -137,6 +138,36 @@ function createUnpolish() {
   function clamp(n, lo, hi) { return Math.min(hi, Math.max(lo, n)); }
   function round(n, p) { var f = Math.pow(10, p || 0); return Math.round(n * f) / f; }
   function warn() { try { console.warn.apply(console, ['[unpolish]'].concat([].slice.call(arguments))); } catch (e) { /* noop */ } }
+  function validSelectors(list, kind) {
+    return (Array.isArray(list) ? list : [list]).filter(function (sel) {
+      if (typeof sel !== 'string' || !sel.trim()) return false;
+      try { document.createDocumentFragment().querySelector(sel); return true; } catch (e) { warn('Ignoring invalid ' + kind + ' selector:', sel); return false; }
+    });
+  }
+  function keptWhere(include) {
+    var parts = [KEEP_SEL, KEEP_SEL + ' *'];
+    splitSel(include || '').forEach(function (s) { if (s) { parts.push(s); parts.push(s + ' *'); } });
+    return ':where(' + parts.join(', ') + ')';
+  }
+  function skipKind(el) {
+    var tag = el.tagName;
+    if (tag === 'IMG' || tag === 'PICTURE') return 'image';
+    if (tag === 'VIDEO') return 'video';
+    if (tag === 'CANVAS') return 'canvas';
+    if (tag === 'IFRAME' || tag === 'EMBED' || tag === 'OBJECT') return 'media';
+    if (/^GMP-/.test(tag)) return 'map';
+    try { if (el.matches(MAP_WIDGET_SEL)) return 'map'; } catch (e) { /* invalid */ }
+    return 'heavy';
+  }
+  function absMajority(el) {
+    var kids = el.children, n = Math.min(kids.length, 24), abs = 0, i;
+    if (!n) return false;
+    for (i = 0; i < n; i++) {
+      var s = kids[i].getAttribute('style') || '';
+      if (/position\s*:\s*(absolute|fixed)/i.test(s)) abs++;
+    }
+    return abs * 2 >= n;
+  }
   function normTheme(id) {
     if (id == null) return null;
     id = String(id).trim().toLowerCase();
@@ -144,12 +175,23 @@ function createUnpolish() {
     return id === 'original' || THEMES[id] ? id : null;
   }
   function raf(fn) { return (window.requestAnimationFrame || setTimeout)(fn); }
+  function scheduleIdle(fn) {
+    if (typeof requestIdleCallback === 'function') return requestIdleCallback(fn, { timeout: 48 });
+    return raf(fn);
+  }
   function now() { return (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now(); }
   var WORK_BUDGET_MS = 8;
-  // Regions that churn or must keep their own look. data-unpolish-ignore is always honoured;
-  // Google Maps (gmp-* / .gm-style) is skipped even without a project exclude.
-  var BUILTIN_EXEMPT = ['[data-unpolish-ignore]', 'unpolish-harness', '#unpolish-filters', '#unpolish-probe', 'gmp-map', 'gmp-advanced-marker', '.gm-style'];
-  var MEDIA_LEAF = { CANVAS: 1, VIDEO: 1, IFRAME: 1, EMBED: 1, OBJECT: 1 };
+  var BATCH_MAX = 24;
+  var HEAVY_CHILD_MIN = 80;
+  var CHURN_WINDOW_MS = 1000;
+  var CHURN_MARK_MIN = 30;
+  // Regions that must keep their own look. data-unpolish-ignore and project exclude
+  // win over skip-placeholders. Maps and media are skipped separately (placeholder, no walk).
+  var BUILTIN_EXEMPT = ['[data-unpolish-ignore]', 'unpolish-harness', '#unpolish-filters'];
+  var MEDIA_LEAF = { IMG: 1, PICTURE: 1, VIDEO: 1, CANVAS: 1, IFRAME: 1, EMBED: 1, OBJECT: 1 };
+  var MAP_WIDGET_SEL = '.leaflet-container, .mapboxgl-map, .maplibregl-map, .gm-style, gmp-map, .ol-viewport, [class*="deckgl"], [class*="deck-gl"], [role="application"]:not(html, body)';
+  var SKIP_MEDIA_SEL = 'img, picture, video, canvas, iframe, object, embed';
+  var KEEP_SEL = '[data-unpolish="keep"]';
   var ANIM_STYLE = /^(transform|translate|rotate|scale|offset|opacity|filter|perspective|perspective-origin|transform-origin|will-change|left|top|right|bottom|x|y|cx|cy|d|points|transition|animation|offset-path|offset-distance|offset-rotate|contain|content-visibility)$/i;
   function styleDecls(s) {
     var out = {};
@@ -318,10 +360,8 @@ function createUnpolish() {
     cfg.defaultTheme = normTheme(cfg.defaultTheme) || 'original';
     cfg.ui = cfg.ui === 'hidden' ? 'hidden' : 'visible';
     if (!/^(top|bottom)-(left|right)$/.test(cfg.launcher) && cfg.launcher !== false) cfg.launcher = 'bottom-right';
-    cfg.exclude = (Array.isArray(cfg.exclude) ? cfg.exclude : [cfg.exclude]).filter(function (sel) {
-      if (typeof sel !== 'string' || !sel.trim()) return false;
-      try { document.createDocumentFragment().querySelector(sel); return true; } catch (e) { warn('Ignoring invalid exclude selector:', sel); return false; }
-    });
+    cfg.exclude = validSelectors(cfg.exclude, 'exclude');
+    cfg.include = validSelectors(cfg.include, 'include');
     var themes = {};
     Object.keys(cfg.themes || {}).forEach(function (k) {
       var id = normTheme(k);
@@ -556,7 +596,11 @@ function createUnpolish() {
   function buildCSS(v, opts) {
     var P = opts.shadow ? '' : 'html[data-unpolish] ';
     var EXQ = ':is(' + opts.exempt + ')';
-    var NOTX = ':where(:not(' + EXQ + ', ' + EXQ + ' *))';
+    var SKIPQ = ':is(' + MAP_WIDGET_SEL + ', [data-unpolish-skip])';
+    var MEDIAQ = ':is(' + SKIP_MEDIA_SEL + ')';
+    var KEPTQ = keptWhere(opts.include);
+    var NOTKEEP = ':not(' + KEPTQ + ')';
+    var NOTX = ':where(:not(' + EXQ + ', ' + EXQ + ' *, ' + SKIPQ + ', ' + SKIPQ + ' *, ' + MEDIAQ + ':not(svg)))';
     var t = v.tones, I = ' !important';
     var css = [];
     function rule(sel, body) { css.push(sel + '{' + body + '}'); }
@@ -779,7 +823,7 @@ function createUnpolish() {
     rule(P + ':where(*' + NOTX + '):focus-visible', 'outline:2px solid var(--up-focus)' + I + ';outline-offset:2px' + I);
     rule(S('dialog::backdrop'), 'background-color:' + alpha(v.ink, 0.35) + I + ';backdrop-filter:none' + I);
 
-    // Media
+    // Media that was classified (opted-in with include / data-unpolish="keep", or svg / background-image).
     if (v.images === 'theme' || v.images === 'mono') {
       rule(S('[data-up~="media"]'), 'filter:' + v.imgFilter + I);
       rule(S('[data-up~="media-bg"][data-up~="solo"]'), 'filter:' + v.imgFilter + I);
@@ -792,6 +836,32 @@ function createUnpolish() {
       rule(S('svg[data-up~="media"] > *'), 'visibility:hidden' + I);
       rule(S('[data-up~="media-bg"]'), ph);
     }
+
+    // Skipped maps and media: one placeholder on the container, nothing restyled inside.
+    var hatch = 'repeating-linear-gradient(135deg, color-mix(in srgb, var(--up-line) 35%, transparent) 0 1px, transparent 1px 9px)';
+    var skipBox = 'position:relative' + I + ';isolation:isolate' + I + ';overflow:hidden' + I +
+      ';background-color:var(--up-ph-bg)' + I + ';background-image:' + hatch + ', var(--up-ph)' + I +
+      ';background-size:auto, 100% 100%' + I + ';background-repeat:repeat, no-repeat' + I +
+      ';border-radius:var(--up-radius, 4px)' + I + ';box-shadow:inset 0 0 0 100vmax color-mix(in srgb, var(--up-ph-bg) 82%, transparent)' + I;
+    var skipLabelCss = 'position:absolute' + I + ';inset:0' + I + ';display:flex' + I + ';align-items:center' + I +
+      ';justify-content:center' + I + ';margin:0' + I + ';padding:0.35em 0.6em' + I +
+      ';font:600 12px/1 var(--up-font, ui-sans-serif, system-ui, sans-serif)' + I +
+      ';letter-spacing:0.08em' + I + ';text-transform:uppercase' + I + ';color:var(--up-ink)' + I +
+      ';background:transparent' + I + ';pointer-events:none' + I + ';z-index:1' + I;
+    var NOTEX = ':not(' + EXQ + ', ' + EXQ + ' *)';
+    var skipRoots = ':is(' + MAP_WIDGET_SEL + ', [data-unpolish-skip="map"], [data-unpolish-skip="heavy"])' + NOTKEEP + NOTEX;
+    var skipMedia = ':is(' + SKIP_MEDIA_SEL + ', [data-unpolish-skip="image"], [data-unpolish-skip="video"], [data-unpolish-skip="canvas"], [data-unpolish-skip="media"], input[type="image"])' + NOTKEEP + NOTEX;
+    rule(S(skipRoots), skipBox);
+    rule(S(skipRoots + ' > *'), 'visibility:hidden' + I);
+    rule(S(skipRoots + '::after'), 'content:"Map"' + I + ';' + skipLabelCss + ';visibility:visible' + I);
+    rule(S('[data-unpolish-skip="heavy"]' + NOTKEEP + NOTEX + '::after'), 'content:"Skipped"' + I);
+    rule(S(skipMedia), skipBox + ';object-position:-99999px -99999px' + I + ';object-fit:none' + I);
+    rule(S('img' + NOTKEEP + NOTEX + ', picture' + NOTKEEP + NOTEX + ', [data-unpolish-skip="image"]' + NOTKEEP + NOTEX), skipBox);
+    rule(S('picture' + NOTKEEP + NOTEX + ' > *'), 'visibility:hidden' + I);
+    rule(S('picture' + NOTKEEP + NOTEX + '::after, [data-unpolish-skip="image"]' + NOTKEEP + NOTEX + '::after'), 'content:"Image"' + I + ';' + skipLabelCss);
+    rule(S('video' + NOTKEEP + NOTEX + '::after, [data-unpolish-skip="video"]' + NOTKEEP + NOTEX + '::after'), 'content:"Video"' + I + ';' + skipLabelCss);
+    rule(S('canvas' + NOTKEEP + NOTEX + '::after, [data-unpolish-skip="canvas"]' + NOTKEEP + NOTEX + '::after'), 'content:"Canvas"' + I + ';' + skipLabelCss);
+    rule(S(':is(iframe, embed, object)' + NOTKEEP + NOTEX + '::after, [data-unpolish-skip="media"]' + NOTKEEP + NOTEX + '::after'), 'content:"Media"' + I + ';' + skipLabelCss);
 
     // Project overrides
     var ov = opts.overrides || {};
@@ -854,20 +924,39 @@ function createUnpolish() {
 
   Classifier.prototype.isExempt = function (el) {
     if (!el || el.nodeType !== 1) return true;
-    if (/^GMP-/.test(el.tagName)) return true;
     try { return el.matches(this.engine.exemptSelector); } catch (e) { return false; }
   };
 
-  /* Collect elements under `root` in document order, skipping exempt subtrees. */
+  Classifier.prototype.isSkipRoot = function (el) {
+    if (!el || el.nodeType !== 1) return false;
+    if (el === document.body || el === document.documentElement) return false;
+    if (this.engine.isKept(el)) return false;
+    if (this.engine.heavy && this.engine.heavy.has(el)) return true;
+    var tag = el.tagName;
+    if (MEDIA_LEAF[tag]) return true;
+    if (/^GMP-/.test(tag)) return true;
+    try { if (el.matches(MAP_WIDGET_SEL)) return true; } catch (e) { /* invalid */ }
+    if (el.childElementCount >= HEAVY_CHILD_MIN && absMajority(el)) return true;
+    return false;
+  };
+
+  Classifier.prototype.markSkip = function (el, kind) {
+    if (!el || el.nodeType !== 1) return;
+    kind = kind || skipKind(el);
+    if (el.getAttribute('data-unpolish-skip') !== kind) el.setAttribute('data-unpolish-skip', kind);
+  };
+
+  /* Collect elements under `root` in document order, skipping exempt and heavy subtrees. */
   Classifier.prototype.collect = function (root, out, roots) {
     var self = this;
     (function walk(el) {
       var tag = el.tagName;
       if (SKIP[tag] && tag !== 'HTML' && tag !== 'BODY') return;
       if (self.isExempt(el)) { if (self.exemptRoots) self.exemptRoots.push(el); return; }
+      if (self.isSkipRoot(el)) { self.markSkip(el); return; }
       if (tag !== 'HTML' && tag !== 'BODY') out.push(el);
       if (el.shadowRoot && roots) roots.push(el.shadowRoot);
-      if (tag === 'svg' || tag === 'SVG' || MEDIA_LEAF[tag] || el instanceof SVGElement) return;
+      if (tag === 'svg' || tag === 'SVG' || el instanceof SVGElement) return;
       var kids = el.children;
       for (var i = 0; i < kids.length; i++) walk(kids[i]);
       if (el.shadowRoot && roots) {
@@ -1200,16 +1289,20 @@ function createUnpolish() {
     this.pendingNodes = new Set();
     this.workScheduled = false;
     this.exemptSelector = BUILTIN_EXEMPT.join(', ');
+    this.includeSelector = '';
     this.roleSelectors = {};
     this.lastCSS = '';
     this.fontsLoaded = {};
     this.exemptRules = [];
     this.exemptCount = 0;
+    this.heavy = new WeakSet();
+    this.churn = new WeakMap();
   }
 
   Engine.prototype.configure = function (cfg) {
     var ex = BUILTIN_EXEMPT.concat(cfg.exclude || []);
     this.exemptSelector = ex.join(', ');
+    this.includeSelector = (cfg.include || []).join(', ');
     this.overrides = cfg.overrides || {};
     this.webFonts = cfg.webFonts !== false;
     var roles = {};
@@ -1228,6 +1321,15 @@ function createUnpolish() {
     return null;
   };
 
+  Engine.prototype.isKept = function (el) {
+    if (!el || el.nodeType !== 1) return false;
+    try {
+      if (el.closest && el.closest(KEEP_SEL)) return true;
+      if (this.includeSelector && el.closest && el.closest(this.includeSelector)) return true;
+    } catch (e) { return false; }
+    return false;
+  };
+
   Engine.prototype.setDisabled = function (off) {
     if (this.style && this.style.sheet) this.style.sheet.disabled = off;
     this.shadowSheets.forEach(function (sheet) { sheet.disabled = off; });
@@ -1236,6 +1338,7 @@ function createUnpolish() {
   /* Read original styles for a batch with Unpolish switched off, then tag. */
   Engine.prototype.classify = function (els) {
     var c = this.classifier, eng = this;
+    els = (els || []).filter(function (el) { return el && el.isConnected && !eng.inSkipTree(el); });
     var exempts = (c.exemptRoots || []).filter(function (e) { return e.isConnected && !e.hasAttribute('data-unpolish-x') && e.tagName !== 'UNPOLISH-HARNESS' && e !== eng.filters && e !== eng.style; });
     c.exemptRoots = [];
     if (!els.length && !exempts.length) return;
@@ -1268,41 +1371,27 @@ function createUnpolish() {
     this.finishClassify(reads, exempts.length);
   };
 
-  /* Tag newly inserted nodes without disabling the theme sheet (that invalidates the whole page). */
-  Engine.prototype.ensureProbe = function () {
-    if (this.probe && this.probe.isConnected) return this.probe;
-    var probe = this.probe = document.createElement('div');
-    probe.id = 'unpolish-probe';
-    probe.setAttribute('data-unpolish-ignore', '');
-    probe.setAttribute('aria-hidden', 'true');
-    probe.style.cssText = 'position:absolute;left:-9999px;top:0;width:0;height:0;overflow:hidden;pointer-events:none';
-    (document.body || document.documentElement).appendChild(probe);
-    return probe;
-  };
-
-  Engine.prototype.classifyFresh = function (els) {
-    var c = this.classifier, probe = this.ensureProbe();
+  /* Mutation-path classify: read live styles without disabling the theme sheet
+   * (that would restyle the whole page) and without cloning into the document.
+   * Temporarily drop our own tokens so we see the prototype's colours. */
+  Engine.prototype.classifyLive = function (els) {
+    var c = this.classifier;
+    els = (els || []).filter(function (el) { return el && el.isConnected; });
     if (!els.length) return;
-    var htmlClass = document.documentElement.className || '';
-    var bodyClass = (document.body && document.body.className) || '';
-    var reads = els.map(function (el) {
-      var chain = [];
-      for (var n = el; n && n !== document.body && n !== document.documentElement; n = parentEl(n)) chain.unshift(n);
-      var wrap = document.createElement('div');
-      wrap.className = (htmlClass + ' ' + bodyClass).trim();
-      var leaf = wrap;
-      chain.forEach(function (orig) {
-        var copy = orig.cloneNode(false);
-        leaf.appendChild(copy);
-        leaf = copy;
-      });
-      probe.appendChild(wrap);
-      var r = c.read(leaf === wrap ? el : leaf);
-      probe.removeChild(wrap);
-      r.el = el;
-      return r;
+    var stripped = [];
+    els.forEach(function (el) {
+      if (el.hasAttribute('data-up')) {
+        stripped.push([el, el.getAttribute('data-up')]);
+        el.removeAttribute('data-up');
+      }
     });
-    reads.forEach(function (r) { c.parentInfo(r.el); });
+    var reads;
+    try {
+      reads = els.map(function (el) { return c.read(el); });
+      reads.forEach(function (r) { c.parentInfo(r.el); });
+    } finally {
+      stripped.forEach(function (pair) { pair[0].setAttribute('data-up', pair[1]); });
+    }
     this.finishClassify(reads, false);
   };
 
@@ -1338,12 +1427,31 @@ function createUnpolish() {
     this.classifier.exemptRoots = [];
     var roots = [];
     var els = this.classifier.collect(document.body, [], roots);
-    this.classifier.info = new WeakMap();
-    this.classifier.memo = new WeakMap();
-    this.classify(els);
+    // Keep memo/info across resize so we re-decide from cached reads, not a full reclassify.
+    this.retagCached(els);
     if (this.observer) this.observer.takeRecords();
     var self = this;
     roots.forEach(function (r) { self.attachShadow(r); });
+  };
+
+  Engine.prototype.retagCached = function (els) {
+    var c = this.classifier, vw = window.innerWidth, vh = window.innerHeight, need = [], i;
+    for (i = 0; i < els.length; i++) {
+      var el = els[i];
+      if (!el.isConnected) continue;
+      var sig = attrSig(el), bag = c.memo.get(el), hit = bag && bag[sig];
+      if (hit && hit.read) {
+        try {
+          var rect = el.getBoundingClientRect();
+          var tokens = c.decide(hit.read, rect, vw, vh);
+          c.write(el, tokens);
+          bag[sig] = { tokens: tokens, rect: rect, read: hit.read };
+        } catch (e) { warn('classify', e); }
+      } else {
+        need.push(el);
+      }
+    }
+    if (need.length) this.classify(need);
   };
 
   Engine.prototype.attachShadow = function (root) {
@@ -1384,7 +1492,6 @@ function createUnpolish() {
       this.filters.setAttribute('style', 'position:absolute;width:0;height:0;overflow:hidden;pointer-events:none;left:-9999px;top:0');
     }
     if (!this.filters.isConnected) document.body.appendChild(this.filters);
-    this.ensureProbe();
   };
 
   Engine.prototype.suppressTransitions = function () {
@@ -1419,8 +1526,8 @@ function createUnpolish() {
     this.ensureNodes();
     var v = derive(id, settings);
     this.loadFont(v.typography);
-    var css = buildCSS(v, { exempt: this.exemptSelector, overrides: this.overrides });
-    this.shadowCSS = buildCSS(v, { exempt: this.exemptSelector, shadow: true });
+    var css = buildCSS(v, { exempt: this.exemptSelector, include: this.includeSelector, overrides: this.overrides });
+    this.shadowCSS = buildCSS(v, { exempt: this.exemptSelector, include: this.includeSelector, shadow: true });
     if (changedTheme) this.suppressTransitions();
     if (css !== this.lastCSS) { this.style.textContent = css; this.lastCSS = css; }
     var fx = buildFilters(v);
@@ -1448,7 +1555,6 @@ function createUnpolish() {
     if (this.style) this.style.remove();
     if (this.filters) this.filters.remove();
     if (this.exemptStyle) this.exemptStyle.remove();
-    if (this.probe) { this.probe.remove(); this.probe = null; }
     this.exemptRules = [];
     this.lastCSS = '';
     var self = this;
@@ -1458,8 +1564,12 @@ function createUnpolish() {
     this.shadowSheets.clear();
     this.shadowRoots.clear();
     function strip(root) {
-      var nodes = root.querySelectorAll('[data-up], [data-unpolish-x]');
-      for (var i = 0; i < nodes.length; i++) { nodes[i].removeAttribute('data-up'); nodes[i].removeAttribute('data-unpolish-x'); }
+      var nodes = root.querySelectorAll('[data-up], [data-unpolish-x], [data-unpolish-skip]');
+      for (var i = 0; i < nodes.length; i++) {
+        nodes[i].removeAttribute('data-up');
+        nodes[i].removeAttribute('data-unpolish-x');
+        nodes[i].removeAttribute('data-unpolish-skip');
+      }
       var all = root.querySelectorAll('*');
       for (var j = 0; j < all.length; j++) if (all[j].shadowRoot) strip(all[j].shadowRoot);
     }
@@ -1472,16 +1582,46 @@ function createUnpolish() {
 
   Engine.prototype.isOwnNode = function (el) {
     if (!el || el.nodeType !== 1) return true;
-    if (el === this.style || el === this.filters || el === this.guard || el === this.exemptStyle || el === this.probe) return true;
+    if (el === this.style || el === this.filters || el === this.guard || el === this.exemptStyle) return true;
     if (el.id && el.id.indexOf('unpolish-') === 0) return true;
     if (el.tagName === 'UNPOLISH-HARNESS') return true;
-    return !!(el.closest && el.closest('unpolish-harness, #unpolish-filters, #unpolish-theme, #unpolish-guard, #unpolish-exempt, #unpolish-probe'));
+    return !!(el.closest && el.closest('unpolish-harness, #unpolish-filters, #unpolish-theme, #unpolish-guard, #unpolish-exempt'));
   };
 
   Engine.prototype.inExemptTree = function (el) {
     if (!el || el.nodeType !== 1) return true;
-    if (/^GMP-/.test(el.tagName)) return true;
     try { return !!(el.closest && el.closest(this.exemptSelector)); } catch (e) { return false; }
+  };
+
+  Engine.prototype.inSkipTree = function (el) {
+    if (!el || el.nodeType !== 1) return false;
+    if (this.isKept(el)) return false;
+    var tag = el.tagName;
+    if (MEDIA_LEAF[tag] || /^GMP-/.test(tag)) return true;
+    if (el instanceof SVGElement && tag !== 'svg' && tag !== 'SVG') return true;
+    try {
+      if (el.closest && el.closest(MAP_WIDGET_SEL + ', [data-unpolish-skip], ' + SKIP_MEDIA_SEL)) return true;
+    } catch (e) { return false; }
+    return false;
+  };
+
+  Engine.prototype.noteChurn = function (el) {
+    if (!el || this.isKept(el) || this.inExemptTree(el)) return;
+    var t = now(), node = el, depth = 0;
+    while (node && node !== document.body && depth < 6) {
+      if (node.childElementCount >= 40 && absMajority(node)) {
+        var rec = this.churn.get(node);
+        if (!rec || t - rec.at > CHURN_WINDOW_MS) rec = { at: t, n: 0 };
+        rec.n++;
+        this.churn.set(node, rec);
+        if (rec.n >= CHURN_MARK_MIN) {
+          this.heavy.add(node);
+          this.classifier.markSkip(node, 'heavy');
+        }
+      }
+      node = parentEl(node);
+      depth++;
+    }
   };
 
   Engine.prototype.scheduleFullPass = function () {
@@ -1494,19 +1634,19 @@ function createUnpolish() {
     if (this.workScheduled) return;
     this.workScheduled = true;
     var self = this;
-    raf(function () { self.flushWork(); });
+    scheduleIdle(function () { self.flushWork(); });
   };
 
   Engine.prototype.queueRoot = function (el) {
     if (!el || el.nodeType !== 1 || !el.isConnected) return;
-    if (this.isOwnNode(el) || this.inExemptTree(el)) return;
+    if (this.isOwnNode(el) || this.inExemptTree(el) || this.inSkipTree(el)) return;
     this.pendingRoots.add(el);
     this.scheduleWork();
   };
 
   Engine.prototype.queueNode = function (el) {
     if (!el || el.nodeType !== 1 || !el.isConnected) return;
-    if (this.isOwnNode(el) || this.inExemptTree(el)) return;
+    if (this.isOwnNode(el) || this.inExemptTree(el) || this.inSkipTree(el)) return;
     this.pendingNodes.add(el);
     this.scheduleWork();
   };
@@ -1555,7 +1695,7 @@ function createUnpolish() {
     var list = [], seen = new Set(), shadowRoots = [], self = this;
 
     roots.forEach(function (el) {
-      if (!el.isConnected || self.isOwnNode(el) || self.inExemptTree(el)) return;
+      if (!el.isConnected || self.isOwnNode(el) || self.inExemptTree(el) || self.inSkipTree(el)) return;
       var p = parentEl(el);
       while (p && p !== document.documentElement && p !== document.body) {
         if (roots.has(p)) return;
@@ -1565,7 +1705,7 @@ function createUnpolish() {
     });
     list.forEach(function (el) { seen.add(el); });
     nodes.forEach(function (el) {
-      if (!el.isConnected || seen.has(el) || self.isOwnNode(el) || self.inExemptTree(el)) return;
+      if (!el.isConnected || seen.has(el) || self.isOwnNode(el) || self.inExemptTree(el) || self.inSkipTree(el)) return;
       var p = parentEl(el), covered = false;
       while (p && p !== document.documentElement) {
         if (roots.has(p) || seen.has(p)) { covered = true; break; }
@@ -1575,7 +1715,7 @@ function createUnpolish() {
       seen.add(el);
       list.push(el);
     });
-    list = list.filter(function (el) { return el.isConnected && !self.isOwnNode(el) && !self.inExemptTree(el); });
+    list = list.filter(function (el) { return el.isConnected && !self.isOwnNode(el) && !self.inExemptTree(el) && !self.inSkipTree(el); });
     list.sort(function (a, b) { return a === b ? 0 : (a.compareDocumentPosition(b) & 4 ? -1 : 1); });
     this.flushClassify(list, 0, shadowRoots, now());
   };
@@ -1583,18 +1723,25 @@ function createUnpolish() {
   Engine.prototype.flushClassify = function (list, start, shadowRoots, t0) {
     this.workScheduled = false;
     if (!this.active) return;
-    var fresh = [], known = [], i = start, c = this.classifier;
+    var need = [], i = start, c = this.classifier, self = this;
     var vw = window.innerWidth, vh = window.innerHeight;
     for (; i < list.length; i++) {
-      if (i > start && now() - t0 >= WORK_BUDGET_MS) {
-        var later = this;
+      var el = list[i];
+      if (!el.isConnected || self.isOwnNode(el) || self.inExemptTree(el) || self.inSkipTree(el)) continue;
+      if ((need.length && now() - t0 >= WORK_BUDGET_MS) || need.length >= BATCH_MAX) {
         this.workScheduled = true;
-        raf(function () { later.flushClassify(list, i, shadowRoots, now()); });
-        this.tagBatch(fresh, known, shadowRoots, true);
+        scheduleIdle(function () { self.flushClassify(list, i, shadowRoots, now()); });
+        this.tagBatch(need, shadowRoots, true);
         return;
       }
-      var el = list[i], sig = attrSig(el), bag = c.memo.get(el), hit = bag && bag[sig];
+      var sig = attrSig(el), bag = c.memo.get(el), hit = bag && bag[sig];
       if (hit && hit.read) {
+        if (now() - t0 >= WORK_BUDGET_MS && i > start) {
+          this.workScheduled = true;
+          scheduleIdle(function () { self.flushClassify(list, i, shadowRoots, now()); });
+          this.tagBatch(need, shadowRoots, true);
+          return;
+        }
         var tagged = c.tags.get(el);
         var cached = hit.rect;
         var tiny = !cached || cached.width < 10 || cached.height < 10;
@@ -1611,19 +1758,14 @@ function createUnpolish() {
         } catch (e) { warn('classify', e); }
         continue;
       }
-      if (c.tags.get(el)) known.push(el);
-      else fresh.push(el);
+      need.push(el);
     }
-    this.tagBatch(fresh, known, shadowRoots, false);
+    this.tagBatch(need, shadowRoots, false);
   };
 
-  Engine.prototype.tagBatch = function (fresh, known, shadowRoots, moreComing) {
-    // Mutation-path tagging never disables the theme sheet: that would force a
-    // full-document style recalc. New nodes and first-seen class/state signatures
-    // are read from the ignore probe; repeats hit Classifier.memo. A cached
-    // 0×0 rect (e.g. a closed <details> child) is remeasured when it appears.
-    if (fresh.length) this.classifyFresh(fresh);
-    if (known.length) this.classifyFresh(known);
+  Engine.prototype.tagBatch = function (need, shadowRoots, moreComing) {
+    // Read the whole batch, then write. No clone-and-measure, no per-element insert.
+    if (need && need.length) this.classifyLive(need);
     if ((this.classifier.exemptRoots || []).length) this.classify([]);
     if (moreComing) return;
     var eng = this;
@@ -1638,7 +1780,7 @@ function createUnpolish() {
       var rec = recs[i], t = rec.target;
       if (t.nodeType === 1 && this.isOwnNode(t)) continue;
       if (rec.type === 'childList') {
-        if (t.nodeType === 1 && MEDIA_LEAF[t.tagName]) continue;
+        if (t.nodeType === 1 && (MEDIA_LEAF[t.tagName] || this.inSkipTree(t))) continue;
         for (var j = 0; j < rec.addedNodes.length; j++) {
           var n = rec.addedNodes[j];
           if (n.nodeType !== 1 || SKIP[n.tagName]) continue;
@@ -1652,7 +1794,13 @@ function createUnpolish() {
             } catch (e) { /* invalid */ }
             continue;
           }
+          if (this.classifier.isSkipRoot(n)) {
+            this.classifier.markSkip(n);
+            continue;
+          }
+          if (this.inSkipTree(n)) continue;
           if (n.getRootNode && n.getRootNode() instanceof ShadowRoot && n.getRootNode() === this.app.ui.root) continue;
+          this.noteChurn(n);
           this.queueRoot(n);
         }
         if (t === document.head || t === html) {
@@ -1665,13 +1813,15 @@ function createUnpolish() {
           if (html.getAttribute('data-unpolish') !== this.active) html.setAttribute('data-unpolish', this.active);
           continue;
         }
-        if (name === 'data-up' || name === 'data-unpolish-x') continue;
+        if (name === 'data-up' || name === 'data-unpolish-x' || name === 'data-unpolish-skip') continue;
         if (t === html || t === document.body) {
           if (name === 'class' || name === 'data-state') this.scheduleFullPass();
           continue;
         }
-        if (this.inExemptTree(t) || MEDIA_LEAF[t.tagName]) continue;
+        if (this.inExemptTree(t) || this.inSkipTree(t) || MEDIA_LEAF[t.tagName]) continue;
         if (name === 'style' && !styleAffectsTheme(rec.oldValue, t.getAttribute('style'))) continue;
+        this.noteChurn(t);
+        if (this.inSkipTree(t)) continue;
         this.queueAttr(t, name === 'class' || name === 'open' || name === 'hidden' || name === 'data-state');
       }
     }
@@ -2963,6 +3113,7 @@ function createUnpolish() {
     if (cfg.launcher !== 'bottom-right') out.launcher = cfg.launcher;
     if (cfg.webFonts === false) out.webFonts = false;
     out.exclude = cfg.exclude;
+    if (cfg.include && cfg.include.length) out.include = cfg.include;
     if (Object.keys(cfg.roles || {}).length) out.roles = cfg.roles;
     out.shortcuts = this.shortcuts();
     out.themes = {};

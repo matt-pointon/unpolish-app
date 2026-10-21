@@ -77,18 +77,18 @@ test('exempt regions, canvas and project overrides are respected', async ({ page
   await settle(page);
   expect(await brand.getAttribute('data-up')).toBeNull();
   expect(await brand.evaluate((e) => getComputedStyle(e).backgroundColor + getComputedStyle(e).fontFamily)).toBe(before);
-  // Canvas pixels are left alone.
-  expect(await page.getByTestId('canvas').getAttribute('data-up')).toBe('media-opaque');
-  expect(await page.getByTestId('canvas').evaluate((e) => getComputedStyle(e).filter)).toBe('none');
-  // Project config: sketch with 2px strokes + black-and-white images.
+  // Canvas is skipped (placeholder), not classified.
+  expect(await page.getByTestId('canvas').getAttribute('data-up')).toBeNull();
+  expect(await page.getByTestId('canvas').getAttribute('data-unpolish-skip')).toBe('canvas');
+  expect(await page.getByTestId('canvas').evaluate((e) => getComputedStyle(e).backgroundImage)).not.toBe('none');
+  // Project config: sketch with 2px strokes + black-and-white images (applies to opted-in media).
   const s = await page.evaluate(() => window.Unpolish.getSettings('sketch'));
   expect(s.border.weight).toBe(2);
   expect(s.images).toBe('mono');
-  expect(await page.locator('img[data-up~="media"]').first().evaluate((e) => getComputedStyle(e).filter)).toContain('grayscale(1)');
-  // Match theme is the default: Sketch draws images with its pencil filter
-  await page.evaluate(() => window.Unpolish.update({ images: 'theme' }));
-  await settle(page);
-  expect(await page.locator('img[data-up~="media"]').first().evaluate((e) => getComputedStyle(e).filter)).toContain('url');
+  const img = page.locator('img').first();
+  expect(await img.getAttribute('data-up')).toBeNull();
+  expect(await img.getAttribute('data-unpolish-skip')).toBe('image');
+  expect(await img.evaluate((e) => getComputedStyle(e).backgroundImage)).not.toBe('none');
   // Older configs: "simplified" means Match theme, details true/false map to the default/0
   expect(await page.evaluate(() => window.Unpolish._internal.normalizeSettings('sketch', { images: 'simplified', details: false }))).toMatchObject({ images: 'theme', details: 0 });
 

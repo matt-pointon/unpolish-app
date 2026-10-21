@@ -157,5 +157,5 @@ test('visual states keep distinctions: selected, disabled, invalid, loading, sta
   await page.locator('#hold-submit').click();
   await expect(page.locator('#hold-submit')).toHaveAttribute('aria-busy', 'true');
   await expect(page.locator('#hold-submit')).not.toHaveAttribute('aria-busy', 'true');
-  await expect(page.locator('#feed li').first().locator('img')).toHaveAttribute('data-up', /media/);
+  await expect(page.locator('#feed li').first().locator('img')).toHaveAttribute('data-unpolish-skip', 'image');
 });

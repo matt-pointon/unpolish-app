@@ -67,7 +67,7 @@ Exit codes: `0` done or nothing to do · `1` failed, nothing changed (e.g. the l
 
 One file, no dependencies, starts itself. `data-config` resolves relative to the page (falling back to the script's folder). Keep `unpolish.config.json` next to your pages and commit it. Without `data-config` the built-in presets are used. Alternatives: inline `<script type="application/json" id="unpolish-config">{…}</script>` before the tag, `window.UnpolishConfig = {…}`, or `data-manual` and call `Unpolish.init({ config })` yourself.
 
-Pin a version: the bundle's first line names it (`/*! Unpolish v0.1.2 …`). After publication, jsDelivr and unpkg serve every npm version at `https://cdn.jsdelivr.net/npm/unpolish@<version>/dist/unpolish.js` — use an exact version, never `latest`, for a prototype others review.
+Pin a version: the bundle's first line names it (`/*! Unpolish v0.1.3 …`). After publication, jsDelivr and unpkg serve every npm version at `https://cdn.jsdelivr.net/npm/unpolish@<version>/dist/unpolish.js` — use an exact version, never `latest`, for a prototype others review.
 
 ## In code
 
@@ -114,7 +114,8 @@ Precedence: **review link → local draft (this browser) → project config → 
 
 ```jsonc
 {
-  "exclude": [".brand-logo", "#map"],  // extra regions; maps, data-unpolish-ignore and gmp-* are already skipped
+  "exclude": [".brand-logo"],           // extra regions that keep their original look
+  "include": ["#tiny-map"],             // opt a skipped map/image back in (or set data-unpolish="keep")
   "roles": { ".my-chip": "fill" },     // classifier hints: surface | fill | media | icon | plain
   "launcher": "bottom-left",           // or top-right | top-left | false
   "webFonts": false,                   // system fonts instead of Google Fonts
@@ -127,7 +128,15 @@ Precedence: **review link → local draft (this browser) → project config → 
 }
 ```
 
-`exclude` is additive. Unpolish already skips `[data-unpolish-ignore]`, its own UI, Google Maps containers (`gmp-map`, `gmp-advanced-marker`, `.gm-style`, and any `gmp-*` custom element), and does not walk into `canvas` / `video` / `iframe` internals. Put a `data-unpolish-ignore` attribute on a region, or list a selector here, when something else must keep its look.
+`exclude` is additive and keeps the original look (no placeholder). Unpolish already ignores `[data-unpolish-ignore]` and its own UI.
+
+Maps, images and other heavy widgets are skipped automatically — they are not classified and Sketch draws one hatched placeholder on the container (`Map`, `Image`, `Canvas`, `Media`) instead of walking the subtree:
+
+- **Media:** `img`, `picture`, `video`, `canvas`, `iframe`, `svg` internals, `object`, `embed`
+- **Map widgets:** Leaflet (`.leaflet-container`), Mapbox/MapLibre (`.mapboxgl-map`, `.maplibregl-map`), Google Maps (`.gm-style`, `gmp-map`, `gmp-*`), OpenLayers (`.ol-viewport`), deck.gl, and `[role="application"]`
+- **Heavy subtrees:** a node with a very high count of absolutely positioned children, or a lot of mutation churn, is marked skipped at runtime
+
+To classify a skipped region anyway, set `data-unpolish="keep"` on it or list a selector in `include`. Do not do that on a map with thousands of markers. Put `data-unpolish-ignore` or an `exclude` selector on a region that must keep its real pixels with no placeholder.
 
 The schema (`schema/unpolish.config.schema.json`) documents every field and gives editors autocomplete.
 

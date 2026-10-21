@@ -4,6 +4,7 @@
   "defaultTheme": "original",
   "ui": "visible",
   "exclude": [],
+  "include": [],
   "shortcuts": {
     "toggle": "\\",
     "themes": {}
