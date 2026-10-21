@@ -3,6 +3,7 @@ import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join, relative, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { cacheControl, compileVercel, spaDestination } from '../scripts/site-routing.mjs';
+import { OG_HEIGHT, OG_WIDTH, siteOrigin, sitemapUrls } from '../scripts/site-seo.mjs';
 
 const ROOT = fileURLToPath(new URL('..', import.meta.url));
 const PUBLIC = join(ROOT, 'public');
@@ -28,6 +29,12 @@ test('vercel.json rewrites SPA paths without extensions and 404s files', () => {
   expect(cacheControl(vercel.headers, '/unpolish/unpolish.js')).toMatch(/no-cache/);
   expect(cacheControl(vercel.headers, '/site/release.js')).toMatch(/no-cache/);
   expect(cacheControl(vercel.headers, '/')).toMatch(/no-cache/);
+  expect(cacheControl(vercel.headers, '/og.png')).toMatch(/max-age=86400/);
+  expect(cacheControl(vercel.headers, '/robots.txt')).toMatch(/no-cache/);
+  expect(cacheControl(vercel.headers, '/sitemap.xml')).toMatch(/no-cache/);
+  expect(spaDestination(vercel.rewrites, '/og.png')).toBeNull();
+  expect(spaDestination(vercel.rewrites, '/robots.txt')).toBeNull();
+  expect(spaDestination(vercel.rewrites, '/sitemap.xml')).toBeNull();
 });
 
 test('public/ contains only hosted files', () => {
@@ -41,6 +48,7 @@ test('public/ contains only hosted files', () => {
     'examples/react/index.html', 'examples/vue/index.html', 'examples/svelte/index.html',
     'unpolish/unpolish.js', `unpolish/${PKG.version}/unpolish.js`,
     'docs/VALIDATION.md',
+    'og.png', 'apple-touch-icon.png', 'robots.txt', 'sitemap.xml',
   ]) expect(files, need).toContain(need);
 });
 
@@ -112,6 +120,7 @@ test('missing assets 404 as files, not as HTML', async ({ request }) => {
     '/examples/svelte/no-such.json',
     '/unpolish/missing.tgz',
     '/site/not-a-file.js',
+    '/no-such-page',
   ]) {
     const res = await request.get(u);
     expect(res.status(), u).toBe(404);
@@ -132,4 +141,42 @@ test('versioned downloads are immutable; HTML and aliases are not cached', async
   expect(html.headers()['cache-control']).toMatch(/no-cache/);
   expect(release.headers()['cache-control']).toMatch(/no-cache/);
   expect(Buffer.from(await versioned.body()).equals(Buffer.from(await alias.body()))).toBe(true);
+});
+
+test('og.png, robots.txt and sitemap.xml are served with the right types', async ({ page, request }) => {
+  const origin = siteOrigin();
+  const og = await request.get('/og.png');
+  expect(og.status()).toBe(200);
+  expect(og.headers()['content-type']).toMatch(/image\/png/);
+  const png = Buffer.from(await og.body());
+  expect(png.length).toBeLessThan(300 * 1024);
+  expect(png.readUInt32BE(16)).toBe(OG_WIDTH);
+  expect(png.readUInt32BE(20)).toBe(OG_HEIGHT);
+
+  const robots = await request.get('/robots.txt');
+  expect(robots.status()).toBe(200);
+  expect(robots.headers()['content-type']).toMatch(/text\/plain/);
+  const robotsText = await robots.text();
+  expect(robotsText).toContain('Disallow: /examples/');
+  expect(robotsText).toContain(`Sitemap: ${origin}/sitemap.xml`);
+
+  const sitemap = await request.get('/sitemap.xml');
+  expect(sitemap.status()).toBe(200);
+  expect(sitemap.headers()['content-type']).toMatch(/xml/);
+  const xml = await sitemap.text();
+  for (const loc of sitemapUrls(origin)) expect(xml).toContain(`<loc>${loc}</loc>`);
+  expect(xml).not.toContain('/examples/');
+
+  const icon = await request.get('/apple-touch-icon.png');
+  expect(icon.status()).toBe(200);
+  expect(icon.headers()['content-type']).toMatch(/image\/png/);
+
+  await page.goto('/site/demo/');
+  expect(await page.locator('link[rel="canonical"]').getAttribute('href')).toBe(`${origin}/site/demo/`);
+  expect(await page.locator('meta[property="og:image"]').getAttribute('content')).toBe(`${origin}/og.png`);
+
+  for (const u of ['/examples/plain-html/', '/examples/react/', '/examples/vue/', '/examples/svelte/']) {
+    await page.goto(u);
+    expect(await page.locator('meta[name="robots"]').getAttribute('content'), u).toMatch(/noindex/);
+  }
 });

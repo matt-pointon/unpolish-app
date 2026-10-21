@@ -12,6 +12,8 @@
     "check:dist": "node scripts/check-dist.mjs",
     "build:examples": "node scripts/build-examples.mjs",
     "build:site": "node scripts/build-site.mjs",
+    "og": "node scripts/og-image.mjs",
+    "seo": "node scripts/site-seo.mjs",
     "test": "npm run release && npm run build:examples && npm run build:site && playwright test",
     "test:only": "playwright test"
   },

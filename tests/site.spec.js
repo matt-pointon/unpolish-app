@@ -2,6 +2,7 @@ import { test, expect } from '@playwright/test';
 
 import { readFileSync } from 'node:fs';
 import { buildRelease, loadReleaseSettings } from '../scripts/release-config.mjs';
+import { OG_HEIGHT, OG_WIDTH, siteOrigin, sitePages } from '../scripts/site-seo.mjs';
 
 const TGZ = 'http://localhost:4174/unpolish/unpolish-0.1.0.tgz';
 const PKG = JSON.parse(readFileSync(new URL('../packages/unpolish/package.json', import.meta.url), 'utf8'));
@@ -244,4 +245,40 @@ test('the configurator drives its own live preview with the panel\'s settings', 
   await page.locator('#cfg-reset').click();
   await expect.poll(settings).toMatchObject({ details: 45, images: 'theme' });
   await expect(page.locator('[data-cfg="images"] [data-v="theme"]')).toHaveAttribute('aria-checked', 'true');
+});
+
+test('homepage SEO uses the production siteUrl and a local OG image', async ({ page, request }) => {
+  const origin = siteOrigin();
+  expect(origin).toBe('https://unpolishdesign.vercel.app');
+  const home = sitePages(origin)[0];
+  await page.goto('/');
+  expect(await page.locator('html').getAttribute('lang')).toBe('en');
+  expect(await page.title()).toBe(home.title);
+  const attr = (sel, a = 'content') => page.locator(sel).first().getAttribute(a);
+  expect(await attr('meta[name="description"]')).toBe(home.description);
+  expect(await attr('link[rel="canonical"]', 'href')).toBe(`${origin}/`);
+  expect(await attr('meta[property="og:title"]')).toBe(home.title);
+  expect(await attr('meta[property="og:description"]')).toBe(home.description);
+  expect(await attr('meta[property="og:url"]')).toBe(`${origin}/`);
+  expect(await attr('meta[property="og:image"]')).toBe(`${origin}/og.png`);
+  expect(await attr('meta[property="og:image:width"]')).toBe(String(OG_WIDTH));
+  expect(await attr('meta[property="og:image:height"]')).toBe(String(OG_HEIGHT));
+  expect(await attr('meta[property="og:image:alt"]')).toBe('Less polish. Better conversations.');
+  expect(await attr('meta[property="og:image:type"]')).toBe('image/png');
+  expect(await attr('meta[property="og:type"]')).toBe('website');
+  expect(await attr('meta[property="og:site_name"]')).toBe('Unpolish');
+  expect(await attr('meta[name="twitter:card"]')).toBe('summary_large_image');
+  expect(await attr('meta[name="twitter:title"]')).toBe(home.title);
+  expect(await attr('meta[name="twitter:description"]')).toBe(home.description);
+  expect(await attr('meta[name="twitter:image"]')).toBe(`${origin}/og.png`);
+  expect(await attr('meta[name="theme-color"]')).toBe('#f7f6f2');
+  expect(await attr('link[rel="icon"]', 'href')).toBe(`${origin}/site/favicon.svg`);
+  expect(await attr('link[rel="apple-touch-icon"]', 'href')).toBe(`${origin}/apple-touch-icon.png`);
+  const og = await request.get('/og.png');
+  expect(og.status()).toBe(200);
+  expect(og.headers()['content-type']).toMatch(/image\/png/);
+  const body = Buffer.from(await og.body());
+  expect(body.length).toBeLessThan(300 * 1024);
+  expect(body.readUInt32BE(16)).toBe(OG_WIDTH);
+  expect(body.readUInt32BE(20)).toBe(OG_HEIGHT);
 });
