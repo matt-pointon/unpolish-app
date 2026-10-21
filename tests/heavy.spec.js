@@ -273,7 +273,7 @@ test('Sketch hybrid on the Seattle Leaflet map', async ({ page }) => {
   expect(switched.ms).toBeLessThanOrEqual(900);
 });
 
-test('Sketch fleet map: gray tiles while cars move, car imgs unfiltered, queue idle', async ({ page }) => {
+test('Sketch fleet map: gray tiles and marker pane, car imgs not classified, queue idle', async ({ page }) => {
   test.setTimeout(90_000);
   await page.goto('/tests/fixtures/leaflet-fleet.html?n=500&kind=div&icon=img');
   await page.waitForFunction(() => window.Unpolish && window.__mapReady && window.__fleet && window.__fleet.carsOn, { timeout: 20_000 });
@@ -285,10 +285,13 @@ test('Sketch fleet map: gray tiles while cars move, car imgs unfiltered, queue i
   await expect(map).toHaveAttribute('data-unpolish-skip', 'map');
   const look = await map.evaluate((el) => {
     const tiles = el.querySelector('.leaflet-tile-pane');
+    const pane = el.querySelector('.leaflet-marker-pane');
     const img = el.querySelector('.car-dot img');
     return {
       tileFilter: tiles ? getComputedStyle(tiles).filter : null,
+      paneFilter: pane ? getComputedStyle(pane).filter : null,
       mapFilter: getComputedStyle(el).filter,
+      markers: document.documentElement.getAttribute('data-unpolish-markers'),
       busy: el.hasAttribute('data-unpolish-busy'),
       imgFilter: img ? getComputedStyle(img).filter : null,
       imgSkip: img ? img.getAttribute('data-unpolish-skip') : 'missing',
@@ -297,11 +300,13 @@ test('Sketch fleet map: gray tiles while cars move, car imgs unfiltered, queue i
     };
   });
   expect(look.carCount).toBeGreaterThanOrEqual(500);
+  expect(look.markers).toBe('pane');
   expect(look.mapFilter === 'none' || look.mapFilter === '').toBeTruthy();
   expect(look.imgFilter === 'none' || look.imgFilter === '').toBeTruthy();
   expect(look.imgSkip).toBeNull();
   expect(look.imgUp).toBeNull();
   expect(look.tileFilter).toMatch(/grayscale|up-f-skip-edge/);
+  expect(look.paneFilter).toMatch(/grayscale/);
   await expect(page.getByTestId('ui-card')).toHaveAttribute('data-up', /bg|box|fill/);
 
   const moving = await page.evaluate(async () => {

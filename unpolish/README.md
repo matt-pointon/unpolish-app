@@ -116,6 +116,7 @@ Precedence: **review link → local draft (this browser) → project config → 
 {
   "exclude": [".brand-logo"],           // extra regions that keep their original look
   "include": ["#tiny-map"],             // opt a skipped map/image back in (or set data-unpolish="keep")
+  "mapMarkers": "original",             // keep map pin/car icons full color (default is "pane")
   "roles": { ".my-chip": "fill" },     // classifier hints: surface | fill | media | icon | plain
   "launcher": "bottom-left",           // or top-right | top-left | false
   "webFonts": false,                   // system fonts instead of Google Fonts
@@ -135,7 +136,7 @@ Maps, images and other heavy widgets are skipped automatically — they are not 
 - **Media:** `img`, `picture`, `video`, `canvas`, `iframe`, `svg` internals, `object`, `embed`
 - **Map widgets:** Leaflet (`.leaflet-container`), Mapbox/MapLibre (`.mapboxgl-map`, `.maplibregl-map`), Google Maps (`.gm-style`, `gmp-map`, `gmp-*`), OpenLayers (`.ol-viewport`), deck.gl, and `[role="application"]`
 - **Heavy subtrees:** a node with a very high count of absolutely positioned children, or a lot of mutation churn, is marked skipped at runtime
-- **Sketch hybrid:** idle skipped regions use the SVG pencil-line edge filter. While a region is panning, zooming, playing, or otherwise changing (including moving map markers), one `data-unpolish-busy` toggle on that root swaps it to a cheap CSS grayscale filter, then back after ~260ms still. Video and animated canvas that never sit still stay gray. On Leaflet maps the filter sits on the **tile pane** so markers and per-marker `img` icons stay unfiltered (crisp) on top. A fleet of moving cars therefore keeps the tiles gray; leaving the edge filter on while cars move drops to ~5 fps. Blueprint stays a cheap ink wash on the tiles.
+- **Sketch hybrid:** idle skipped regions use the SVG pencil-line edge filter. While a region is panning, zooming, playing, or otherwise changing (including moving map markers), one `data-unpolish-busy` toggle on that root swaps it to a cheap CSS grayscale filter, then back after ~260ms still. Video and animated canvas that never sit still stay gray. On Leaflet maps the filter sits on the **tile pane** (never per tile). Moving cars keep the tiles gray — leaving the edge filter on while cars move drops to ~5 fps. Marker icons get a second cheap CSS filter on the **marker pane** (`mapMarkers: "pane"`, default) so they read as sketch/blueprint without an SVG edge filter and without classifying each `img`. `mapMarkers: "original"` or `data-unpolish-ignore` on the pane keeps icons full color. Blueprint stays a cheap ink wash on tiles and the marker pane.
 
 To classify a skipped region anyway, set `data-unpolish="keep"` on it or list a selector in `include`. Do not do that on a map with thousands of markers. Put `data-unpolish-ignore` or an `exclude` selector on a region that must keep its real pixels with no filter.
 

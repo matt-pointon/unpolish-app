@@ -106,7 +106,7 @@
       shortcuts: { toggle: '\\', themes: {} },
       themes: {},
       overrides: {},
-      mapMarkers: 'original'
+      mapMarkers: 'pane'
     };
 
     /* ------------------------------------------------------------------ *
@@ -386,7 +386,7 @@
         if (id && typeof sc.themes[k] === 'string' && sc.themes[k]) themeKeys[id] = sc.themes[k];
       });
       cfg.shortcuts = { toggle: typeof sc.toggle === 'string' && sc.toggle ? sc.toggle : '\\', themes: themeKeys };
-      cfg.mapMarkers = cfg.mapMarkers === 'pane' || cfg.mapMarkers === 'img' ? cfg.mapMarkers : 'original';
+      cfg.mapMarkers = cfg.mapMarkers === 'original' || cfg.mapMarkers === 'img' || cfg.mapMarkers === 'pane' ? cfg.mapMarkers : 'pane';
       return cfg;
     }
 
@@ -1370,7 +1370,7 @@
       this.churn = new WeakMap();
       this.skipBusyTimers = new WeakMap();
       this.skipWatched = new WeakSet();
-      this.mapMarkers = 'original';
+      this.mapMarkers = 'pane';
     }
 
     Engine.prototype.configure = function (cfg) {
@@ -1379,7 +1379,7 @@
       this.includeSelector = (cfg.include || []).join(', ');
       this.overrides = cfg.overrides || {};
       this.webFonts = cfg.webFonts !== false;
-      this.mapMarkers = cfg.mapMarkers === 'pane' || cfg.mapMarkers === 'img' ? cfg.mapMarkers : 'original';
+      this.mapMarkers = cfg.mapMarkers === 'original' || cfg.mapMarkers === 'img' || cfg.mapMarkers === 'pane' ? cfg.mapMarkers : 'pane';
       var roles = {};
       Object.keys(cfg.roles || {}).forEach(function (sel) {
         var role = cfg.roles[sel];
@@ -3325,7 +3325,7 @@
       if (cfg.webFonts === false) out.webFonts = false;
       out.exclude = cfg.exclude;
       if (cfg.include && cfg.include.length) out.include = cfg.include;
-      if (cfg.mapMarkers && cfg.mapMarkers !== 'original') out.mapMarkers = cfg.mapMarkers;
+      if (cfg.mapMarkers && cfg.mapMarkers !== 'pane') out.mapMarkers = cfg.mapMarkers;
       if (Object.keys(cfg.roles || {}).length) out.roles = cfg.roles;
       out.shortcuts = this.shortcuts();
       out.themes = {};
