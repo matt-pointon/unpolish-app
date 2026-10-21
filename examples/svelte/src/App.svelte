@@ -1,6 +1,8 @@
 <script>
-  const ROOT = (location.pathname.match(/^.*\/dist\//) || ['/'])[0];
-  let path = $state(location.pathname.slice(ROOT.length));
+  const ROOT = import.meta.env.BASE_URL.startsWith('/')
+    ? import.meta.env.BASE_URL
+    : (location.pathname.match(/^.*\/dist\//) || ['/'])[0];
+  let path = $state(location.pathname.slice(ROOT.length).replace(/\/$/, ''));
   function go(p, e) { e?.preventDefault(); history.pushState({}, '', ROOT + p + location.search + location.hash); path = p; }
   $effect(() => { const on = () => (path = location.pathname.slice(ROOT.length)); addEventListener('popstate', on); return () => removeEventListener('popstate', on); });
 
@@ -23,7 +25,7 @@
   <aside class="rail">
     <div class="brand">Pulse</div>
     <a href={ROOT} class:active={path === ''} aria-current={path === '' ? 'page' : undefined} onclick={(e) => go('', e)} data-testid="nav-home">Overview</a>
-    <a href={ROOT + 'alerts'} class:active={path === 'alerts'} aria-current={path === 'alerts' ? 'page' : undefined} onclick={(e) => go('alerts', e)} data-testid="nav-alerts">Alerts</a>
+    <a href={ROOT + 'alerts'} class:active={path === 'alerts' || path.startsWith('alerts/')} aria-current={path === 'alerts' || path.startsWith('alerts/') ? 'page' : undefined} onclick={(e) => go('alerts', e)} data-testid="nav-alerts">Alerts</a>
   </aside>
   <main>
     <header>
@@ -38,7 +40,7 @@
         {/if}
       </div>
     </header>
-    {#if path === 'alerts'}
+    {#if path === 'alerts' || path.startsWith('alerts/')}
       <h1>Alerts</h1>
       <p class="empty">No open alerts. <button class="tip" type="button" aria-describedby="tip-1">ⓘ<span role="tooltip" id="tip-1">Alerts fire when a metric is red for 5 minutes.</span></button></p>
     {:else}

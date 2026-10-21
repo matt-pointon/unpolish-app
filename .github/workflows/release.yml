@@ -1,0 +1,51 @@
+# Publish unpolish to npm with Trusted Publishing (OIDC).
+#
+# On npmjs.com → unpolish → Settings → Trusted Publisher:
+#   Provider: GitHub Actions
+#   Organization or user: matt-pointon
+#   Repository: unpolish-app
+#   Workflow filename: release.yml
+#   Environment name: (leave empty unless you add a GitHub Environment)
+#   Allowed actions: allow `npm publish` (and dist-tag if you want CI to move `latest`)
+#
+# The first publish of a new package name cannot use trusted publishing — the
+# package has to exist on npmjs.com before a trusted publisher can be attached.
+# Do that once from a logged-in machine (see docs/RELEASE.md), then this workflow
+# is the path for later versions.
+#
+# Requires npm CLI ≥ 11.5.1 (Node 24 on this job). Provenance is generated
+# automatically for trusted publishes from public GitHub repositories; --provenance
+# is kept so a token-based first publish from this file would still attest.
+
+name: Release
+
+on:
+  workflow_dispatch:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          registry-url: 'https://registry.npmjs.org'
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+      - run: npm ci
+      - run: npx playwright install chromium --with-deps
+      - run: npm test
+      - name: Publish packed tarball
+        run: |
+          VERSION=$(node -p "require('./packages/unpolish/package.json').version")
+          TARBALL="unpolish/unpolish-${VERSION}.tgz"
+          test -f "$TARBALL"
+          npm publish "$TARBALL" --access public --tag latest --provenance

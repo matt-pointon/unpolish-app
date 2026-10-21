@@ -3,11 +3,13 @@
 // Fixtures live in .tmp/install/ and are served by the test server.
 import { test, expect } from '@playwright/test';
 import { execFileSync, spawn, spawnSync } from 'node:child_process';
+import { createServer } from 'node:http';
 import { cpSync, existsSync, lstatSync, mkdirSync, readFileSync, readdirSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import { join, relative, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { open, setTheme, settle, shadow, styles } from './helpers.js';
+import { buildRelease, loadReleaseSettings, parseReleaseJs } from '../scripts/release-config.mjs';
 
 const ROOT = fileURLToPath(new URL('..', import.meta.url));
 const PKG = JSON.parse(readFileSync(join(ROOT, 'packages/unpolish/package.json'), 'utf8'));
@@ -112,6 +114,10 @@ test('the tarball contains the runtime, bundle, types, schema, starter config an
   expect(pkg.exports['.']).toMatchObject({ types: './dist/unpolish.d.ts', import: './dist/unpolish.mjs', require: './dist/unpolish.cjs' });
   expect(pkg.exports['./browser']).toBe('./dist/unpolish.js');
   expect(pkg.dependencies).toBeUndefined();
+  expect(pkg.repository).toEqual({ type: 'git', url: 'git+https://github.com/matt-pointon/unpolish-app.git' });
+  expect(pkg.homepage).toBe('https://github.com/matt-pointon/unpolish-app#readme');
+  expect(pkg.bugs).toEqual({ url: 'https://github.com/matt-pointon/unpolish-app/issues' });
+  expect(JSON.stringify(pkg)).not.toMatch(/file:|localhost|workspace:/);
   const starter = JSON.parse(execFileSync('tar', ['-xzOf', TGZ, 'package/templates/unpolish.config.json'], { encoding: 'utf8' }));
   expect(starter.defaultTheme).toBe('original');
 });
@@ -127,10 +133,70 @@ test('committed release files match a fresh build of the package', () => {
   execFileSync('tar', ['-xzf', TGZ, '-C', b]);
   expect(snapshot(b), 'the committed tarball is stale: run npm run release').toEqual(snapshot(a));
   // The website reads its commands from site/release.js.
-  const rel = read(join(ROOT, 'site/release.js'));
-  const data = JSON.parse(rel.slice(rel.indexOf('{'), rel.lastIndexOf('}') + 1));
-  const settings = json(join(ROOT, 'release.config.json'));
-  expect(data).toEqual({ name: PKG.name, version: PKG.version, node: PKG.engines.node, published: settings.published, tarball: `${PKG.name}-${PKG.version}.tgz`, distUrl: settings.distUrl });
+  const data = parseReleaseJs(read(join(ROOT, 'site/release.js')));
+  const settings = loadReleaseSettings(json(join(ROOT, 'release.config.json')));
+  expect(data).toEqual(buildRelease(PKG, settings));
+});
+
+test('help, version and dry-run of the packed CLI', () => {
+  const dir = fresh('cli-meta');
+  writeFileSync(join(dir, 'index.html'), '<!doctype html>\n<html>\n<head>\n  <title>x</title>\n</head>\n<body></body>\n</html>\n');
+  let r = run(dir, ['--help']);
+  expect(r.code).toBe(0);
+  expect(r.out).toContain(`npx ${PKG.name} init`);
+  r = run(dir, ['--version']);
+  expect(r.code).toBe(0);
+  expect(r.out.trim()).toBe(PKG.version);
+  r = run(dir, ['init', '--dry-run', '--json']);
+  expect(r.code).toBe(0);
+  expect(r.report.status).toBe('planned');
+  expect(existsSync(join(dir, 'unpolish'))).toBe(false);
+  expect(read(join(dir, 'index.html'))).not.toContain('unpolish');
+});
+
+test('the script-tag bundle on its own starts one harness', async ({ page }) => {
+  const dir = fresh('bundle-only');
+  writeFileSync(join(dir, 'index.html'), '<!doctype html>\n<html>\n<head>\n  <script src="/unpolish/unpolish.js" defer></script>\n</head>\n<body><h1>solo</h1></body>\n</html>\n');
+  await page.goto(served(dir));
+  await page.waitForFunction(() => window.Unpolish && document.querySelector('unpolish-harness'));
+  expect(await page.locator('unpolish-harness').count()).toBe(1);
+  expect(await page.evaluate(() => window.Unpolish.version)).toBe(PKG.version);
+});
+
+test('an unpinned @latest-style install still writes an exact version into package.json', async () => {
+  const dir = viteVanilla('pin-latest');
+  const tgz = readFileSync(TGZ);
+  const shasum = createHash('sha1').update(tgz).digest('hex');
+  const integrity = 'sha512-' + createHash('sha512').update(tgz).digest('base64');
+  const server = createServer((req, res) => {
+    const host = `http://127.0.0.1:${server.address().port}`;
+    const ver = {
+      name: PKG.name,
+      version: PKG.version,
+      dist: { tarball: `${host}/${PKG.name}/-/${PKG.name}-${PKG.version}.tgz`, shasum, integrity },
+    };
+    const packument = { name: PKG.name, 'dist-tags': { latest: PKG.version }, versions: { [PKG.version]: ver } };
+    if (req.url.endsWith('.tgz')) {
+      res.writeHead(200, { 'content-type': 'application/octet-stream' });
+      res.end(tgz);
+      return;
+    }
+    res.writeHead(200, { 'content-type': 'application/json' });
+    res.end(JSON.stringify(req.url.includes(PKG.version) && !req.url.includes('dist-tags') ? ver : packument));
+  });
+  await new Promise((r) => server.listen(0, '127.0.0.1', r));
+  const registry = `http://127.0.0.1:${server.address().port}`;
+  const env = { npm_config_registry: registry, npm_config_audit: 'false', npm_config_fund: 'false' };
+  try {
+    sh(dir, 'npm', ['install', '--save-exact', `${PKG.name}@latest`, '--no-audit', '--no-fund'], env);
+    expect(json(join(dir, 'package.json')).dependencies.unpolish).toBe(PKG.version);
+    let r = run(dir, ['init', '--dry-run', '--json'], env);
+    expect(r.report.commands[0] || r.report.changes.find((c) => c.type === 'keep')?.detail).toBeTruthy();
+    expect(JSON.stringify(r.report)).not.toContain(`${PKG.name}@latest`);
+    expect(json(join(dir, 'package.json')).dependencies.unpolish).toBe(PKG.version);
+  } finally {
+    await new Promise((r) => server.close(r));
+  }
 });
 
 test('imports are safe on the server: nothing runs until init() in a browser', () => {

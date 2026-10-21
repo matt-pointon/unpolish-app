@@ -6,3 +6,4 @@ playwright-report/
 .DS_Store
 .tmp/
 packages/unpolish/dist/
+public/
