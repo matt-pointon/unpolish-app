@@ -1,0 +1,11 @@
+{
+  "$schema": "../../unpolish/unpolish.config.schema.json",
+  "version": 1,
+  "id": "example-plain",
+  "defaultTheme": "original",
+  "exclude": [".keep-brand"],
+  "shortcuts": { "toggle": "\\", "themes": { "blueprint": "Alt+B" } },
+  "themes": {
+    "sketch": { "images": "mono", "border": { "weight": 2 } }
+  }
+}

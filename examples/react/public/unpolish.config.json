@@ -1,0 +1,10 @@
+{
+  "version": 1,
+  "id": "example-react",
+  "defaultTheme": "original",
+  "exclude": ["[data-brand-logo]"],
+  "shortcuts": { "toggle": "\\", "themes": { "sketch": "Alt+S" } },
+  "themes": {
+    "blueprint": { "shadows": "flat" }
+  }
+}

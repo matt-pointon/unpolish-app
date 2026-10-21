@@ -1,0 +1,53 @@
+{
+  "name": "unpolish",
+  "version": "0.1.0",
+  "description": "Reversible lo-fi themes for working web prototypes. Less polish. Better conversations.",
+  "license": "MIT",
+  "type": "module",
+  "main": "./dist/unpolish.cjs",
+  "module": "./dist/unpolish.mjs",
+  "types": "./dist/unpolish.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/unpolish.d.ts",
+      "import": "./dist/unpolish.mjs",
+      "require": "./dist/unpolish.cjs"
+    },
+    "./browser": "./dist/unpolish.js",
+    "./unpolish.js": "./dist/unpolish.js",
+    "./schema.json": "./schema/unpolish.config.schema.json",
+    "./starter-config.json": "./templates/unpolish.config.json",
+    "./package.json": "./package.json"
+  },
+  "unpkg": "./dist/unpolish.js",
+  "jsdelivr": "./dist/unpolish.js",
+  "bin": {
+    "unpolish": "bin/unpolish.mjs"
+  },
+  "files": [
+    "dist",
+    "bin",
+    "schema",
+    "templates",
+    "README.md",
+    "LICENSE"
+  ],
+  "sideEffects": false,
+  "engines": {
+    "node": ">=18"
+  },
+  "keywords": [
+    "prototype",
+    "wireframe",
+    "lo-fi",
+    "design-review",
+    "theme",
+    "sketch",
+    "balsamiq",
+    "stakeholder"
+  ],
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "prepack": "node scripts/build.mjs"
+  }
+}

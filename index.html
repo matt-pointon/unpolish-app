@@ -1,0 +1,186 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Unpolish — Less polish. Better conversations.</title>
+  <meta name="description" content="Unpolish puts a reversible lo-fi layer over your working prototype, so stakeholder reviews focus on structure, content and flow.">
+  <link rel="icon" href="site/favicon.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Instrument+Serif:ital@0;1&display=swap">
+  <link rel="stylesheet" href="site/site.css">
+</head>
+<body>
+  <a class="skip" href="#main">Skip to content</a>
+  <header class="nav">
+    <div class="wrap nav-inner">
+      <a class="brand" href="#top" aria-label="Unpolish home">
+        <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><rect x="2.75" y="2.75" width="18.5" height="18.5" rx="6" stroke="currentColor" stroke-width="1.6"/><path d="M6.5 13.6c1.3-2.3 2.4-2.6 3.4-.9.9 1.6 1.9 1.7 3.1-.2 1.1-1.7 2.2-2 4.5-.4" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>
+        Unpolish
+      </a>
+      <nav aria-label="Sections" class="nav-links">
+        <a href="#top">Demo</a>
+        <a href="#customize">Customize</a>
+        <a href="#install">Install</a>
+        <a href="#review-links">Review links</a>
+      </nav>
+      <button class="btn btn-dark btn-sm" type="button" data-copy-prompt>
+        <span class="swap"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1.8l1.35 3.6a2 2 0 001.25 1.25L14.2 8l-3.6 1.35a2 2 0 00-1.25 1.25L8 14.2l-1.35-3.6a2 2 0 00-1.25-1.25L1.8 8l3.6-1.35a2 2 0 001.25-1.25z" fill="currentColor"/></svg><span>Install with your agent</span></span>
+      </button>
+    </div>
+  </header>
+
+  <main id="main">
+    <section class="hero" id="top" aria-labelledby="hero-title">
+      <div class="wrap hero-inner">
+        <h1 id="hero-title">Less polish.<br><em>Better conversations.</em></h1>
+        <p class="lede">A reversible lo-fi layer for working prototypes, so reviews focus on structure, content and flow — not pixels.</p>
+        <div class="hero-actions">
+          <button class="btn btn-accent btn-lg" type="button" data-copy-prompt><span class="swap"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1.8l1.35 3.6a2 2 0 001.25 1.25L14.2 8l-3.6 1.35a2 2 0 00-1.25 1.25L8 14.2l-1.35-3.6a2 2 0 00-1.25-1.25L1.8 8l3.6-1.35a2 2 0 001.25-1.25z" fill="currentColor"/></svg><span>Install with your agent</span></span></button>
+          <p class="hero-hint">Copy the prompt into your coding agent with your prototype’s project open.</p>
+          <div class="cmd-row cmd-row-hero" role="group" aria-label="Install command">
+            <div class="cmd-box"><code class="cmd-text" data-cmd tabindex="0" aria-label="Install command"></code></div>
+            <button class="btn cmd-copy" type="button" data-copy-cmd><span class="swap"><svg viewBox="0 0 16 16" aria-hidden="true"><rect x="5.5" y="5.5" width="7.5" height="7.5" rx="2" stroke="currentColor" stroke-width="1.4" fill="none"/><path d="M10.5 3.6V3.5A1.5 1.5 0 009 2H4a1.5 1.5 0 00-1.5 1.5V9A1.5 1.5 0 004 10.5h.1" stroke="currentColor" stroke-width="1.4" fill="none"/></svg><span>Copy</span></span></button>
+          </div>
+        </div>
+      </div>
+
+      <div class="wrap demo" id="demo">
+        <div class="browser">
+          <div class="browser-bar">
+            <span class="lights" aria-hidden="true"><i></i><i></i><i></i></span>
+            <div class="seg" role="radiogroup" aria-label="Demo theme" id="demo-themes">
+              <button type="button" role="radio" aria-checked="true" data-theme="original"><span class="sw sw-original"></span>Original</button>
+              <button type="button" role="radio" aria-checked="false" data-theme="black-white" tabindex="-1"><span class="sw sw-bw"></span>Black &amp; White</button>
+              <button type="button" role="radio" aria-checked="false" data-theme="sketch" tabindex="-1"><span class="sw sw-sketch"></span>Sketch</button>
+              <button type="button" role="radio" aria-checked="false" data-theme="blueprint" tabindex="-1"><span class="sw sw-blueprint"></span>Blueprint</button>
+              <button type="button" role="radio" aria-checked="false" data-theme="pastel" tabindex="-1"><span class="sw sw-pastel"></span>Pastel Blocks</button>
+            </div>
+            <label class="select-wrap">
+              <span class="sr-only">Demo theme</span>
+              <select id="demo-select">
+                <option value="original">Original</option>
+                <option value="black-white">Black &amp; White</option>
+                <option value="sketch">Sketch</option>
+                <option value="blueprint">Blueprint</option>
+                <option value="pastel">Pastel Blocks</option>
+              </select>
+              <svg class="chev" viewBox="0 0 16 16" aria-hidden="true"><path d="M4.5 6.5L8 10l3.5-3.5" stroke="currentColor" stroke-width="1.6" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </label>
+            <a class="icon-link" href="site/demo/" target="_blank" rel="noopener" id="demo-full" aria-label="Open demo full screen" title="Open demo full screen"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M6 3.5H3.5v9h9V10M9 3.5h3.5V7M12.5 3.5L7.5 8.5" stroke="currentColor" stroke-width="1.4" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg></a>
+          </div>
+          <iframe id="demo-frame" src="site/demo/index.html" title="Fieldtrip — interactive prototype example" loading="eager"></iframe>
+        </div>
+        <p class="demo-foot">A working prototype — click around. <span class="hint-key">Press <kbd>\</kbd> inside it for the real panel.</span><span class="hint-touch">Tap the launcher in its corner for the real panel.</span></p>
+      </div>
+    </section>
+
+    <section class="customize" id="customize" aria-labelledby="customize-title">
+      <div class="wrap">
+        <div class="section-head">
+          <h2 id="customize-title">Great defaults. Tune when it matters.</h2>
+          <p>These are the panel's own controls. Your edits save per theme and copy straight into the repo's config.</p>
+        </div>
+        <div class="cfg">
+          <div class="cfg-panel" role="group" aria-label="Theme settings">
+            <div class="cfg-head"><span class="cfg-brand"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><rect x="2.75" y="2.75" width="18.5" height="18.5" rx="6" stroke="currentColor" stroke-width="1.5"/><path d="M6.5 13.6c1.3-2.3 2.4-2.6 3.4-.9.9 1.6 1.9 1.7 3.1-.2 1.1-1.7 2.2-2 4.5-.4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>Edit theme</span><button class="cfg-reset" type="button" id="cfg-reset">Reset</button></div>
+            <div class="cfg-field"><span class="cfg-label" id="cfg-l-theme">Theme</span><div class="cfg-seg" role="radiogroup" aria-labelledby="cfg-l-theme" data-cfg="theme"><button type="button" role="radio" aria-checked="false" tabindex="-1" data-v="black-white">B&amp;W</button><button type="button" role="radio" aria-checked="true" tabindex="0" data-v="sketch">Sketch</button><button type="button" role="radio" aria-checked="false" tabindex="-1" data-v="blueprint">Blueprint</button><button type="button" role="radio" aria-checked="false" tabindex="-1" data-v="pastel">Pastel</button></div></div>
+            <div class="cfg-field cfg-details">
+              <div class="cfg-row"><label class="cfg-label" for="cfg-details">Details</label><span class="cfg-hint" id="cfg-details-hint">Stroke wobble and shading</span><output class="cfg-val" for="cfg-details" id="cfg-details-val">50</output></div>
+              <input type="range" id="cfg-details" min="0" max="100" value="50" aria-describedby="cfg-details-hint">
+            </div>
+            <div class="cfg-field"><span class="cfg-label" id="cfg-l-images">Images</span><div class="cfg-seg" role="radiogroup" aria-labelledby="cfg-l-images" data-cfg="images"><button type="button" role="radio" aria-checked="false" tabindex="-1" data-v="original">Original</button><button type="button" role="radio" aria-checked="false" tabindex="-1" data-v="mono">B&amp;W</button><button type="button" role="radio" aria-checked="true" tabindex="0" data-v="theme">Match theme</button><button type="button" role="radio" aria-checked="false" tabindex="-1" data-v="placeholder">Placeholder</button></div></div>
+            <div class="cfg-field"><span class="cfg-label" id="cfg-l-lines">Lines</span><div class="cfg-seg" role="radiogroup" aria-labelledby="cfg-l-lines" data-cfg="lines"><button type="button" role="radio" aria-checked="false" tabindex="-1" data-v="solid">Solid</button><button type="button" role="radio" aria-checked="false" tabindex="-1" data-v="dashed">Dashed</button><button type="button" role="radio" aria-checked="true" tabindex="0" data-v="hand">Hand</button><button type="button" role="radio" aria-checked="false" tabindex="-1" data-v="none">None</button></div></div>
+            <div class="cfg-field"><span class="cfg-label" id="cfg-l-radius">Corners</span><div class="cfg-seg" role="radiogroup" aria-labelledby="cfg-l-radius" data-cfg="radius"><button type="button" role="radio" aria-checked="false" tabindex="-1" data-v="keep">Keep</button><button type="button" role="radio" aria-checked="false" tabindex="-1" data-v="0">0</button><button type="button" role="radio" aria-checked="true" tabindex="0" data-v="4">4</button><button type="button" role="radio" aria-checked="false" tabindex="-1" data-v="8">8</button><button type="button" role="radio" aria-checked="false" tabindex="-1" data-v="14">14</button></div></div>
+            <div class="cfg-field"><span class="cfg-label" id="cfg-l-typography">Type</span><div class="cfg-seg" role="radiogroup" aria-labelledby="cfg-l-typography" data-cfg="typography"><button type="button" role="radio" aria-checked="false" tabindex="-1" data-v="original">Keep</button><button type="button" role="radio" aria-checked="false" tabindex="-1" data-v="neutral">Sans</button><button type="button" role="radio" aria-checked="true" tabindex="0" data-v="hand">Hand</button><button type="button" role="radio" aria-checked="false" tabindex="-1" data-v="technical">Tech</button><button type="button" role="radio" aria-checked="false" tabindex="-1" data-v="rounded">Round</button></div></div>
+          </div>
+          <div class="browser cfg-preview">
+            <div class="browser-bar" aria-hidden="true"><span class="lights"><i></i><i></i><i></i></span><span class="url"><span class="lock"></span>Live preview</span></div>
+            <iframe id="cfg-frame" src="site/demo/index.html?embed=configure" title="Live preview of the theme settings" loading="lazy"></iframe>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="install" id="install" aria-labelledby="install-title">
+      <div class="wrap install-inner">
+        <h2 id="install-title">Add it to the prototype you already have.</h2>
+        <p class="install-lede">One small browser runtime, added the way your project already works. No need to rewrite your prototype, and one command takes it out again.</p>
+        <div class="paths">
+          <article class="path path-agent">
+            <h3>With your agent</h3>
+            <p>Copy the prompt into your coding agent with your prototype’s project open.</p>
+            <button class="btn btn-accent" type="button" data-copy-prompt><span class="swap"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1.8l1.35 3.6a2 2 0 001.25 1.25L14.2 8l-3.6 1.35a2 2 0 00-1.25 1.25L8 14.2l-1.35-3.6a2 2 0 00-1.25-1.25L1.8 8l3.6-1.35a2 2 0 001.25-1.25z" fill="currentColor"/></svg><span>Install with your agent</span></span></button>
+            <details class="disclosure">
+              <summary>Read the prompt<svg class="chev" viewBox="0 0 16 16" aria-hidden="true"><path d="M4.5 6.5L8 10l3.5-3.5" stroke="currentColor" stroke-width="1.6" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg></summary>
+              <pre class="prompt-text" id="prompt-text" tabindex="0" aria-label="Installation prompt"></pre>
+            </details>
+          </article>
+          <article class="path">
+            <h3>Or run the command</h3>
+            <p>Run from your prototype’s project folder.</p>
+            <div class="cmd-row" role="group" aria-label="Install command">
+            <div class="cmd-box"><code class="cmd-text" data-cmd tabindex="0" aria-label="Install command"></code></div>
+            <button class="btn cmd-copy" type="button" data-copy-cmd><span class="swap"><svg viewBox="0 0 16 16" aria-hidden="true"><rect x="5.5" y="5.5" width="7.5" height="7.5" rx="2" stroke="currentColor" stroke-width="1.4" fill="none"/><path d="M10.5 3.6V3.5A1.5 1.5 0 009 2H4a1.5 1.5 0 00-1.5 1.5V9A1.5 1.5 0 004 10.5h.1" stroke="currentColor" stroke-width="1.4" fill="none"/></svg><span>Copy</span></span></button>
+          </div>
+            <p class="fine" data-node-note></p>
+            <p class="fine" data-local-note hidden>This page is served from your computer, so the command only works on this machine.</p>
+          </article>
+        </div>
+        <details class="disclosure manual" id="manual">
+          <summary>Manual installation<svg class="chev" viewBox="0 0 16 16" aria-hidden="true"><path d="M4.5 6.5L8 10l3.5-3.5" stroke="currentColor" stroke-width="1.6" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg></summary>
+          <div class="disclosure-body manual-grid">
+            <div>
+              <h4>Script tag</h4>
+              <p>Download <a data-dist="unpolish.js" href="unpolish/unpolish.js" download>unpolish.js</a> into an <code>unpolish/</code> folder, put <a data-dist="unpolish.config.json" href="unpolish/unpolish.config.json" download>unpolish.config.json</a> next to your pages (<a data-dist="unpolish.config.schema.json" href="unpolish/unpolish.config.schema.json" download>schema</a>), and add to the <code>&lt;head&gt;</code>:</p>
+              <pre class="code"><code>&lt;script src="unpolish/unpolish.js"
+  data-config="unpolish.config.json" defer&gt;&lt;/script&gt;</code></pre>
+              <p class="fine">To remove: delete the tag, the folder and the config.</p>
+            </div>
+            <div>
+              <h4>npm package</h4>
+              <p>Install the exact version, then start it once in browser code. Importing is safe during server rendering.</p>
+              <pre class="code"><code data-npm-install></code>
+
+<code>import { init } from 'unpolish';
+init({ configUrl: '/unpolish.config.json' });</code></pre>
+              <p class="fine">Put the config in <code>public/</code>. To remove: delete the call and uninstall.</p>
+            </div>
+          </div>
+          <p class="fine manual-foot">Installed with the command? Remove it with <code data-cmd-remove></code>. Framework notes, configuration and updating: <a data-dist="README.md" href="unpolish/README.md">the guide</a>. Download the <a data-tarball href="#" download>package</a>.</p>
+        </details>
+      </div>
+    </section>
+
+    <section class="links" id="review-links" aria-labelledby="links-title">
+      <div class="wrap narrow">
+        <h2 id="links-title">Share the exact fidelity you mean</h2>
+        <p>Review links keep the page, query and hash, open in your saved preset, and can hide the controls.</p>
+        <code class="url-line">/plan?tab=venues<mark>&amp;unpolish=blueprint&amp;unpolish-ui=hidden</mark>#schedule</code>
+      </div>
+    </section>
+
+    <section class="closing">
+      <div class="wrap closing-inner">
+        <h2>Bring the conversation back to the work.</h2>
+        <div class="hero-cta">
+          <button class="btn btn-accent btn-lg" type="button" data-copy-prompt><span class="swap"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1.8l1.35 3.6a2 2 0 001.25 1.25L14.2 8l-3.6 1.35a2 2 0 00-1.25 1.25L8 14.2l-1.35-3.6a2 2 0 00-1.25-1.25L1.8 8l3.6-1.35a2 2 0 001.25-1.25z" fill="currentColor"/></svg><span>Install with your agent</span></span></button>
+          <a class="btn btn-ghost btn-lg" href="#install">Other ways to install</a>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <div class="wrap footer-inner">
+      <span>Unpolish v<span id="version">0.1.0</span> · MIT</span>
+      <span><a href="unpolish/README.md">Integration &amp; removal guide</a> · <a href="docs/VALIDATION.md">What we validated</a></span>
+    </div>
+  </footer>
+
+  <div class="toast" role="status" aria-live="polite" id="toast"></div>
+  <script src="site/release.js"></script>
+  <script src="site/site.js"></script>
+</body>
+</html>

@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Harbor Clinic — plain HTML example</title>
+  <link rel="stylesheet" href="style.css">
+  <script src="../../unpolish/unpolish.js" data-config="unpolish.config.json" defer></script>
+</head>
+<body>
+  <header class="site-header">
+    <span class="site-header__logo keep-brand" data-testid="brand" style="background:#fde68a;color:#0f172a;padding:2px 8px;border-radius:4px">Harbor</span>
+    <nav class="site-header__nav">
+      <a href="index.html" class="is-current" aria-current="page">Appointments</a>
+      <a href="about.html" data-testid="nav-about">About</a>
+    </nav>
+    <details class="dropdown" style="margin-left:auto">
+      <summary class="btn btn--outline" data-testid="dropdown">Account ▾</summary>
+      <div class="dropdown__menu" data-testid="dropdown-menu"><a href="#">Profile</a><a href="#">Sign out</a></div>
+    </details>
+  </header>
+  <main class="layout">
+    <section class="panel">
+      <h1 class="panel__title">Upcoming appointments</h1>
+      <p class="panel__meta">3 this week · <span class="tooltip" data-tip="Times are in your local zone">Local time</span></p>
+      <div class="tabs" role="tablist">
+        <button role="tab" aria-selected="true" data-testid="tab-week">This week</button>
+        <button role="tab" aria-selected="false" data-testid="tab-month">This month</button>
+      </div>
+      <ul class="list" id="list">
+        <li><span>Dr. Osei · Check-up</span><span class="badge badge--ok">Confirmed</span></li>
+        <li><span>Dr. Lind · Blood test</span><span class="badge badge--warn">Pending</span></li>
+        <li><span>Physio · Knee</span><span class="badge badge--err">Cancelled</span></li>
+      </ul>
+      <p style="margin-top:16px"><button class="btn btn--primary" id="add" data-testid="add">Add appointment</button> <button class="btn btn--outline" id="open" data-testid="open-dialog">Reschedule…</button> <button class="btn btn--danger" disabled>Delete</button></p>
+    </section>
+    <section class="grid">
+      <article class="tile"><img class="tile__img" src="../assets/lake.svg" alt="Clinic garden by the lake"><div class="tile__body"><strong>Garden wing</strong><br><span class="hint">Quiet rooms</span></div></article>
+      <article class="tile"><div class="tile__bg" role="img" aria-label="Desert dunes mural" data-testid="bg-image"></div><div class="tile__body"><strong>Mural lobby</strong><br><span class="hint">Ground floor</span></div></article>
+      <article class="tile"><canvas id="chart" width="280" height="120" data-testid="canvas" aria-label="Visits chart" style="display:block;width:100%;height:120px"></canvas><div class="tile__body"><strong>Visits</strong><br><span class="hint">Canvas stays as drawn</span></div></article>
+    </section>
+    <section class="panel">
+      <h2 class="panel__title">Patient details</h2>
+      <form id="form">
+        <div class="form-row"><label for="n">Full name</label><input id="n" name="n" data-testid="name" placeholder="Jane Doe" required></div>
+        <div class="form-row"><label for="e">Email</label><input id="e" type="email" data-testid="email" placeholder="jane@example.com"></div>
+        <div class="form-row"><label for="r">Reason</label><select id="r"><option>Check-up</option><option>Follow-up</option></select></div>
+        <div class="form-row"><label><input type="checkbox" checked data-testid="consent"> I agree to reminders</label></div>
+        <status-pill state="info" data-testid="pill">Insurance verified</status-pill>
+      </form>
+    </section>
+  </main>
+  <dialog id="dlg" data-testid="dialog"><h2 style="margin-top:0">Reschedule</h2><p class="hint">Pick a new time.</p><form method="dialog"><button class="btn btn--outline">Cancel</button> <button class="btn btn--primary" value="ok">Confirm</button></form></dialog>
+  <script>
+    // Web component with an open shadow root
+    customElements.define('status-pill', class extends HTMLElement {
+      constructor() { super(); this.attachShadow({ mode: 'open' }).innerHTML = '<style>span{display:inline-block;padding:4px 10px;border-radius:999px;background:#dbeafe;color:#1e40af;font-weight:600;font-size:13px;border:1px solid #93c5fd}</style><span part="pill"><slot></slot></span>'; }
+    });
+    document.getElementById('open').onclick = function () { document.getElementById('dlg').showModal(); };
+    var n = 0;
+    document.getElementById('add').onclick = function () {
+      var li = document.createElement('li');
+      li.setAttribute('data-testid', 'added');
+      li.innerHTML = '<span>New visit ' + (++n) + '</span><span class="badge badge--ok">Confirmed</span>';
+      document.getElementById('list').appendChild(li);
+    };
+    document.querySelectorAll('[role=tab]').forEach(function (t) {
+      t.onclick = function () { document.querySelectorAll('[role=tab]').forEach(function (x) { x.setAttribute('aria-selected', String(x === t)); }); };
+    });
+    var c = document.getElementById('chart').getContext('2d');
+    var g = c.createLinearGradient(0, 0, 280, 0); g.addColorStop(0, '#14b8a6'); g.addColorStop(1, '#6366f1');
+    c.fillStyle = '#f0fdfa'; c.fillRect(0, 0, 280, 120);
+    c.fillStyle = g; [40, 70, 55, 90, 65, 100, 80].forEach(function (h, i) { c.fillRect(14 + i * 38, 110 - h, 24, h); });
+  </script>
+</body>
+</html>

@@ -1,0 +1,13 @@
+{
+  "version": 1,
+  "id": "example-vue",
+  "defaultTheme": "original",
+  "exclude": [".map-embed"],
+  "roles": { ".chip": "fill" },
+  "themes": {
+    "pastel": { "radius": 8 }
+  },
+  "overrides": {
+    "sketch": ".hero h1 { letter-spacing: 0 !important; }"
+  }
+}
