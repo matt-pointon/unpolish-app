@@ -25,8 +25,8 @@
         <a href="#install">Install</a>
         <a href="#review-links">Review links</a>
       </nav>
-      <button class="btn btn-dark btn-sm" type="button" data-copy-cmd>
-        <span class="swap"><svg viewBox="0 0 16 16" aria-hidden="true"><rect x="5.5" y="5.5" width="7.5" height="7.5" rx="2" stroke="currentColor" stroke-width="1.4" fill="none"/><path d="M10.5 3.6V3.5A1.5 1.5 0 009 2H4a1.5 1.5 0 00-1.5 1.5V9A1.5 1.5 0 004 10.5h.1" stroke="currentColor" stroke-width="1.4" fill="none"/></svg><span>Copy install command</span></span>
+      <button class="btn btn-dark btn-sm" type="button" data-copy-prompt>
+        <span class="swap"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1.8l1.35 3.6a2 2 0 001.25 1.25L14.2 8l-3.6 1.35a2 2 0 00-1.25 1.25L8 14.2l-1.35-3.6a2 2 0 00-1.25-1.25L1.8 8l3.6-1.35a2 2 0 001.25-1.25z" fill="currentColor"/></svg><span>Install with your agent</span></span>
       </button>
     </div>
   </header>
@@ -36,12 +36,15 @@
       <div class="wrap hero-inner">
         <h1 id="hero-title">Less polish.<br><em>Better conversations.</em></h1>
         <p class="lede">A reversible lo-fi layer for working prototypes, so reviews focus on structure, content and flow — not pixels.</p>
-        <div class="cmd cmd-hero" role="group" aria-label="Install command">
-          <span class="cmd-sigil" aria-hidden="true">$</span>
-          <code class="cmd-text" data-cmd tabindex="0"></code>
-          <button class="btn btn-accent cmd-copy" type="button" data-copy-cmd><span class="swap"><svg viewBox="0 0 16 16" aria-hidden="true"><rect x="5.5" y="5.5" width="7.5" height="7.5" rx="2" stroke="currentColor" stroke-width="1.4" fill="none"/><path d="M10.5 3.6V3.5A1.5 1.5 0 009 2H4a1.5 1.5 0 00-1.5 1.5V9A1.5 1.5 0 004 10.5h.1" stroke="currentColor" stroke-width="1.4" fill="none"/></svg><span>Copy</span></span></button>
+        <div class="hero-cta">
+          <button class="btn btn-accent btn-lg" type="button" data-copy-prompt><span class="swap"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1.8l1.35 3.6a2 2 0 001.25 1.25L14.2 8l-3.6 1.35a2 2 0 00-1.25 1.25L8 14.2l-1.35-3.6a2 2 0 00-1.25-1.25L1.8 8l3.6-1.35a2 2 0 001.25-1.25z" fill="currentColor"/></svg><span>Install with your agent</span></span></button>
+          <div class="cmd cmd-hero" role="group" aria-label="Install command">
+            <span class="cmd-sigil" aria-hidden="true">$</span>
+            <code class="cmd-text" data-cmd tabindex="0"></code>
+            <button class="btn btn-quiet cmd-copy" type="button" data-copy-cmd aria-label="Copy install command"><span class="swap"><svg viewBox="0 0 16 16" aria-hidden="true"><rect x="5.5" y="5.5" width="7.5" height="7.5" rx="2" stroke="currentColor" stroke-width="1.4" fill="none"/><path d="M10.5 3.6V3.5A1.5 1.5 0 009 2H4a1.5 1.5 0 00-1.5 1.5V9A1.5 1.5 0 004 10.5h.1" stroke="currentColor" stroke-width="1.4" fill="none"/></svg><span>Copy</span></span></button>
+          </div>
         </div>
-        <p class="cmd-note">Run it in your project folder — any framework, no package manager. <a href="#install">How it works</a></p>
+        <p class="cmd-note"><span class="pill" data-release-label></span> <span data-release-note></span> <a href="#install">All options</a></p>
       </div>
 
       <div class="wrap demo" id="demo">
@@ -103,34 +106,57 @@
 
     <section class="install" id="install" aria-labelledby="install-title">
       <div class="wrap install-inner">
-        <h2 id="install-title">One command. Any stack.</h2>
-        <ol class="steps">
-          <li><strong>Run it in your project folder.</strong> It copies <code>unpolish/</code> into <code>public/</code>, <code>static/</code> or your site root.</li>
-          <li><strong>It adds one script tag</strong> to your HTML entry. For Next.js and other layouts without one, it prints the line to paste.</li>
-          <li><strong>Press <kbd>\</kbd></strong> in your prototype and pick a theme.</li>
-        </ol>
-        <div class="cmd cmd-dark" role="group" aria-label="Install command">
-          <span class="cmd-sigil" aria-hidden="true">$</span>
-          <code class="cmd-text" data-cmd tabindex="0"></code>
-          <button class="btn btn-accent cmd-copy" type="button" data-copy-cmd><span class="swap"><svg viewBox="0 0 16 16" aria-hidden="true"><rect x="5.5" y="5.5" width="7.5" height="7.5" rx="2" stroke="currentColor" stroke-width="1.4" fill="none"/><path d="M10.5 3.6V3.5A1.5 1.5 0 009 2H4a1.5 1.5 0 00-1.5 1.5V9A1.5 1.5 0 004 10.5h.1" stroke="currentColor" stroke-width="1.4" fill="none"/></svg><span>Copy</span></span></button>
+        <h2 id="install-title">Add it to the prototype you already have.</h2>
+        <p class="install-lede">One small browser runtime, added the way your project already works. Nothing to rebuild, and one command takes it out again.</p>
+        <div class="paths">
+          <article class="path path-agent">
+            <h3>With your agent <span class="pill pill-accent">Recommended</span></h3>
+            <p>Paste the prompt into Claude Code, Cursor, Codex or Copilot. It inspects the repo, previews the installer’s plan, installs, reviews the diff and checks the app still works.</p>
+            <button class="btn btn-accent" type="button" data-copy-prompt><span class="swap"><svg viewBox="0 0 16 16" aria-hidden="true"><rect x="5.5" y="5.5" width="7.5" height="7.5" rx="2" stroke="currentColor" stroke-width="1.4" fill="none"/><path d="M10.5 3.6V3.5A1.5 1.5 0 009 2H4a1.5 1.5 0 00-1.5 1.5V9A1.5 1.5 0 004 10.5h.1" stroke="currentColor" stroke-width="1.4" fill="none"/></svg><span>Copy prompt</span></span></button>
+            <details class="disclosure">
+              <summary>Read the prompt<svg class="chev" viewBox="0 0 16 16" aria-hidden="true"><path d="M4.5 6.5L8 10l3.5-3.5" stroke="currentColor" stroke-width="1.6" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg></summary>
+              <pre class="prompt-text" id="prompt-text" tabindex="0" aria-label="Installation prompt text"></pre>
+            </details>
+          </article>
+          <article class="path">
+            <h3>Run the installer <span class="pill" data-release-label></span></h3>
+            <div class="cmd cmd-dark" role="group" aria-label="Install command">
+              <span class="cmd-sigil" aria-hidden="true">$</span>
+              <code class="cmd-text" data-cmd tabindex="0"></code>
+              <button class="btn btn-accent cmd-copy" type="button" data-copy-cmd aria-label="Copy install command"><span class="swap"><svg viewBox="0 0 16 16" aria-hidden="true"><rect x="5.5" y="5.5" width="7.5" height="7.5" rx="2" stroke="currentColor" stroke-width="1.4" fill="none"/><path d="M10.5 3.6V3.5A1.5 1.5 0 009 2H4a1.5 1.5 0 00-1.5 1.5V9A1.5 1.5 0 004 10.5h.1" stroke="currentColor" stroke-width="1.4" fill="none"/></svg><span>Copy</span></span></button>
+            </div>
+            <ul class="what">
+              <li><strong>Vite</strong> — React, Vue, Svelte: a pinned dependency and a marked 4-line block in the client entry.</li>
+              <li><strong>Next.js</strong> — App Router: a client component rendered once in the root layout.</li>
+              <li><strong>Plain HTML</strong> — one script tag per page and a local copy of the script. No package.json.</li>
+              <li><strong>Anything else</strong> — prints the exact steps and changes nothing.</li>
+            </ul>
+            <p class="fine">Add <code>--dry-run</code> to see the plan first. Re-running is safe and keeps your <code>unpolish.config.json</code>. Remove with <code data-cmd-remove></code></p>
+          </article>
         </div>
-        <p class="fine">macOS, Linux, WSL or Git Bash. Re-run to update; your <code>unpolish.config.json</code> is kept. To remove it: <code data-cmd-uninstall></code></p>
+        <details class="disclosure manual" id="manual">
+          <summary>Manual installation<svg class="chev" viewBox="0 0 16 16" aria-hidden="true"><path d="M4.5 6.5L8 10l3.5-3.5" stroke="currentColor" stroke-width="1.6" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg></summary>
+          <div class="disclosure-body manual-grid">
+            <div>
+              <h4>Script tag</h4>
+              <p>Download <a href="unpolish/unpolish.js" download>unpolish.js</a> into an <code>unpolish/</code> folder, put <a href="unpolish/unpolish.config.json" download>unpolish.config.json</a> next to your pages (<a href="unpolish/unpolish.config.schema.json" download>schema</a>), and add to the <code>&lt;head&gt;</code>:</p>
+              <pre class="code"><code>&lt;script src="unpolish/unpolish.js"
+  data-config="unpolish.config.json" defer&gt;&lt;/script&gt;</code></pre>
+              <p class="fine">To remove: delete the tag, the folder and the config.</p>
+            </div>
+            <div>
+              <h4>npm package</h4>
+              <p>Install the exact version, then start it once in browser code. Importing is safe during server rendering.</p>
+              <pre class="code"><code data-npm-install></code>
+
+<code>import { init } from 'unpolish';
+init({ configUrl: '/unpolish.config.json' });</code></pre>
+              <p class="fine">Put the config in <code>public/</code>. To remove: delete the call and uninstall.</p>
+            </div>
+          </div>
+          <p class="fine manual-foot">Framework notes, configuration, updating and removal: <a href="unpolish/README.md">the guide</a>. Download the <a data-tarball href="#" download>package tarball</a>.</p>
+        </details>
         <p class="fine" id="origin-note"></p>
-        <details class="disclosure">
-          <summary>Prefer a coding agent?<svg class="chev" viewBox="0 0 16 16" aria-hidden="true"><path d="M4.5 6.5L8 10l3.5-3.5" stroke="currentColor" stroke-width="1.6" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg></summary>
-          <div class="prompt-card">
-            <div class="prompt-head"><span>Prompt for Claude Code, Cursor and others</span><button class="btn btn-quiet btn-sm" type="button" data-copy-prompt><span class="swap"><span>Copy prompt</span></span></button></div>
-            <pre id="prompt-text" tabindex="0" aria-label="Installation prompt text"></pre>
-          </div>
-        </details>
-        <details class="disclosure">
-          <summary>Install by hand<svg class="chev" viewBox="0 0 16 16" aria-hidden="true"><path d="M4.5 6.5L8 10l3.5-3.5" stroke="currentColor" stroke-width="1.6" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg></summary>
-          <div class="disclosure-body">
-            <pre class="code"><code>&lt;script src="/unpolish/unpolish.js"
-        data-config="unpolish.config.json" defer&gt;&lt;/script&gt;</code></pre>
-            <p class="fine">Copy the <code>unpolish/</code> folder into your static assets, <a href="unpolish/unpolish.js" download>download unpolish.js</a> directly, or see the <a href="unpolish/README.md">guide</a>. To remove it, delete the tag and the folder.</p>
-          </div>
-        </details>
       </div>
     </section>
 
@@ -145,9 +171,10 @@
     <section class="closing">
       <div class="wrap closing-inner">
         <h2>Bring the conversation back to the work.</h2>
-        <button class="btn btn-accent btn-lg" type="button" data-copy-cmd>
-          <span class="swap"><svg viewBox="0 0 16 16" aria-hidden="true"><rect x="5.5" y="5.5" width="7.5" height="7.5" rx="2" stroke="currentColor" stroke-width="1.4" fill="none"/><path d="M10.5 3.6V3.5A1.5 1.5 0 009 2H4a1.5 1.5 0 00-1.5 1.5V9A1.5 1.5 0 004 10.5h.1" stroke="currentColor" stroke-width="1.4" fill="none"/></svg><span>Copy install command</span></span>
-        </button>
+        <div class="hero-cta">
+          <button class="btn btn-accent btn-lg" type="button" data-copy-prompt><span class="swap"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1.8l1.35 3.6a2 2 0 001.25 1.25L14.2 8l-3.6 1.35a2 2 0 00-1.25 1.25L8 14.2l-1.35-3.6a2 2 0 00-1.25-1.25L1.8 8l3.6-1.35a2 2 0 001.25-1.25z" fill="currentColor"/></svg><span>Install with your agent</span></span></button>
+          <a class="btn btn-ghost btn-lg" href="#install">Other ways to install</a>
+        </div>
       </div>
     </section>
   </main>
@@ -160,6 +187,7 @@
   </footer>
 
   <div class="toast" role="status" aria-live="polite" id="toast"></div>
+  <script src="site/release.js"></script>
   <script src="site/site.js"></script>
 </body>
 </html>

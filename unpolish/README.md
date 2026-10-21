@@ -1,178 +1,163 @@
-# Unpolish — integration guide
+# Unpolish
 
-Unpolish is a reversible lo-fi visual layer for working web prototypes. It ships as **one dependency-free file** (`unpolish.js`) plus a **JSON config** (`unpolish.config.json`). It does not need React, Tailwind, a component library or a particular build tool, and it never edits your components, routes, state or stylesheets.
+**Less polish. Better conversations.** Reversible lo-fi themes — Black & White, Sketch, Blueprint, Pastel Blocks — for working web prototypes. Every click, route and form keeps working; *Original* puts everything back.
 
-> Not published to npm. Copy (vendor) the files in this folder into the prototype's repository.
+One framework-independent browser runtime, three ways in:
 
-| File | Purpose |
-| --- | --- |
-| `unpolish.js` | The harness: themes, panel, shortcuts, review links (≈157 KB source, ≈42 KB gzipped) |
-| `unpolish.config.json` | Shared, version-controlled project preset (start from this one) |
-| `unpolish.config.schema.json` | JSON Schema for the config (editor autocomplete/validation) |
+| | When | How |
+| --- | --- | --- |
+| **Installer** | Any project with a `package.json` (Vite, Next.js…), or a folder of HTML pages | `npx unpolish@latest init` |
+| **Script tag** | No build step, or you'd rather not add a dependency | `<script src="unpolish/unpolish.js" data-config="unpolish.config.json" defer></script>` |
+| **Download** | Self-hosting, offline, locked-down repos | `unpolish.js` + `unpolish.config.json` from the website or `node_modules/unpolish/dist/` |
 
 ## Install
 
-**One command, any stack.** From your project folder (macOS, Linux, WSL or Git Bash):
+From the prototype's folder:
 
 ```sh
-curl -fsSL https://<where-this-folder-is-served>/install.sh | sh -s -- https://<where-this-folder-is-served>/
+npx unpolish@latest init --dry-run   # show the plan, change nothing
+npx unpolish@latest init
 ```
 
-The website's *Copy install command* button fills in the address. The installer:
+Then start the app and press **`\`**.
 
-- copies `unpolish/` into `public/`, `static/` or the project root (override with `--dir <path>`);
-- adds one `<script>` tag before `</head>` in your HTML entry — `index.html`, SvelteKit's `src/app.html`, or every top-level page of a plain site;
-- for Next.js and other layouts without an HTML entry, prints the exact line to paste instead of editing app code;
-- is safe to re-run: it updates `unpolish.js` and never overwrites your `unpolish.config.json`.
+> **Before the npm release** `npx unpolish@latest` can't find the package yet. Use the preview build from the Unpolish website instead — the same installer, packed as a tarball: `npx <site>/unpolish/unpolish-<version>.tgz init`. It installs that same tarball into your project.
 
-`--no-tag` copies files only; `--uninstall` removes the tag(s) and the folder.
+### What `init` does
 
-### Manual install
+It inspects the project (package manager from the lockfile, framework, entry points, static folder, base path, an existing install) and makes the smallest change that fits:
 
-Copy this folder to wherever the app serves static files (`public/unpolish/`, `static/unpolish/`, …), then pick the smallest integration that fits.
+| Project | Changes |
+| --- | --- |
+| **Vite** (React, Vue, Svelte, vanilla…) | adds `unpolish` as an exact-version dependency with your package manager · creates `public/unpolish.config.json` · adds a 4-line marked block at the top of the client entry (`src/main.*`, read from `index.html`) |
+| **Next.js App Router** | adds the dependency · creates `public/unpolish.config.json` · creates `app/unpolish-client.tsx` (a client component that starts Unpolish after hydration) · adds one import and `<Unpolish />` inside `<body>` in `app/layout` |
+| **Plain HTML** (no `package.json`) | copies `unpolish/unpolish.js` and its schema · creates `unpolish.config.json` · adds one script tag before `</head>` on each top-level page. No `package.json`, no build step |
+| **Anything else** — Next.js Pages Router, SvelteKit, Nuxt, Astro, Remix, Angular, CRA, a monorepo root, an unfamiliar layout | changes nothing and prints the exact integration to add (exit code 2). Agents can read it with `--json` |
 
-**Script tag** — plain HTML, Vite, Vue, Svelte, Astro, CRA. Put it in the HTML entry or root layout `<head>`:
-
-```html
-<script src="/unpolish/unpolish.js" data-config="unpolish.config.json" defer></script>
-```
-
-`data-config` resolves **relative to the script file**. It auto-starts on load.
-
-**Next.js** (App Router `app/layout.tsx`, or `pages/_app.tsx`):
-
-```tsx
-import Script from 'next/script';
-// inside <body>
-<Script src="/unpolish/unpolish.js" data-config="unpolish.config.json" strategy="afterInteractive" />
-```
-
-**Bundled import** — when a script tag doesn't fit:
+The Vite entry block looks like this — `BASE_URL` keeps it working under a base path:
 
 ```js
-import './vendor/unpolish/unpolish.js';         // defines window.Unpolish; no auto-start
-import config from './vendor/unpolish/unpolish.config.json';
-window.Unpolish.init({ config });
+// unpolish:start — lo-fi review themes. Remove with `npx unpolish remove` or delete this block.
+import { init as initUnpolish } from 'unpolish';
+initUnpolish({ configUrl: `${import.meta.env.BASE_URL}unpolish.config.json` });
+// unpolish:end
 ```
 
-**Inline config** — no extra request:
+`init` is safe to re-run: it skips what's in place, reuses your existing `unpolish.config.json` without touching it, never stacks a second integration on top of a script tag or import you added by hand, and doesn't reformat files or change other dependencies. It never prompts.
+
+| Option | |
+| --- | --- |
+| `--dry-run` | Print the plan (with the lines it would add); change nothing |
+| `--json` | Machine-readable report on stdout |
+| `--scope all` | Default. Every build: local dev, preview deploys, production |
+| `--scope dev` | Local development only (`import.meta.env.DEV` / `NODE_ENV`) |
+| `--scope env:NAME` | Only builds where `NAME` is `"true"`, e.g. `env:VITE_UNPOLISH` |
+| `--mode script` | Use the script-tag install even when there's a `package.json` |
+| `--from <spec>` | Install the runtime from a tarball, URL or path instead of the registry |
+| `--upgrade` | Re-pin an existing install (or vendored file) to this version |
+| `--cwd <dir>` | Run as if from `<dir>` (in a monorepo, point it at one app) |
+
+Exit codes: `0` done or nothing to do · `1` failed, nothing changed (e.g. the lockfile says pnpm but `pnpm` isn't installed) · `2` manual step needed, plan printed, nothing changed · `3` partially applied, the report lists what was and wasn't · `64` bad usage.
+
+**Deployed previews.** The default scope includes production builds on purpose: review links only work where Unpolish is loaded. Choose `--scope dev` or `env:NAME` to leave it out of some builds, or set `"enabled": false` in a build's config. Hiding the controls (`"ui": "hidden"`) is not access control — anyone can still press `\`.
+
+## Script tag and self-hosting
 
 ```html
-<script type="application/json" id="unpolish-config">{ "version": 1, "defaultTheme": "original" }</script>
-<script src="/unpolish/unpolish.js" defer></script>
+<script src="unpolish/unpolish.js" data-config="unpolish.config.json" defer></script>
 ```
 
-Other options: set `window.UnpolishConfig = {…}` before the script, or add `data-manual` to the tag and call `Unpolish.init({ config })` yourself. Server-rendered apps should load it on the client only (after hydration).
+One file, no dependencies, starts itself. `data-config` resolves relative to the page (falling back to the script's folder). Keep `unpolish.config.json` next to your pages and commit it. Without `data-config` the built-in presets are used. Alternatives: inline `<script type="application/json" id="unpolish-config">{…}</script>` before the tag, `window.UnpolishConfig = {…}`, or `data-manual` and call `Unpolish.init({ config })` yourself.
 
-To ship a build without it, set `"enabled": false` in the config or leave the tag out of that build.
+Pin a version: the bundle's first line names it (`/*! Unpolish v0.1.0 …`). After publication, jsDelivr and unpkg serve every npm version at `https://cdn.jsdelivr.net/npm/unpolish@<version>/dist/unpolish.js` — use an exact version, never `latest`, for a prototype others review.
+
+## In code
+
+```js
+import { init } from 'unpolish';
+init({ configUrl: '/unpolish.config.json' });   // or init({ config: {...} })
+```
+
+Importing is side-effect free and safe during server rendering: `init()` returns `null` on the server and starts Unpolish once in the browser. Repeated calls (hot reload, React strict mode, a second import, a script tag on the same page) return the running instance instead of starting another. `getUnpolish()` returns it; `window.Unpolish` is the same object. Types are included.
+
+```js
+const u = init();
+u.setTheme('sketch');                  // 'original' restores
+u.update({ images: 'placeholder', border: { style: 'dashed' } });
+u.getReviewLink({ hideUI: true });
+u.on('change', (state) => {});        // also 'ready', 'open', 'close'
+u.destroy();                           // remove the treatment and panel
+```
 
 ## Use
 
-- Press **`\`** (or the launcher in the corner) to open the panel.
-- **1–4** pick Black & White, Sketch, Blueprint, Pastel Blocks while the panel is open. **0** restores Original. **Esc** closes.
-- **Edit theme** opens with the **Details** dial (0–100: how strongly the theme's own character shows — stroke wobble and shading in Sketch, patterns in Black & White, grid and marks in Blueprint, colour fields in Pastel Blocks; it never moves anything). Below it are collapsible groups — Color (status colors behind their own disclosure), Type & lines, Images, Shortcut — with Reset preset and Copy configuration always at the bottom.
-- **Images** default to *Match theme* (grayscale in Black & White, pencil in Sketch, blue duotone in Blueprint, soft duotone in Pastel Blocks). *B&W* makes every image black and white; *Original* leaves them alone; *Placeholder* swaps in wireframe boxes that keep size and alt text.
-- **Review link** opens a small share view: the theme being shared, *Hide controls for viewers*, any unsaved-edit warning, and an explicit **Copy link** button.
-- **Shortcuts** shows every binding and lets you reassign them. Shortcuts never fire while typing in inputs, textareas, selects or contenteditable regions.
+- **`\`** or the launcher opens the panel. **1–4** pick a theme while it's open, **0** restores Original, **Esc** closes.
+- **Edit theme** — the **Details** dial (how strongly the theme's character shows), colour, type & lines, images (*Match theme*, *B&W*, *Original*, *Placeholder*), shortcuts. **Reset preset** and **Copy configuration** at the bottom.
+- **Review link** copies the current URL with `?unpolish=<theme>` and, optionally, `&unpolish-ui=hidden`. Values: `original`, `black-white`, `sketch`, `blueprint`, `pastel`. Links use the saved project preset, survive navigation in that tab, and leave your app's own parameters and hash alone.
 
 ## Configuration
 
-Precedence for a page view: **review-link URL → local draft (this browser) → project config → built-in presets**.
+`unpolish.config.json` is the shared, version-controlled preset. The starter file:
 
-```jsonc
+```json
 {
-  "$schema": "./unpolish.config.schema.json",
+  "$schema": "../node_modules/unpolish/schema/unpolish.config.schema.json",
   "version": 1,
-  "id": "checkout-v2",                 // namespaces local drafts per prototype
-  "defaultTheme": "original",          // original | black-white | sketch | blueprint | pastel
-  "ui": "visible",                     // "hidden" removes the launcher (\ still opens the panel)
-  "launcher": "bottom-right",          // or bottom-left | top-right | top-left | false
-  "webFonts": true,                    // load Balsamiq Sans / IBM Plex / Nunito from Google Fonts
-  "exclude": [".brand-logo", "#map"],  // never restyle these regions
-  "roles": { ".my-chip": "fill" },     // hints: surface | fill | media | icon | plain
-  "shortcuts": { "toggle": "\\", "themes": { "sketch": "Alt+S" } },
-  "themes": {
-    "sketch": {
-      "palette": { "accent": "#2563c9" },
-      "typography": "hand",            // original | neutral | hand | technical | rounded
-      "border": { "weight": 1.6, "style": "hand" },  // solid | dashed | hand | none
-      "radius": 4,                     // number (px) or "keep"
-      "shadows": "none",               // none | soft | flat
-      "details": 50,                   // 0 (off)–100: wobble, patterns, grid, colour fields — per theme
-      "images": "theme"                // theme (match the theme) | mono (black & white) | original | placeholder
-    }
-  },
-  "overrides": {
-    "*": ".chart canvas { filter: grayscale(1) !important; }",
-    "blueprint": ".hero { background-color: var(--up-paper) !important; }"
-  }
+  "id": "my-prototype",
+  "defaultTheme": "original",
+  "ui": "visible",
+  "exclude": [],
+  "shortcuts": { "toggle": "\\", "themes": {} },
+  "themes": {}
 }
 ```
 
-Only list what you change; everything else uses the built-in preset. The full schema is in `unpolish.config.schema.json`.
+Precedence: **review link → local draft (this browser) → project config → built-in presets.** Panel edits are saved in the browser only; **Copy configuration** gives you the full JSON to paste into this file (or hand to your agent). Only list what you change:
 
-### Drafts vs. the project config
-
-Panel adjustments preview instantly and are saved **in the browser only** (a local draft, shown as *Local draft* in the panel header). A deployed page cannot write to your repository. To save:
-
-1. Click **Copy configuration**. You get the complete JSON plus short instructions.
-2. Paste it to your coding agent (or replace `unpolish.config.json` yourself) and redeploy.
-3. Once the file matches your draft, the panel shows *Project* again.
-
-**Discard local changes** returns to the project config. **Reset preset** returns only the current theme.
-
-### Exempting regions
-
-Add `data-unpolish-ignore` to an element, or list a selector in `exclude`. Exempt regions keep their own styles, inherited font and colour. Canvas, WebGL, `<iframe>`, `<embed>` and `<object>` are always left as they are.
-
-### Role hints and overrides
-
-The classifier reads each element's rendered styles (background, borders, shadow, colour, size) and tags it with roles — surface, fill, edge, media, icon, text tone. If a custom component is misread, either annotate it (`data-unpolish-role="surface|fill|media|icon|plain"`) or add a selector in `roles`. For anything else, `overrides` takes CSS that is scoped to a theme (`html[data-unpolish="sketch"] { … }`, via CSS nesting). Use `!important`; these variables are available: `--up-paper`, `--up-surface`, `--up-ink`, `--up-muted`, `--up-line`, `--up-rule`, `--up-accent`, `--up-danger`, `--up-success`, `--up-warning`, `--up-radius`, `--up-stroke`, `--up-font`.
-
-## Review links
-
-**Review link → Copy link** keeps the current path, your app's query parameters and hash, and adds:
-
-| Parameter | Values |
-| --- | --- |
-| `unpolish` | `original`, `black-white`, `sketch`, `blueprint`, `pastel` (aliases: `bw`, `pastel-blocks`) |
-| `unpolish-ui` | `visible` or `hidden` (hides panel and launcher; the shortcut still opens them) |
-
-Example: `/plan?tab=venues&unpolish=blueprint&unpolish-ui=hidden#schedule`
-
-Links apply the **saved project preset** for the theme; the recipient's own local drafts are ignored for that session. Links carry only the theme, so if your current theme has unsaved edits the panel asks you to save them first. The review session is kept in `sessionStorage`, so it survives client-side navigation and reloads in that tab. Invalid values fall back to the project defaults with a console warning. *Exit* in the panel ends the session.
-
-## JavaScript API
-
-```js
-Unpolish.setTheme('sketch');          // 'original' restores
-Unpolish.update({ images: 'placeholder', border: { style: 'dashed' } });
-Unpolish.getSettings('pastel');
-Unpolish.getConfig();                 // config object incl. local edits
-Unpolish.getReviewLink({ hideUI: true });
-Unpolish.open(); Unpolish.close(); Unpolish.toggle();
-Unpolish.resetTheme(); Unpolish.discardLocalChanges();
-Unpolish.on('change', (state) => {}); // also 'ready', 'open', 'close'
-Unpolish.destroy();                   // remove treatment + panel
+```jsonc
+{
+  "exclude": [".brand-logo", "#map"],  // never restyle these (or add data-unpolish-ignore)
+  "roles": { ".my-chip": "fill" },     // classifier hints: surface | fill | media | icon | plain
+  "launcher": "bottom-left",           // or top-right | top-left | false
+  "webFonts": false,                   // system fonts instead of Google Fonts
+  "shortcuts": { "toggle": "Alt+U", "themes": { "sketch": "Alt+S" } },
+  "themes": {
+    "sketch": { "details": 70, "typography": "hand", "border": { "weight": 2, "style": "hand" },
+                "radius": 4, "shadows": "none", "images": "mono", "palette": { "accent": "#2563c9" } }
+  },
+  "overrides": { "blueprint": ".hero { background-color: var(--up-paper) !important; }" }
+}
 ```
 
-## How it stays safe
+The schema (`schema/unpolish.config.schema.json`) documents every field and gives editors autocomplete.
 
-- **Reversible.** Everything lives in one `<style id="unpolish-theme">` (in an `@layer` so `!important` rules win predictably), `data-up` role attributes, and a hidden SVG with image filters. Original removes all of them.
-- **Layout-safe.** Themes change colour, borders' colour, outlines, backgrounds, radii, shadows and fonts. They never change size, padding, margin, position or border width; strokes are drawn with outlines/backgrounds that don't take space. Only a typography swap can nudge text width — choose *Keep original* when that matters.
-- **Behaviour untouched.** No element is replaced, wrapped or covered; event handlers, focus, form values, scroll and routes are preserved. Host transitions are paused for two frames during a switch so the prototype doesn't animate.
-- **Dynamic content.** A `MutationObserver` classifies new nodes before paint, and re-reads elements whose class, style, ARIA/data state or `open` attribute change. Open shadow roots get the theme via adopted stylesheets.
-- **Isolated UI.** The panel lives in a shadow root with its own reset; it excludes itself from theming.
+## Update
 
-## Limitations
+```sh
+npx unpolish@latest init --upgrade
+```
 
-- Canvas/WebGL, cross-origin iframes and closed shadow roots can't be restyled; they're left as they are.
-- Large inline SVGs (charts, illustrations) are treated as imagery: *Original* keeps them, *Simplified* filters them, *Placeholder* hides them. Exclude charts you want untouched.
-- Some elements are styled only through pseudo-elements or `:has()`; Unpolish re-reads on `change`/`click`, but a custom component may still need a role hint or override.
-- Child elements with opaque backgrounds can hide hand-drawn or dashed strokes drawn on a parent's edge.
-- Requires a modern browser: Chrome/Edge 111+, Safari 16.4+, Firefox 113+ (`color-mix`, `@layer`, `:where()`, CSS nesting for overrides).
-- Web fonts load from Google Fonts unless `"webFonts": false`; system fallbacks are used offline.
+Re-pins the dependency (or replaces the vendored `unpolish/unpolish.js`) at the new exact version. Your config is kept as is.
 
 ## Remove
 
-Run the installer with `--uninstall` (`curl -fsSL …/install.sh | sh -s -- --uninstall`), or delete the script tag (or import + `init` call) and this folder by hand. Optionally delete `unpolish.config.json`. Nothing else in the app refers to Unpolish. Visitors may keep a small `unpolish:*` entry in `localStorage`; it does nothing without the script.
+```sh
+npx unpolish remove --dry-run
+npx unpolish remove            # add --purge to delete unpolish.config.json too
+```
+
+Removes only what it can identify: the marked `unpolish:start…end` block, the generated Next.js client component and its import/`<Unpolish />`, Unpolish script tags, the vendored bundle and schema, and the dependency (with your package manager). Your configuration stays unless you pass `--purge`. Lines you added by hand without markers are reported, not guessed at. Visitors may keep a small `unpolish:*` entry in `localStorage`; it does nothing without the script.
+
+## How it stays safe
+
+Themes live in one `<style id="unpolish-theme">` (an `@layer`), `data-up` attributes and a hidden SVG filter set — Original removes all of it. They change colours, outlines, backgrounds, radii, shadows and fonts, never size, padding, position or border width. No element is replaced, wrapped or covered, so handlers, focus, form values, scroll and routes are untouched. New content is classified as it appears; open shadow roots get the theme too. The panel lives in its own shadow root.
+
+## Limitations
+
+- Canvas/WebGL, cross-origin iframes and closed shadow roots are left as they are.
+- A custom component styled only through pseudo-elements or `:has()` may need a role hint or override.
+- A typography swap can nudge text width; pick *Keep original* type when that matters.
+- Modern browsers only: Chrome/Edge 111+, Safari 16.4+, Firefox 113+.
+- `init` sets up Vite, Next.js App Router and plain HTML automatically; other frameworks get exact manual steps.
+
+MIT License.

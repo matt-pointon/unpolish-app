@@ -2,11 +2,12 @@
   "name": "unpolish-app",
   "version": "0.1.0",
   "private": true,
-  "description": "Unpolish — reversible lo-fi themes for working web prototypes. Website, harness and validation examples.",
+  "description": "Unpolish \u2014 reversible lo-fi themes for working web prototypes. Website, harness and validation examples.",
   "type": "module",
   "license": "MIT",
   "scripts": {
     "serve": "node scripts/serve.mjs",
+    "release": "node scripts/release.mjs",
     "build:examples": "node scripts/build-examples.mjs",
     "test": "npm run build:examples && playwright test",
     "test:only": "playwright test"
@@ -21,6 +22,7 @@
     "react-dom": "^19.1.1",
     "svelte": "^5.38.6",
     "tailwindcss": "^4.1.13",
+    "unpolish": "file:packages/unpolish",
     "vite": "^7.1.4",
     "vue": "^3.5.21"
   }

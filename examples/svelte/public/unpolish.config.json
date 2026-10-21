@@ -1,0 +1,9 @@
+{
+  "version": 1,
+  "id": "example-svelte",
+  "defaultTheme": "original",
+  "shortcuts": {
+    "toggle": "\\",
+    "themes": {}
+  }
+}

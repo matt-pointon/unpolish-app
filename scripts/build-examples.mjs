@@ -1,16 +1,12 @@
-// Vendors the harness into each Vite example (as an agent would) and builds it.
-import { cpSync, mkdirSync, existsSync } from 'node:fs';
+// Builds the Vite examples. Each imports the runtime from the `unpolish`
+// package (linked from packages/unpolish), exactly as the installer sets it up.
 import { execSync } from 'node:child_process';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const root = fileURLToPath(new URL('..', import.meta.url));
+execSync('node scripts/build.mjs', { cwd: join(root, 'packages', 'unpolish'), stdio: 'inherit' });
 for (const name of ['react', 'vue', 'svelte']) {
-  const dir = join(root, 'examples', name);
-  const pub = join(dir, 'public', 'unpolish');
-  mkdirSync(pub, { recursive: true });
-  cpSync(join(root, 'unpolish', 'unpolish.js'), join(pub, 'unpolish.js'));
-  if (existsSync(join(dir, 'unpolish.config.json'))) cpSync(join(dir, 'unpolish.config.json'), join(pub, 'unpolish.config.json'));
   console.log(`\n▸ building examples/${name}`);
-  execSync(`npx vite build --logLevel warn`, { cwd: dir, stdio: 'inherit' });
+  execSync('npx vite build --logLevel warn', { cwd: join(root, 'examples', name), stdio: 'inherit' });
 }

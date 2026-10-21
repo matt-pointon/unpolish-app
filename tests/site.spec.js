@@ -1,26 +1,41 @@
 import { test, expect } from '@playwright/test';
 
-test('copy install command: a real one-liner, plus the agent prompt as an alternative', async ({ page, request }) => {
+const TGZ = 'http://localhost:4174/unpolish/unpolish-0.1.0.tgz';
+
+test('install with your agent: a short prompt that matches the release the site serves', async ({ page, request }) => {
   await page.goto('/');
-  await page.locator('.hero [data-copy-cmd]').click();
-  await expect(page.locator('.hero [data-copy-cmd]')).toContainText('Copied');
-  await expect(page.locator('#toast')).toHaveClass(/show/);
-  await expect(page.locator('#toast')).toContainText('Install command copied');
-  const cmd = await page.evaluate(() => navigator.clipboard.readText());
-  expect(cmd).toBe('curl -fsSL http://localhost:4174/unpolish/install.sh | sh -s -- http://localhost:4174/unpolish/');
-  await expect(page.locator('.hero [data-cmd]')).toHaveText(cmd);
-  for (const f of ['install.sh', 'unpolish.js', 'unpolish.config.json', 'unpolish.config.schema.json', 'README.md']) {
-    expect((await request.get('/unpolish/' + f)).status(), f).toBe(200);
-  }
-  // The coding-agent prompt is still there, and points at the installer
-  await page.locator('summary', { hasText: 'Prefer a coding agent?' }).click();
-  await page.locator('[data-copy-prompt]').click();
+  const release = await page.evaluate(() => window.UNPOLISH_RELEASE);
+  expect(release).toEqual({ name: 'unpolish', version: '0.1.0', published: false, tarball: 'unpolish-0.1.0.tgz' });
+  await page.locator('.hero [data-copy-prompt]').click();
+  await expect(page.locator('.hero [data-copy-prompt]')).toContainText('Copied');
+  await expect(page.locator('#toast')).toContainText('paste it into your coding agent');
   const text = await page.evaluate(() => navigator.clipboard.readText());
   expect(text).toContain('Install Unpolish in this prototype.');
-  expect(text).toContain(cmd);
-  expect(text).toMatch(/Inspect the repository first/);
-  const urls = text.match(/https?:\/\/\S+?\.(json|js|md|sh)(?=\s|$)/gm);
-  for (const u of urls) expect((await request.get(u)).status(), u).toBe(200);
+  expect(text).toContain(`npx ${TGZ} init --dry-run`);
+  expect(text).toContain(`npx ${TGZ} remove`);
+  expect(text).toMatch(/not on npm yet/);
+  expect(text).not.toMatch(/npx unpolish(@| )/);          // never the unpublished registry package
+  expect(text.split('\n').length).toBeLessThan(25);
+  await expect(page.locator('#prompt-text')).toHaveText(text);
+  for (const u of text.match(/https?:\/\/\S+?\.(tgz|md)(?=\s|$)/gm)) expect((await request.get(u)).status(), u).toBe(200);
+});
+
+test('copy install command: labelled as a preview build, and every download exists', async ({ page, request }) => {
+  await page.goto('/');
+  await expect(page.locator('.hero [data-release-label]')).toHaveText('Preview build · not on npm yet');
+  await page.locator('.hero [data-copy-cmd]').click();
+  await expect(page.locator('.hero [data-copy-cmd]')).toContainText('Copied');
+  await expect(page.locator('#toast')).toContainText('run it in your project folder to install');
+  const cmd = await page.evaluate(() => navigator.clipboard.readText());
+  expect(cmd).toBe(`npx ${TGZ} init`);
+  await expect(page.locator('.hero [data-cmd]')).toHaveText(cmd);
+  await expect(page.locator('[data-cmd-remove]')).toHaveText(`npx ${TGZ} remove`);
+  await expect(page.locator('[data-npm-install]')).toHaveText(`npm install --save-exact ${TGZ}`);
+  const html = await page.content();
+  expect(html).not.toMatch(/jsdelivr|unpkg|install\.sh/);
+  const links = await page.locator('#install a[href]').evaluateAll((as) => as.map((a) => a.href).filter((h) => !h.includes('#')));
+  expect(links.length).toBeGreaterThanOrEqual(5);
+  for (const u of links) expect((await request.get(u)).status(), u).toBe(200);
 });
 
 test('the demo is visible on the first screen and drives the real harness', async ({ page }) => {
@@ -49,6 +64,7 @@ test('site works on small screens without horizontal scrolling', async ({ page }
   await page.goto('/');
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
   expect(overflow).toBeLessThanOrEqual(0);
+  await expect(page.locator('.hero [data-copy-prompt]')).toBeVisible();
   await expect(page.locator('.hero [data-copy-cmd]')).toBeVisible();
   // Narrow screens get a dropdown instead of the clipped segmented control, plus a full-screen demo link.
   await expect(page.locator('#demo-themes')).toBeHidden();

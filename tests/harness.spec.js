@@ -245,6 +245,8 @@ test.describe('panel', () => {
     const vv = await page.evaluate(() => ({ w: visualViewport.width, h: visualViewport.height, x: visualViewport.offsetLeft }));
     expect(box.x).toBeGreaterThanOrEqual(vv.x);
     expect(box.x + box.width).toBeLessThanOrEqual(vv.x + vv.w + 1);
+    // Pointer opens animate in; tap once the sheet has settled.
+    await page.waitForFunction(() => document.querySelector('unpolish-harness').shadowRoot.getAnimations().every((a) => a.playState !== 'running'));
     await shadow(page, '.tile[data-theme="sketch"]').tap();
     expect(await theme(page)).toBe('sketch');
     await ctx.close();

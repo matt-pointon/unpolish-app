@@ -1,17 +1,13 @@
 {
-  "$schema": "./unpolish.config.schema.json",
+  "$schema": "./unpolish/unpolish.config.schema.json",
   "version": 1,
   "id": "my-prototype",
   "defaultTheme": "original",
   "ui": "visible",
-  "launcher": "bottom-right",
-  "webFonts": true,
   "exclude": [],
-  "roles": {},
   "shortcuts": {
     "toggle": "\\",
     "themes": {}
   },
-  "themes": {},
-  "overrides": {}
+  "themes": {}
 }

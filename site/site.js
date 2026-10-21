@@ -3,56 +3,60 @@
   var $ = function (s, r) { return (r || document).querySelector(s); };
   var $$ = function (s, r) { return Array.prototype.slice.call((r || document).querySelectorAll(s)); };
 
-  /* ---------------- Installation prompt ---------------- */
-  // Files are referenced from wherever this site is served, so the links are always real.
+  /* ---------------- Release + install commands ---------------- */
+  // site/release.js (written by scripts/release.mjs) says which version this site
+  // serves and whether it is on npm yet. Before publication every command points
+  // at the tarball this site hosts, so nothing refers to a package that isn't there.
+  var R = window.UNPOLISH_RELEASE || { name: 'unpolish', version: '', published: false, tarball: '' };
   var base = new URL('unpolish/', location.href);
   base.search = ''; base.hash = '';
+  var tarball = new URL(R.tarball, base).href;
+  var docs = new URL('README.md', base).href;
   var isLocal = location.protocol === 'file:' || /^(localhost|127\.|0\.0\.0\.0|\[::1\])/.test(location.hostname);
+  var spec = R.published ? R.name + '@latest' : tarball;
 
-  // One-line installer: works with any stack, no package manager.
-  function command() { return 'curl -fsSL ' + base.href + 'install.sh | sh -s -- ' + base.href; }
-  function uninstallCommand() { return 'curl -fsSL ' + base.href + 'install.sh | sh -s -- --uninstall'; }
+  function command(sub) { return 'npx ' + spec + ' ' + (sub || 'init'); }
+  var npmInstall = 'npm install --save-exact ' + (R.published ? R.name + '@' + R.version : tarball);
 
   function prompt() {
-    var js = new URL('unpolish.js', base).href;
-    var cfg = new URL('unpolish.config.json', base).href;
-    var schema = new URL('unpolish.config.schema.json', base).href;
-    var docs = new URL('README.md', base).href;
+    var source = R.published
+      ? ['Package: ' + R.name + ' on npm (current version ' + R.version + '). Docs: ' + docs]
+      : ['It is not on npm yet. Use this preview build of version ' + R.version + ', and do not install "' + R.name + '" from the npm registry:',
+         '  ' + tarball,
+         'Docs: ' + docs];
     return [
       'Install Unpolish in this prototype.',
       '',
-      'Unpolish is a reversible lo-fi visual layer for working web prototypes: one dependency-free script plus a JSON config file. It must not change application logic, routes, state, markup or existing styles.',
+      'Unpolish adds reversible lo-fi review themes (Black & White, Sketch, Blueprint, Pastel Blocks) to a working web prototype. It must not change the app\'s logic, routes, state, markup or existing styles.'
+    ].concat(source, [
       '',
-      'Get the files (they are not on npm — do not add a package dependency):',
-      '- ' + js,
-      '- ' + cfg + '  (starting config)',
-      '- ' + schema + '  (JSON schema for the config)',
-      '- Integration guide: ' + docs,
-      'If you cannot download them, stop and ask me to add the files to the repo.',
-      '',
-      'Steps:',
-      '1. Inspect the repository first: framework, build tool, where static assets are served from (public/, static/, assets/), the HTML entry point or root layout, whether pages are server-rendered, and how other third-party scripts are added. Follow those conventions.',
-      '2. Vendor the files into the static assets folder. Preferably run the installer from the project root, which copies them into public/, static/ or the site root and adds the script tag where there is an HTML entry:',
-      '   ' + command(),
-      '   Otherwise copy them by hand, e.g. public/unpolish/unpolish.js, public/unpolish/unpolish.config.json and public/unpolish/unpolish.config.schema.json (use the project\'s equivalent path).',
-      '3. Make sure the script loads with the smallest integration that fits (check what the installer did):',
-      '   - Static HTML, Vite, Vue, Svelte, Astro, CRA: add <script src="/unpolish/unpolish.js" data-config="unpolish.config.json" defer></script> to the HTML entry or root layout <head>. data-config resolves relative to the script file.',
-      '   - Next.js: use next/script with strategy="afterInteractive" in the root layout (app/layout or pages/_app), keeping the data-config attribute.',
-      '   - Other server-rendered apps: load it on the client after hydration; never execute it on the server.',
-      '   - If a script tag doesn\'t fit, import the file once from the client entry and call window.Unpolish.init({ config }) with the imported JSON.',
-      '   Respect the base path if the app is served from a sub-path.',
-      '4. Configure unpolish.config.json (it is the shared, version-controlled project preset): keep "defaultTheme": "original" unless I say otherwise; set a short project "id"; add "exclude" selectors (or data-unpolish-ignore attributes) for regions that must keep their look, such as logos, maps, charts, video or canvas. Leave theme presets at their defaults.',
-      '5. Verify: run the dev server, open the prototype and press \\ to open the Unpolish panel. Switch through Black & White, Sketch, Blueprint and Pastel Blocks; check that navigation, forms, menus, dialogs and any client-side routes still work; open ?unpolish=sketch and confirm Sketch loads; choose Original and confirm the app looks exactly as before. Run the project\'s existing tests, linters and type checks.',
-      '6. Report what you changed, anything that may need a role hint or override (see the guide), and how to remove Unpolish: ' + uninstallCommand() + ', or delete the script tag (or import) and the unpolish folder — nothing else.',
+      '1. Inspect the repo: package manager, framework, client entry or root layout, static folder, base path, and any existing Unpolish setup. In a monorepo, pick the app to review.',
+      '2. Preview the installer\'s plan; it changes nothing:',
+      '   ' + command('init --dry-run'),
+      '   (in a monorepo add --cwd <app folder>)',
+      '3. If the plan fits, run ' + command('init') + '. It uses the project\'s package manager and pins the exact version. Exit code 2 means it changed nothing and printed manual steps (also as --json): apply them with the smallest change that follows the project\'s conventions. Don\'t touch unrelated files, formatting or dependencies.',
+      '4. Review the diff. Keep "defaultTheme": "original" in unpolish.config.json. Add "exclude" selectors only for regions that must keep their look, such as logos, maps, charts or video.',
+      '5. Verify: start the app, press \\ and switch themes; check that navigation, forms and dialogs still work; open the page with ?unpolish=sketch&unpolish-ui=hidden; choose Original and confirm it looks exactly as before. Run the project\'s tests, linter and type check. Unpolish is included in every build by default so review links work on deployed previews; only restrict it (--scope dev) if I ask.',
+      '6. Report the files changed, the scope, anything that may need a role hint or override, known limits (canvas/WebGL, cross-origin iframes and closed shadow roots are left as they are), and how to remove it: ' + command('remove') + ' (keeps unpolish.config.json; --purge deletes it).',
       ''
-    ].join('\n');
+    ]).join('\n');
   }
+
   $('#prompt-text').textContent = prompt();
   $$('[data-cmd]').forEach(function (el) { el.textContent = command(); });
-  $$('[data-cmd-uninstall]').forEach(function (el) { el.textContent = uninstallCommand(); });
+  $$('[data-cmd-remove]').forEach(function (el) { el.textContent = command('remove'); });
+  $$('[data-npm-install]').forEach(function (el) { el.textContent = npmInstall; });
+  $$('[data-tarball]').forEach(function (el) { el.href = tarball; el.textContent = R.tarball ? R.tarball : 'package tarball'; });
+  $$('[data-release-label]').forEach(function (el) { el.textContent = R.published ? 'v' + R.version + ' on npm' : 'Preview build · not on npm yet'; });
+  $$('[data-release-note]').forEach(function (el) {
+    el.textContent = R.published
+      ? 'The prompt has your agent run the installer, review the changes and check the app.'
+      : 'The command installs v' + R.version + ' from this site. The prompt has your agent run it, review the changes and check the app.';
+  });
+  if (R.version) $('#version').textContent = R.version;
   $('#origin-note').textContent = isLocal
-    ? 'You are viewing this page locally, so the command downloads from ' + base.href + ' — great for trying it on projects on this machine. Publish the site to share it.'
-    : 'Files are served from ' + base.href;
+    ? 'You’re viewing this site locally, so the commands download from ' + base.href + ' — fine for projects on this machine. Deploy the site to share them.'
+    : '';
 
   /* ---------------- Clipboard + feedback ---------------- */
   var CHECK = '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3.5 8.5l3 3 6-7" stroke="currentColor" stroke-width="1.8" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>';
@@ -75,7 +79,7 @@
     toastEl.innerHTML = html;
     clearTimeout(toastTimer);
     toastEl.classList.add('show');
-    toastTimer = setTimeout(function () { toastEl.classList.remove('show'); }, 2600);
+    toastTimer = setTimeout(function () { toastEl.classList.remove('show'); }, 3200);
   }
   function copied(btn) {
     var swap = btn.querySelector('.swap');
@@ -84,13 +88,16 @@
     clearTimeout(btn._t);
     btn._t = setTimeout(function () { swap.innerHTML = btn._orig; btn._orig = null; }, 1800);
   }
+  function selectText(el) {
+    var range = document.createRange(); range.selectNodeContents(el);
+    var sel = getSelection(); sel.removeAllRanges(); sel.addRange(range);
+  }
+  // "Copied" only means the clipboard has it; the toast says what happens next.
   $$('[data-copy-cmd]').forEach(function (btn) {
     btn.addEventListener('click', function () {
       copy(command()).then(function (ok) {
-        if (ok) { copied(btn); toast(CHECK + '<span>Install command copied. Run it in your project folder.</span>'); return; }
-        var code = $('[data-cmd]');
-        var range = document.createRange(); range.selectNodeContents(code);
-        var sel = getSelection(); sel.removeAllRanges(); sel.addRange(range);
+        if (ok) { copied(btn); toast(CHECK + '<span>Command copied — run it in your project folder to install.</span>'); return; }
+        selectText(btn.parentNode.querySelector('[data-cmd]') || $('[data-cmd]'));
         toast('<span>Clipboard unavailable — the command is selected, press Ctrl/⌘ + C.</span>');
       });
     });
@@ -98,20 +105,13 @@
   $$('[data-copy-prompt]').forEach(function (btn) {
     btn.addEventListener('click', function () {
       copy(prompt()).then(function (ok) {
-        var swap = btn.querySelector('.swap');
-        if (ok) {
-          if (!btn._orig) btn._orig = swap.innerHTML;
-          swap.innerHTML = CHECK + '<span>Copied</span>';
-          clearTimeout(btn._t);
-          btn._t = setTimeout(function () { swap.innerHTML = btn._orig; btn._orig = null; }, 1800);
-          toast(CHECK + '<span>Installation prompt copied. Paste it into your coding agent.</span>');
-        } else {
-          var pre = $('#prompt-text');
-          pre.scrollIntoView({ block: 'center' });
-          var range = document.createRange(); range.selectNodeContents(pre);
-          var sel = getSelection(); sel.removeAllRanges(); sel.addRange(range);
-          toast('<span>Clipboard unavailable — the prompt is selected, press Ctrl/⌘ + C.</span>');
-        }
+        if (ok) { copied(btn); toast(CHECK + '<span>Prompt copied — paste it into your coding agent. It installs Unpolish when it runs.</span>'); return; }
+        var pre = $('#prompt-text');
+        var details = pre.closest('details');
+        if (details) details.open = true;
+        pre.scrollIntoView({ block: 'center' });
+        selectText(pre);
+        toast('<span>Clipboard unavailable — the prompt is selected, press Ctrl/⌘ + C.</span>');
       });
     });
   });

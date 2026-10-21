@@ -4,3 +4,5 @@ examples/*/public/unpolish/
 test-results/
 playwright-report/
 .DS_Store
+.tmp/
+packages/unpolish/dist/
