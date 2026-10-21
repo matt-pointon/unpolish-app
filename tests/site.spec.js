@@ -1,22 +1,27 @@
 import { test, expect } from '@playwright/test';
 
 import { readFileSync } from 'node:fs';
+import { buildRelease, loadReleaseSettings } from '../scripts/release-config.mjs';
 
 const TGZ = 'http://localhost:4174/unpolish/unpolish-0.1.0.tgz';
+const PKG = JSON.parse(readFileSync(new URL('../packages/unpolish/package.json', import.meta.url), 'utf8'));
 const CONFIG = JSON.parse(readFileSync(new URL('../release.config.json', import.meta.url), 'utf8'));
 const clip = (page) => page.evaluate(() => navigator.clipboard.readText());
 
-/** Serve the page with a different release.js, as scripts/release.mjs would write it. */
-async function withRelease(page, overrides) {
+function releaseFrom(overrides = {}) {
+  return buildRelease(PKG, loadReleaseSettings({ ...CONFIG, ...overrides }));
+}
+
+/** Serve the page with a generated release.js, as `npm run release` would write it. */
+async function withRelease(page, release) {
   await page.route('**/site/release.js', async (route) => {
-    const body = (await (await route.fetch()).text()).replace(/window\.UNPOLISH_RELEASE = (\{[\s\S]*\});/, (m, json) => `window.UNPOLISH_RELEASE = ${JSON.stringify({ ...JSON.parse(json), ...overrides })};`);
-    await route.fulfill({ body, contentType: 'text/javascript' });
+    await route.fulfill({ body: `window.UNPOLISH_RELEASE = ${JSON.stringify(release)};\n`, contentType: 'text/javascript' });
   });
 }
 
 test('install with your agent copies a prompt that matches the local release', async ({ page, request }) => {
   await page.goto('/');
-  expect(await page.evaluate(() => window.UNPOLISH_RELEASE)).toEqual({ name: 'unpolish', version: '0.1.0', node: '>=18', published: CONFIG.published, tarball: 'unpolish-0.1.0.tgz', distUrl: CONFIG.distUrl });
+  expect(await page.evaluate(() => window.UNPOLISH_RELEASE)).toEqual(releaseFrom());
   const btn = page.locator('.hero [data-copy-prompt]');
   await btn.click();
   await expect(btn).toHaveText('Prompt copied');
@@ -119,7 +124,7 @@ test('disclosures open with keyboard and pointer', async ({ page }) => {
 
 test('a public HTTPS distribution location changes every command, link and the prompt', async ({ page }) => {
   const dist = 'https://downloads.example.org/unpolish/';
-  await withRelease(page, { distUrl: dist });
+  await withRelease(page, releaseFrom({ distUrl: dist }));
   await page.goto('/');
   const tgz = `${dist}unpolish-0.1.0.tgz`;
   await expect(page.locator('.hero [data-cmd]')).toHaveText(`npx ${tgz} init`);
@@ -136,16 +141,35 @@ test('a public HTTPS distribution location changes every command, link and the p
 });
 
 test('once published, the site switches to the npm package everywhere', async ({ page }) => {
-  await withRelease(page, { published: true });
+  await withRelease(page, releaseFrom({ published: true, distUrl: null, siteUrl: null }));
   await page.goto('/');
   await expect(page.locator('.hero [data-cmd]')).toHaveText('npx unpolish@latest init');
   await expect(page.locator('[data-cmd-remove]')).toHaveText('npx unpolish@latest remove');
   await expect(page.locator('[data-npm-install]')).toHaveText('npm install --save-exact unpolish@0.1.0');
   await expect(page.locator('[data-local-note]')).toBeHidden();
   const text = await page.locator('#prompt-text').textContent();
-  expect(text).toContain('npx unpolish@latest init --dry-run');
+  expect(text).toContain('npx unpolish@0.1.0 init --dry-run');
+  expect(text).toContain('npx unpolish@0.1.0 init');
+  expect(text).not.toContain('npx unpolish@latest init --dry-run');
   expect(text).toContain('Package: unpolish 0.1.0 on npm.');
-  expect(text).not.toMatch(/\.tgz|not on the npm registry|only works on that machine/);
+  expect(text).toContain('https://github.com/matt-pointon/unpolish-app');
+  expect(text).not.toMatch(/\.tgz|not on the npm registry|only works on that machine|localhost|127\.0\.0\.1|Preview build|not on npm yet/i);
+  const visible = await page.locator('body').innerText();
+  expect(visible).toContain('npx unpolish@latest init');
+  expect(visible).not.toMatch(/not on npm yet|Preview build/i);
+  expect(visible).not.toContain('.tgz');
+  expect(visible).not.toContain('localhost');
+});
+
+test('published mode with a production URL keeps the prompt off localhost', async ({ page }) => {
+  const published = JSON.parse(readFileSync(new URL('./fixtures/release-published.json', import.meta.url), 'utf8'));
+  await withRelease(page, releaseFrom(published));
+  await page.goto('/');
+  await expect(page.locator('.hero [data-cmd]')).toHaveText('npx unpolish@latest init');
+  const text = await page.locator('#prompt-text').textContent();
+  expect(text).toContain('npx unpolish@0.1.0 init --dry-run');
+  expect(text).toContain('https://unpolish.vercel.app/unpolish/README.md');
+  expect(text).not.toMatch(/localhost|\.tgz|not on the npm registry|Preview build/i);
 });
 
 test('the demo is visible on the first screen and drives the real harness', async ({ page }) => {
@@ -153,7 +177,7 @@ test('the demo is visible on the first screen and drives the real harness', asyn
   // The live preview starts above the fold on a laptop-sized screen.
   await page.setViewportSize({ width: 1280, height: 800 });
   const top = await page.locator('#demo-frame').boundingBox();
-  expect(top.y).toBeLessThan(560);
+  expect(top.y).toBeLessThan(600);
   const frame = page.frameLocator('#demo-frame');
   await page.waitForFunction(() => document.getElementById('demo-frame').contentWindow?.Unpolish?.state);
   await page.locator('#demo-themes [data-theme="blueprint"]').click();

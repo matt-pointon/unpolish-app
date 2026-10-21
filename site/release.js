@@ -2,8 +2,22 @@
 window.UNPOLISH_RELEASE = {
   "name": "unpolish",
   "version": "0.1.0",
+  "executable": "unpolish",
   "node": ">=18",
   "published": false,
+  "siteUrl": "https://unpolish.vercel.app/",
+  "distUrl": null,
+  "homepage": "https://unpolish.vercel.app",
   "tarball": "unpolish-0.1.0.tgz",
-  "distUrl": null
+  "bundleUrl": null,
+  "docsUrl": null,
+  "schemaUrl": null,
+  "configUrl": null,
+  "tarballUrl": null,
+  "bundlePath": "unpolish/unpolish.js",
+  "docsPath": "unpolish/README.md",
+  "schemaPath": "unpolish/unpolish.config.schema.json",
+  "configPath": "unpolish/unpolish.config.json",
+  "tarballPath": "unpolish/unpolish-0.1.0.tgz",
+  "versionedPath": "unpolish/0.1.0/"
 };

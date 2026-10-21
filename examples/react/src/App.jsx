@@ -1,9 +1,11 @@
 import { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 
-const ROOT = (location.pathname.match(/^.*\/dist\//) || ['/'])[0];
+const ROOT = import.meta.env.BASE_URL.startsWith('/')
+  ? import.meta.env.BASE_URL
+  : (location.pathname.match(/^.*\/dist\//) || ['/'])[0];
 function usePath() {
-  const [path, setPath] = useState(location.pathname.slice(ROOT.length) || '');
+  const [path, setPath] = useState(location.pathname.slice(ROOT.length).replace(/\/$/, '') || '');
   useEffect(() => {
     const on = () => setPath(location.pathname.slice(ROOT.length) || '');
     window.addEventListener('popstate', on);
@@ -56,8 +58,8 @@ export default function App() {
       </header>
       <main className="mx-auto max-w-5xl px-6 py-10">
         {path === '' && <Invoices rows={rows} onNew={() => setModal(true)} />}
-        {path === 'clients' && <Clients />}
-        {path === 'settings' && <Settings onSaved={() => setToast('Settings saved')} />}
+        {(path === 'clients' || path.startsWith('clients/')) && <Clients />}
+        {(path === 'settings' || path.startsWith('settings/')) && <Settings onSaved={() => setToast('Settings saved')} />}
       </main>
       {modal && createPortal(
         <NewInvoice onClose={() => setModal(false)} onCreate={(r) => { setRows((x) => [...x, r]); setModal(false); setToast('Invoice created'); }} />, document.body)}

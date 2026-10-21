@@ -8,6 +8,7 @@ import { createHash } from 'node:crypto';
 import { join, relative, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { open, setTheme, settle, shadow, styles } from './helpers.js';
+import { buildRelease, loadReleaseSettings, parseReleaseJs } from '../scripts/release-config.mjs';
 
 const ROOT = fileURLToPath(new URL('..', import.meta.url));
 const PKG = JSON.parse(readFileSync(join(ROOT, 'packages/unpolish/package.json'), 'utf8'));
@@ -112,6 +113,10 @@ test('the tarball contains the runtime, bundle, types, schema, starter config an
   expect(pkg.exports['.']).toMatchObject({ types: './dist/unpolish.d.ts', import: './dist/unpolish.mjs', require: './dist/unpolish.cjs' });
   expect(pkg.exports['./browser']).toBe('./dist/unpolish.js');
   expect(pkg.dependencies).toBeUndefined();
+  expect(pkg.repository).toEqual({ type: 'git', url: 'git+https://github.com/matt-pointon/unpolish-app.git' });
+  expect(pkg.homepage).toBe('https://unpolish.vercel.app');
+  expect(pkg.bugs).toEqual({ url: 'https://github.com/matt-pointon/unpolish-app/issues' });
+  expect(JSON.stringify(pkg)).not.toMatch(/file:|localhost|workspace:/);
   const starter = JSON.parse(execFileSync('tar', ['-xzOf', TGZ, 'package/templates/unpolish.config.json'], { encoding: 'utf8' }));
   expect(starter.defaultTheme).toBe('original');
 });
@@ -127,10 +132,50 @@ test('committed release files match a fresh build of the package', () => {
   execFileSync('tar', ['-xzf', TGZ, '-C', b]);
   expect(snapshot(b), 'the committed tarball is stale: run npm run release').toEqual(snapshot(a));
   // The website reads its commands from site/release.js.
-  const rel = read(join(ROOT, 'site/release.js'));
-  const data = JSON.parse(rel.slice(rel.indexOf('{'), rel.lastIndexOf('}') + 1));
-  const settings = json(join(ROOT, 'release.config.json'));
-  expect(data).toEqual({ name: PKG.name, version: PKG.version, node: PKG.engines.node, published: settings.published, tarball: `${PKG.name}-${PKG.version}.tgz`, distUrl: settings.distUrl });
+  const data = parseReleaseJs(read(join(ROOT, 'site/release.js')));
+  const settings = loadReleaseSettings(json(join(ROOT, 'release.config.json')));
+  expect(data).toEqual(buildRelease(PKG, settings));
+});
+
+test('help, version and dry-run of the packed CLI', () => {
+  const dir = fresh('cli-meta');
+  writeFileSync(join(dir, 'index.html'), '<!doctype html>\n<html>\n<head>\n  <title>x</title>\n</head>\n<body></body>\n</html>\n');
+  let r = run(dir, ['--help']);
+  expect(r.code).toBe(0);
+  expect(r.out).toContain(`npx ${PKG.name} init`);
+  r = run(dir, ['--version']);
+  expect(r.code).toBe(0);
+  expect(r.out.trim()).toBe(PKG.version);
+  r = run(dir, ['init', '--dry-run', '--json']);
+  expect(r.code).toBe(0);
+  expect(r.report.status).toBe('planned');
+  expect(existsSync(join(dir, 'unpolish'))).toBe(false);
+  expect(read(join(dir, 'index.html'))).not.toContain('unpolish');
+});
+
+test('the script-tag bundle on its own starts one harness', async ({ page }) => {
+  const dir = fresh('bundle-only');
+  writeFileSync(join(dir, 'index.html'), '<!doctype html>\n<html>\n<head>\n  <script src="/unpolish/unpolish.js" defer></script>\n</head>\n<body><h1>solo</h1></body>\n</html>\n');
+  await page.goto(served(dir));
+  await page.waitForFunction(() => window.Unpolish && document.querySelector('unpolish-harness'));
+  expect(await page.locator('unpolish-harness').count()).toBe(1);
+  expect(await page.evaluate(() => window.Unpolish.version)).toBe(PKG.version);
+});
+
+test('an unpinned @latest-style install still writes an exact version into package.json', () => {
+  const dir = viteVanilla('pin-latest');
+  // npx unpolish@latest runs this version's CLI, which always plans NAME@VERSION
+  // with --save-exact — never @latest or a semver range.
+  let r = run(dir, ['init', '--dry-run', '--json']);
+  expect(r.report.commands[0]).toBe(`npm install --save-exact ${PKG.name}@${PKG.version}`);
+  expect(r.report.commands[0]).not.toMatch(/@latest|\^|~|\*/);
+
+  r = run(dir, ['init', '--from', TGZ, '--json']);
+  expect(r.code, r.out + r.err).toBe(0);
+  const spec = json(join(dir, 'package.json')).dependencies.unpolish;
+  expect(spec).toBeTruthy();
+  expect(spec).not.toMatch(/latest|\^|~|\*/);
+  expect(json(join(dir, 'node_modules/unpolish/package.json')).version).toBe(PKG.version);
 });
 
 test('imports are safe on the server: nothing runs until init() in a browser', () => {
@@ -201,7 +246,7 @@ test('plain HTML: script install without npm, idempotent, themes, review link, c
     await expect(page.getByTestId('dialog')).toBeHidden();
     await page.getByTestId('nav-about').click();
     await expect(page).toHaveURL(/about\.html/);
-    expect(await page.getAttribute('html', 'data-unpolish')).toBe('sketch');
+    await page.waitForFunction(() => document.documentElement.getAttribute('data-unpolish') === 'sketch');
     await page.goBack();
   });
 
