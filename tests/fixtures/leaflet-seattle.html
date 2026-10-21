@@ -70,10 +70,15 @@
     map.boxZoom.disable();
     map.keyboard.disable();
     if (map.tap) map.tap.disable();
+    const pane = map.getPane('mapPane');
     let panRaf = 0;
+    let panT = 0;
     function panTick() {
       if (!window.__seattle.panning) return;
-      map.panBy([8, 0], { animate: false });
+      panT += 1;
+      const x = (panT % 24) - 12;
+      const y = ((panT * 2) % 16) - 8;
+      pane.style.transform = 'translate3d(' + x + 'px,' + y + 'px,0)';
       panRaf = requestAnimationFrame(panTick);
     }
     window.__seattle = {
@@ -87,6 +92,7 @@
       stopPan() {
         this.panning = false;
         cancelAnimationFrame(panRaf);
+        pane.style.transform = '';
       }
     };
 
