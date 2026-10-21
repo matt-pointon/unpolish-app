@@ -254,6 +254,66 @@ test('the configurator drives its own live preview with the panel\'s settings', 
   await expect(page.locator('[data-cfg="images"] [data-v="theme"]')).toHaveAttribute('aria-checked', 'true');
 });
 
+test('footer credits the author and product links, not validation or integrations', async ({ page }) => {
+  await page.goto('/');
+  const footer = page.locator('footer.footer');
+  await expect(footer.getByRole('link', { name: 'Matt Pointon' })).toHaveAttribute('href', 'https://mpointon.com');
+  await expect(footer.getByRole('link', { name: 'GitHub' })).toHaveAttribute('href', 'https://github.com/matt-pointon/unpolish-app');
+  await expect(footer.getByRole('link', { name: 'npm' })).toHaveAttribute('href', 'https://www.npmjs.com/package/unpolish');
+  await expect(footer).toContainText('MIT');
+  await expect(footer).toContainText('© 2026');
+  await expect(footer.locator('#version')).toHaveText(VER);
+  const body = await page.locator('body').innerText();
+  expect(body).not.toContain('What we validated');
+  expect(body).not.toContain('Integration & removal guide');
+  await expect(page.locator('a[href*="VALIDATION"]')).toHaveCount(0);
+});
+
+test('review-link section has an accessible HTML/CSS fidelity diagram', async ({ page }) => {
+  await page.goto('/#review-links');
+  const figure = page.locator('figure.fidelity');
+  await expect(figure).toBeVisible();
+  await expect(figure.locator('#fidelity-caption')).toContainText('unpolish=blueprint');
+  await expect(figure.locator('.mini-original')).toBeVisible();
+  await expect(figure.locator('.mini-sketch')).toBeVisible();
+  await expect(figure.locator('.mini-blueprint')).toBeVisible();
+  await expect(figure.locator('.url-line mark')).toContainText('unpolish=blueprint');
+  expect(await figure.locator('img').count()).toBe(0);
+});
+
+test('FAQ accordion and FAQPage JSON-LD match the README', async ({ page }) => {
+  await page.goto('/#faq');
+  const items = page.locator('#faq details.disclosure');
+  await expect(items).toHaveCount(8);
+  const first = items.first();
+  await expect(first.locator('.disclosure-body')).toBeHidden();
+  await first.locator('summary').focus();
+  await page.keyboard.press('Enter');
+  await expect(first.locator('.disclosure-body')).toBeVisible();
+  await expect(first).toContainText('Reversible lo-fi themes');
+  await page.keyboard.press('Space');
+  await expect(first.locator('.disclosure-body')).toBeHidden();
+  await items.nth(3).locator('summary').click();
+  await expect(items.nth(3)).toContainText('npx unpolish remove');
+
+  const data = await page.locator('#faq-jsonld').evaluate((el) => JSON.parse(el.textContent));
+  expect(data['@type']).toBe('FAQPage');
+  expect(data.mainEntity).toHaveLength(8);
+  const names = data.mainEntity.map((q) => q.name);
+  expect(names).toEqual([
+    'What is Unpolish?',
+    'Does it change my code or styles permanently?',
+    'Which frameworks are supported?',
+    'How do I remove it?',
+    'Does it send any data?',
+    'Does it work in production builds?',
+    'How do reviewers switch fidelity?',
+    'Is it free and open source?',
+  ]);
+  const visibleQs = await items.evaluateAll((els) => els.map((el) => el.querySelector('summary').childNodes[0].textContent.trim()));
+  expect(visibleQs).toEqual(names);
+});
+
 test('homepage SEO uses the production siteUrl and a local OG image', async ({ page, request }) => {
   const origin = siteOrigin();
   expect(origin).toBe('https://unpolishdesign.vercel.app');

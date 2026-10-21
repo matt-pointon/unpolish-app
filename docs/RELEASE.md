@@ -44,7 +44,7 @@ npm test                          # release + both builds + Playwright, includin
 npm run check:dist                # uses distUrl; byte-compare hosted files and confirm the version is on npm
 ```
 
-`npm run build:site` writes only public files: the marketing site, `site/demo/`, the plain HTML example and shared assets, the built React / Vue / Svelte examples, `unpolish/` downloads (current and `unpolish/<version>/`), and `docs/VALIDATION.md`. It does not copy tests, scripts, package source, fixtures or `node_modules`.
+`npm run build:site` writes only public files: the marketing site, `site/demo/`, the plain HTML example and shared assets, the built React / Vue / Svelte examples, and `unpolish/` downloads (current and `unpolish/<version>/`). It does not copy tests, scripts, package source, fixtures, `node_modules` or `docs/VALIDATION.md`.
 
 React and Svelte are built with an absolute Vite `base` (`/examples/react/`, `/examples/svelte/`) so history-routing deep links work on the hosted site. Vue uses hash routing and does not need a rewrite.
 

@@ -44,7 +44,6 @@ export function sitemapUrls(origin = siteOrigin()) {
   return [
     `${origin}/`,
     `${origin}/site/demo/`,
-    `${origin}/docs/VALIDATION.md`,
     `${origin}/unpolish/README.md`,
   ];
 }
