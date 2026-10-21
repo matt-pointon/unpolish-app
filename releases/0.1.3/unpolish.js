@@ -887,8 +887,9 @@
       function rule(sel, body) { css.push(sel + '{' + body + '}'); }
       function S(sel) { return splitSel(sel).map(function (x) { return P + x; }).join(','); }
       var skipLive = ':is(' + MAP_WIDGET_SEL + ', [data-unpolish-skip="map"], [data-unpolish-skip="heavy"])' + NOTKEEP + NOTEX;
-      var skipReplaced = ':is(video, iframe, embed, object, [data-unpolish-skip="video"], [data-unpolish-skip="media"])' + NOTKEEP + NOTEX;
-      var skipStill = ':is(img, picture, canvas, input[type="image"], [data-unpolish-skip="image"], [data-unpolish-skip="canvas"])' + NOTKEEP + NOTEX;
+      var NOTINSIDE = ':not(:is(' + MAP_WIDGET_SEL + ', [data-unpolish-skip]) *)';
+      var skipReplaced = ':is(video, iframe, embed, object, [data-unpolish-skip="video"], [data-unpolish-skip="media"])' + NOTKEEP + NOTEX + NOTINSIDE;
+      var skipStill = ':is(img, picture, canvas, input[type="image"], [data-unpolish-skip="image"], [data-unpolish-skip="canvas"])' + NOTKEEP + NOTEX + NOTINSIDE;
       rule(S(skipStill), 'filter:' + v.skipFilterStill + I);
       rule(S(skipReplaced + ', ' + skipLive), 'filter:' + v.skipFilter + I);
       if (v.skipFilterBusy && v.skipFilterBusy !== v.skipFilter) {
@@ -1346,8 +1347,6 @@
       this.churn = new WeakMap();
       this.skipBusyTimers = new WeakMap();
       this.skipWatched = new WeakSet();
-      this.skipTransformWatch = 0;
-      this.skipTransformLast = new WeakMap();
     }
 
     Engine.prototype.configure = function (cfg) {
@@ -1715,41 +1714,11 @@
       return false;
     };
 
-    Engine.prototype.skipMotionKey = function (root) {
-      var pane = null;
-      try { pane = root.querySelector && root.querySelector('.leaflet-map-pane, .leaflet-proxy, .mapboxgl-canvas-container, .maplibregl-canvas-container'); } catch (e) { pane = null; }
-      var cs = getComputedStyle(pane || root);
-      return cs.transform + '\0' + cs.translate + '\0' + (pane ? pane.style.cssText : root.style.cssText);
-    };
-
-    Engine.prototype.armSkipTransformWatch = function () {
-      if (this.skipTransformWatch) return;
-      var self = this;
-      function tick() {
-        if (!self.active || self.active !== 'sketch') { self.skipTransformWatch = 0; return; }
-        var nodes;
-        try { nodes = document.querySelectorAll('[data-unpolish-skip], [data-unpolish-busy], ' + MAP_WIDGET_SEL); } catch (e) { self.skipTransformWatch = 0; return; }
-        var anyBusy = false;
-        for (var i = 0; i < nodes.length; i++) {
-          var el = nodes[i];
-          if (self.isKept(el) || self.inExemptTree(el)) continue;
-          var key = self.skipMotionKey(el);
-          var prev = self.skipTransformLast.get(el);
-          if (prev != null && prev !== key) self.skipBusy(el);
-          self.skipTransformLast.set(el, key);
-          if (el.hasAttribute('data-unpolish-busy')) anyBusy = true;
-        }
-        self.skipTransformWatch = anyBusy ? raf(tick) : 0;
-      }
-      this.skipTransformWatch = raf(tick);
-    };
-
     Engine.prototype.skipBusy = function (el) {
       if (!this.active || this.active !== 'sketch') return;
       var root = this.skipRootOf(el);
       if (!root) return;
       if (!root.hasAttribute('data-unpolish-busy')) root.setAttribute('data-unpolish-busy', '');
-      this.armSkipTransformWatch();
       var self = this;
       var prev = this.skipBusyTimers.get(root);
       if (prev) clearTimeout(prev);
