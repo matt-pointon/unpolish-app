@@ -34,12 +34,13 @@ npx <site>/unpolish/unpolish-0.1.0.tgz init --dry-run   # see the plan
 npx <site>/unpolish/unpolish-0.1.0.tgz init
 ```
 
-After publication this becomes `npx unpolish@latest init`. The website's primary action, *Install with your agent*, copies a short prompt that has a coding agent run that command, review the diff and verify the app. Setup, script-tag self-hosting, configuration, updates and removal: [`packages/unpolish/README.md`](packages/unpolish/README.md). Publishing steps: [`docs/RELEASE.md`](docs/RELEASE.md).
+After publication this becomes `npx unpolish@latest init`. Where installs come from is set in one place, [`release.config.json`](release.config.json); the website derives every command and the agent prompt from it. The website's primary action, *Install with your agent*, copies a short prompt that has a coding agent run that command, review the diff and verify the app. Setup, script-tag self-hosting, configuration, updates and removal: [`packages/unpolish/README.md`](packages/unpolish/README.md). Publishing steps: [`docs/RELEASE.md`](docs/RELEASE.md).
 
 ## Test
 
 ```sh
-npm run release          # rebuild the package, unpolish/ files and tarball after runtime changes
+npm run release          # rebuild the package, unpolish/ files, tarball and site/release.js
+npm run check:dist       # confirm a public copy of unpolish/ matches the build
 npm test                 # builds the Vite examples, then runs Playwright (incl. installer fixtures)
 ```
 

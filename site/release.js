@@ -2,6 +2,8 @@
 window.UNPOLISH_RELEASE = {
   "name": "unpolish",
   "version": "0.1.0",
+  "node": ">=18",
   "published": false,
-  "tarball": "unpolish-0.1.0.tgz"
+  "tarball": "unpolish-0.1.0.tgz",
+  "distUrl": null
 };

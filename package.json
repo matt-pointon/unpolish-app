@@ -8,6 +8,7 @@
   "scripts": {
     "serve": "node scripts/serve.mjs",
     "release": "node scripts/release.mjs",
+    "check:dist": "node scripts/check-dist.mjs",
     "build:examples": "node scripts/build-examples.mjs",
     "test": "npm run build:examples && playwright test",
     "test:only": "playwright test"

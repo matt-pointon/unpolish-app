@@ -129,7 +129,8 @@ test('committed release files match a fresh build of the package', () => {
   // The website reads its commands from site/release.js.
   const rel = read(join(ROOT, 'site/release.js'));
   const data = JSON.parse(rel.slice(rel.indexOf('{'), rel.lastIndexOf('}') + 1));
-  expect(data).toEqual({ name: PKG.name, version: PKG.version, published: false, tarball: `${PKG.name}-${PKG.version}.tgz` });
+  const settings = json(join(ROOT, 'release.config.json'));
+  expect(data).toEqual({ name: PKG.name, version: PKG.version, node: PKG.engines.node, published: settings.published, tarball: `${PKG.name}-${PKG.version}.tgz`, distUrl: settings.distUrl });
 });
 
 test('imports are safe on the server: nothing runs until init() in a browser', () => {
