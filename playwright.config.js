@@ -16,8 +16,25 @@ export default defineConfig({
   workers: process.env.CI ? 2 : 4,
   reporter: [['list']],
   projects: [
-    { name: 'app', testIgnore: /site-build\.spec\.js/, use: { ...use, baseURL: 'http://localhost:4174' } },
-    { name: 'site-build', testMatch: /site-build\.spec\.js/, use: { ...use, baseURL: 'http://localhost:4175' } },
+    {
+      name: 'app',
+      testIgnore: /site-build\.spec\.js|perf\.spec\.js/,
+      use: { ...use, baseURL: 'http://localhost:4174' },
+    },
+    {
+      name: 'site-build',
+      testMatch: /site-build\.spec\.js/,
+      use: { ...use, baseURL: 'http://localhost:4175' },
+    },
+    // Own worker, after installer/harness tests so Next.js builds cannot steal frames.
+    {
+      name: 'perf',
+      testMatch: /perf\.spec\.js/,
+      fullyParallel: false,
+      timeout: 120_000,
+      dependencies: ['app'],
+      use: { ...use, baseURL: 'http://localhost:4174' },
+    },
   ],
   webServer: [
     { command: 'node scripts/serve.mjs 4174', url: 'http://localhost:4174/', reuseExistingServer: true },
