@@ -898,9 +898,9 @@ function createUnpolish() {
     }
     // Marker icons: cheap CSS only (never SVG edge). Gated by html[data-unpolish-markers].
     // pane = one filter on the marker pane; img = stylesheet rule on marker imgs (raster cache).
-    var markerCheap = id === 'sketch'
+    var markerCheap = v.id === 'sketch'
       ? 'grayscale(1) contrast(1.35) brightness(1.05)'
-      : id === 'blueprint' ? v.skipFilter : '';
+      : v.id === 'blueprint' ? v.skipFilter : '';
     if (markerCheap) {
       var markerSel = function (mode, sel) {
         var prefix = opts.shadow ? '' : 'html[data-unpolish][data-unpolish-markers="' + mode + '"] ';
