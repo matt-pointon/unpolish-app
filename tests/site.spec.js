@@ -254,6 +254,102 @@ test('the configurator drives its own live preview with the panel\'s settings', 
   await expect(page.locator('[data-cfg="images"] [data-v="theme"]')).toHaveAttribute('aria-checked', 'true');
 });
 
+test('footer credits the author and product links, not validation or integrations', async ({ page }) => {
+  await page.goto('/');
+  const footer = page.locator('footer.footer');
+  await expect(footer.getByRole('link', { name: 'Matt Pointon' })).toHaveAttribute('href', 'https://mpointon.com');
+  await expect(footer.getByRole('link', { name: 'GitHub' })).toHaveAttribute('href', 'https://github.com/matt-pointon/unpolish-app');
+  await expect(footer.getByRole('link', { name: 'npm' })).toHaveAttribute('href', 'https://www.npmjs.com/package/unpolish');
+  await expect(footer).toContainText('MIT');
+  await expect(footer.locator('.footer-copy')).toHaveText('© 2026 Matt Pointon');
+  await expect(footer.locator('#version')).toHaveText(VER);
+  const body = await page.locator('body').innerText();
+  expect(body).not.toContain('What we validated');
+  expect(body).not.toContain('Integration & removal guide');
+  await expect(page.locator('a[href*="VALIDATION"]')).toHaveCount(0);
+});
+
+test('review-link section has an accessible HTML/CSS fidelity diagram', async ({ page }) => {
+  await page.goto('/#review-links');
+  const figure = page.locator('figure.fidelity');
+  await expect(figure).toBeVisible();
+  await expect(figure.locator('#fidelity-caption')).toContainText('unpolish=blueprint');
+  await expect(figure.locator('.mini-original')).toBeVisible();
+  await expect(figure.locator('.mini-sketch')).toBeVisible();
+  await expect(figure.locator('.mini-blueprint')).toBeVisible();
+  await expect(figure.locator('.url-line mark')).toContainText('unpolish=blueprint');
+  expect(await figure.locator('.url-line wbr').count()).toBeGreaterThanOrEqual(2);
+  expect(await figure.locator('img').count()).toBe(0);
+});
+
+for (const width of [320, 375, 414, 1440]) {
+  test(`fidelity diagram and page fit the content width at ${width}px`, async ({ page }) => {
+    await page.setViewportSize({ width, height: width < 800 ? 800 : 900 });
+    await page.goto('/#review-links');
+    expect(await page.evaluate(() => document.documentElement.scrollWidth - innerWidth)).toBeLessThanOrEqual(0);
+    const report = await page.evaluate(() => {
+      const wrap = document.querySelector('#review-links .wrap');
+      const wr = wrap.getBoundingClientRect();
+      const cards = [...document.querySelectorAll('figure.fidelity .mini')].map((el) => el.getBoundingClientRect().right - wr.right);
+      const url = document.querySelector('.url-line');
+      return {
+        cards,
+        figure: document.querySelector('figure.fidelity').getBoundingClientRect().right - wr.right,
+        url: url.getBoundingClientRect().right - wr.right,
+        wordBreak: getComputedStyle(url).wordBreak,
+      };
+    });
+    expect(report.wordBreak, 'URL must not break mid-word').not.toBe('break-all');
+    expect(report.figure).toBeLessThanOrEqual(1);
+    expect(report.url).toBeLessThanOrEqual(1);
+    for (const overflow of report.cards) expect(overflow).toBeLessThanOrEqual(1);
+  });
+}
+
+test('FAQ accordion and FAQPage JSON-LD match the visible answers', async ({ page }) => {
+  await page.goto('/#faq');
+  await expect(page.locator('#faq .section-head p')).toHaveText('Short answers about how Unpolish works.');
+  const items = page.locator('#faq details.disclosure');
+  await expect(items).toHaveCount(8);
+  const first = items.first();
+  await expect(first.locator('.disclosure-body')).toBeHidden();
+  await first.locator('summary').focus();
+  await page.keyboard.press('Enter');
+  await expect(first.locator('.disclosure-body')).toBeVisible();
+  await expect(first).toContainText('Reversible lo-fi themes');
+  await page.keyboard.press('Space');
+  await expect(first.locator('.disclosure-body')).toBeHidden();
+  await items.nth(2).locator('summary').click();
+  await expect(items.nth(2)).toContainText('Vite with React, Vue and Svelte is tested end to end');
+  await expect(items.nth(2)).toContainText('vanilla Vite');
+  await expect(items.nth(2)).not.toContainText('npx unpolish init');
+  await items.nth(3).locator('summary').click();
+  await expect(items.nth(3)).toContainText('npx unpolish@latest remove');
+  await expect(items.nth(3)).toContainText('--purge');
+  expect(await page.locator('#faq').innerText()).not.toMatch(/npx unpolish (?!@)/);
+
+  const data = await page.locator('#faq-jsonld').evaluate((el) => JSON.parse(el.textContent));
+  expect(data['@type']).toBe('FAQPage');
+  expect(data.mainEntity).toHaveLength(8);
+  const names = data.mainEntity.map((q) => q.name);
+  expect(names).toEqual([
+    'What is Unpolish?',
+    'Does it change my code or styles permanently?',
+    'Which frameworks are supported?',
+    'How do I remove it?',
+    'Does it send any data?',
+    'Does it work in production builds?',
+    'How do reviewers switch fidelity?',
+    'Is it free and open source?',
+  ]);
+  const visibleQs = await items.evaluateAll((els) => els.map((el) => el.querySelector('summary').childNodes[0].textContent.trim()));
+  expect(visibleQs).toEqual(names);
+  const visibleAs = await items.evaluateAll((els) => els.map((el) => el.querySelector('.disclosure-body').innerText.replace(/\s+/g, ' ').trim()));
+  expect(data.mainEntity[2].acceptedAnswer.text).toBe(visibleAs[2]);
+  expect(data.mainEntity[3].acceptedAnswer.text).toContain('npx unpolish@latest remove');
+  expect(data.mainEntity[3].acceptedAnswer.text).toContain('--purge');
+});
+
 test('homepage SEO uses the production siteUrl and a local OG image', async ({ page, request }) => {
   const origin = siteOrigin();
   expect(origin).toBe('https://unpolishdesign.vercel.app');

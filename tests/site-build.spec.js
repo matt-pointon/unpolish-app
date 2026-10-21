@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { readdirSync, readFileSync, statSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { join, relative, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { cacheControl, compileVercel, spaDestination } from '../scripts/site-routing.mjs';
@@ -47,12 +47,20 @@ test('public/ contains only hosted files', () => {
     'examples/plain-html/index.html', 'examples/assets/lake.svg',
     'examples/react/index.html', 'examples/vue/index.html', 'examples/svelte/index.html',
     'unpolish/unpolish.js', `unpolish/${PKG.version}/unpolish.js`,
-    'docs/VALIDATION.md',
     'og.png', 'apple-touch-icon.png', 'robots.txt', 'sitemap.xml',
   ]) expect(files, need).toContain(need);
 });
 
-test('homepage anchors, demo, examples and validation page are reachable', async ({ page, request }) => {
+test('root LICENSE is MIT for Matt Pointon and is not a hosted file', () => {
+  const text = readFileSync(join(ROOT, 'LICENSE'), 'utf8');
+  expect(text).toMatch(/^MIT License/);
+  expect(text).toContain('Copyright (c) 2026 Matt Pointon');
+  expect(existsSync(join(ROOT, 'packages/unpolish/LICENSE'))).toBe(true);
+  expect(readFileSync(join(ROOT, 'packages/unpolish/LICENSE'), 'utf8')).toContain('Copyright (c) 2026 Unpolish contributors');
+  expect(listFiles(PUBLIC)).not.toContain('LICENSE');
+});
+
+test('homepage anchors, demo and downloads are reachable', async ({ page, request }) => {
   await page.goto('/');
   await expect(page.locator('#hero-title')).toBeVisible();
   await page.locator('.nav-links a[href="#install"]').click();
@@ -62,8 +70,10 @@ test('homepage anchors, demo, examples and validation page are reachable', async
   await expect(page.locator('#customize-title')).toBeVisible();
   await page.locator('.nav-links a[href="#review-links"]').click();
   await expect(page.locator('#links-title')).toBeVisible();
+  await page.locator('.nav-links a[href="#faq"]').click();
+  await expect(page.locator('#faq-title')).toBeVisible();
 
-  expect((await request.get('/docs/VALIDATION.md')).status()).toBe(200);
+  expect((await request.get('/docs/VALIDATION.md')).status()).toBe(404);
   expect((await request.get('/unpolish/README.md')).status()).toBe(200);
   expect((await request.get('/unpolish/unpolish.js')).status()).toBe(200);
   expect((await request.get(`/unpolish/${PKG.version}/unpolish.js`)).status()).toBe(200);
@@ -166,6 +176,7 @@ test('og.png, robots.txt and sitemap.xml are served with the right types', async
   const xml = await sitemap.text();
   for (const loc of sitemapUrls(origin)) expect(xml).toContain(`<loc>${loc}</loc>`);
   expect(xml).not.toContain('/examples/');
+  expect(xml).not.toContain('VALIDATION');
 
   const icon = await request.get('/apple-touch-icon.png');
   expect(icon.status()).toBe(200);

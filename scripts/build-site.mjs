@@ -3,8 +3,8 @@
 //   npm run build:site
 //
 // Output is only files the website links to: marketing pages, demo, examples,
-// downloads, versioned bundles, and the validation notes. Repo source, tests,
-// scripts, fixtures and node_modules stay out.
+// downloads and versioned bundles. Repo source, tests, scripts, fixtures,
+// node_modules and docs/VALIDATION.md stay out.
 import { cpSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import { dirname, join, relative, sep } from 'node:path';
@@ -55,7 +55,6 @@ for (const f of ['og.png', 'apple-touch-icon.png', 'robots.txt', 'sitemap.xml'])
 copyDir(join(root, 'examples', 'plain-html'), join(out, 'examples', 'plain-html'));
 copyDir(join(root, 'examples', 'assets'), join(out, 'examples', 'assets'));
 copyDir(join(root, 'unpolish'), join(out, 'unpolish'));
-copyFile(join(root, 'docs', 'VALIDATION.md'), join(out, 'docs', 'VALIDATION.md'));
 
 const releases = join(root, 'releases');
 if (existsSync(releases)) {
@@ -105,7 +104,6 @@ const required = [
   'unpolish/unpolish.js',
   `unpolish/${pkg.name}-${pkg.version}.tgz`,
   `unpolish/${pkg.version}/unpolish.js`,
-  'docs/VALIDATION.md',
 ];
 for (const f of required) {
   if (!existsSync(join(out, f))) throw new Error(`public/ is missing ${f}`);

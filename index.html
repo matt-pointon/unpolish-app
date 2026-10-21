@@ -44,6 +44,7 @@
         <a href="#customize">Customize</a>
         <a href="#install">Install</a>
         <a href="#review-links">Review links</a>
+        <a href="#faq">FAQ</a>
       </nav>
       <button class="btn btn-dark btn-sm" type="button" data-copy-prompt>
         <span class="swap"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1.8l1.35 3.6a2 2 0 001.25 1.25L14.2 8l-3.6 1.35a2 2 0 00-1.25 1.25L8 14.2l-1.35-3.6a2 2 0 00-1.25-1.25L1.8 8l3.6-1.35a2 2 0 001.25-1.25z" fill="currentColor"/></svg><span>Install with your agent</span></span>
@@ -174,10 +175,117 @@ init({ configUrl: '/unpolish.config.json' });</code></pre>
     </section>
 
     <section class="links" id="review-links" aria-labelledby="links-title">
+      <div class="wrap">
+        <div class="section-head">
+          <h2 id="links-title">Share the exact fidelity you mean</h2>
+          <p>Review links keep the page, query and hash, open in your saved preset, and can hide the controls.</p>
+        </div>
+        <figure class="fidelity" aria-labelledby="fidelity-caption">
+          <figcaption id="fidelity-caption">The same prototype at Original, Sketch and Blueprint. A review URL with unpolish=blueprint and unpolish-ui=hidden opens that exact fidelity for someone else, with the panel hidden.</figcaption>
+          <div class="fidelity-flow" aria-hidden="true">
+            <div class="fidelity-themes">
+              <div class="mini mini-original">
+                <div class="mini-chrome"><i></i><i></i><i></i></div>
+                <div class="mini-body">
+                  <span class="mini-kicker">Booked</span>
+                  <strong>Harbor Hall</strong>
+                  <span class="mini-row"></span>
+                  <span class="mini-row short"></span>
+                  <span class="mini-btn">Reserve</span>
+                </div>
+                <span class="mini-label">Original</span>
+              </div>
+              <div class="mini mini-sketch">
+                <div class="mini-chrome"><i></i><i></i><i></i></div>
+                <div class="mini-body">
+                  <span class="mini-kicker">Booked</span>
+                  <strong>Harbor Hall</strong>
+                  <span class="mini-row"></span>
+                  <span class="mini-row short"></span>
+                  <span class="mini-btn">Reserve</span>
+                </div>
+                <span class="mini-label">Sketch</span>
+              </div>
+              <div class="mini mini-blueprint">
+                <div class="mini-chrome"><i></i><i></i><i></i></div>
+                <div class="mini-body">
+                  <span class="mini-kicker">Booked</span>
+                  <strong>Harbor Hall</strong>
+                  <span class="mini-row"></span>
+                  <span class="mini-row short"></span>
+                  <span class="mini-btn">Reserve</span>
+                </div>
+                <span class="mini-label">Blueprint</span>
+              </div>
+            </div>
+            <svg class="fidelity-arrow" viewBox="0 0 48 24" fill="none" aria-hidden="true">
+              <path d="M2 12h40M34 4l10 8-10 8" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+            <div class="fidelity-share">
+              <code class="url-line">/plan?<wbr>tab=venues<mark><wbr>&amp;unpolish=blueprint<wbr>&amp;unpolish-ui=hidden</mark>#schedule</code>
+              <p>Send the link. They land on Blueprint, controls hidden, your route intact.</p>
+            </div>
+          </div>
+        </figure>
+      </div>
+    </section>
+
+    <section class="faq" id="faq" aria-labelledby="faq-title">
       <div class="wrap narrow">
-        <h2 id="links-title">Share the exact fidelity you mean</h2>
-        <p>Review links keep the page, query and hash, open in your saved preset, and can hide the controls.</p>
-        <code class="url-line">/plan?tab=venues<mark>&amp;unpolish=blueprint&amp;unpolish-ui=hidden</mark>#schedule</code>
+        <div class="section-head">
+          <h2 id="faq-title">Questions</h2>
+          <p>Short answers about how Unpolish works.</p>
+        </div>
+        <div class="faq-list">
+          <details class="disclosure">
+            <summary>What is Unpolish?<svg class="chev" viewBox="0 0 16 16" aria-hidden="true"><path d="M4.5 6.5L8 10l3.5-3.5" stroke="currentColor" stroke-width="1.6" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg></summary>
+            <div class="disclosure-body">
+              <p>Reversible lo-fi themes — Black &amp; White, Sketch, Blueprint, Pastel Blocks — for working web prototypes. Every click, route and form keeps working; Original puts everything back. One framework-independent browser runtime, added with the installer, a script tag, or a downloaded bundle.</p>
+            </div>
+          </details>
+          <details class="disclosure">
+            <summary>Does it change my code or styles permanently?<svg class="chev" viewBox="0 0 16 16" aria-hidden="true"><path d="M4.5 6.5L8 10l3.5-3.5" stroke="currentColor" stroke-width="1.6" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg></summary>
+            <div class="disclosure-body">
+              <p>No. Themes live in one <code>&lt;style id="unpolish-theme"&gt;</code> layer, <code>data-up</code> attributes and a hidden SVG filter set. Original removes all of it. They change colours, outlines, backgrounds, radii, shadows and fonts — never size, padding, position or border width. No element is replaced, wrapped or covered, so handlers, focus, form values, scroll and routes stay as they are.</p>
+            </div>
+          </details>
+          <details class="disclosure">
+            <summary>Which frameworks are supported?<svg class="chev" viewBox="0 0 16 16" aria-hidden="true"><path d="M4.5 6.5L8 10l3.5-3.5" stroke="currentColor" stroke-width="1.6" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg></summary>
+            <div class="disclosure-body">
+              <p>Vite with React, Vue and Svelte is tested end to end. Other setups such as vanilla Vite are supported per the docs but not tested end to end.</p>
+            </div>
+          </details>
+          <details class="disclosure">
+            <summary>How do I remove it?<svg class="chev" viewBox="0 0 16 16" aria-hidden="true"><path d="M4.5 6.5L8 10l3.5-3.5" stroke="currentColor" stroke-width="1.6" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg></summary>
+            <div class="disclosure-body">
+              <p>Run <code>npx unpolish@latest remove</code> (add <code>--purge</code> to delete <code>unpolish.config.json</code> too). That takes out the marked install block, generated Next.js client, Unpolish script tags, the vendored bundle and the dependency. Lines you added by hand without markers are reported, not guessed at. A small <code>unpolish:*</code> entry may remain in <code>localStorage</code>; it does nothing without the script.</p>
+            </div>
+          </details>
+          <details class="disclosure">
+            <summary>Does it send any data?<svg class="chev" viewBox="0 0 16 16" aria-hidden="true"><path d="M4.5 6.5L8 10l3.5-3.5" stroke="currentColor" stroke-width="1.6" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg></summary>
+            <div class="disclosure-body">
+              <p>Unpolish does not send your prototype to a server. Panel edits are saved in this browser only. Visitors may keep a small <code>unpolish:*</code> entry in <code>localStorage</code>. If web fonts are left on (the default), the runtime loads fonts from Google Fonts; set <code>"webFonts": false</code> to use system fonts instead.</p>
+            </div>
+          </details>
+          <details class="disclosure">
+            <summary>Does it work in production builds?<svg class="chev" viewBox="0 0 16 16" aria-hidden="true"><path d="M4.5 6.5L8 10l3.5-3.5" stroke="currentColor" stroke-width="1.6" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg></summary>
+            <div class="disclosure-body">
+              <p>Yes. The default install scope is every build — local, preview and production — because review links only work where Unpolish is loaded. Use <code>--scope dev</code> or <code>env:NAME</code> to leave it out of some builds, or set <code>"enabled": false</code> in a build’s config. Hiding the controls (<code>"ui": "hidden"</code>) is not access control; anyone can still press <kbd>\</kbd>.</p>
+            </div>
+          </details>
+          <details class="disclosure">
+            <summary>How do reviewers switch fidelity?<svg class="chev" viewBox="0 0 16 16" aria-hidden="true"><path d="M4.5 6.5L8 10l3.5-3.5" stroke="currentColor" stroke-width="1.6" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg></summary>
+            <div class="disclosure-body">
+              <p>Copy a review link: the current URL plus <code>?unpolish=&lt;theme&gt;</code> and, optionally, <code>&amp;unpolish-ui=hidden</code>. Values are <code>original</code>, <code>black-white</code>, <code>sketch</code>, <code>blueprint</code> and <code>pastel</code>. Links keep your app’s own query and hash. On the page, <kbd>\</kbd> or the launcher opens the panel; 1–4 pick a theme while it’s open, 0 restores Original, Esc closes.</p>
+            </div>
+          </details>
+          <details class="disclosure">
+            <summary>Is it free and open source?<svg class="chev" viewBox="0 0 16 16" aria-hidden="true"><path d="M4.5 6.5L8 10l3.5-3.5" stroke="currentColor" stroke-width="1.6" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg></summary>
+            <div class="disclosure-body">
+              <p>Yes. Unpolish is published as the public npm package <code>unpolish</code> under the MIT License. The source is on GitHub.</p>
+            </div>
+          </details>
+        </div>
       </div>
     </section>
 
@@ -194,12 +302,92 @@ init({ configUrl: '/unpolish.config.json' });</code></pre>
 
   <footer class="footer">
     <div class="wrap footer-inner">
-      <span>Unpolish v<span id="version">0.1.0</span> · MIT</span>
-      <span><a href="unpolish/README.md">Integration &amp; removal guide</a> · <a href="docs/VALIDATION.md">What we validated</a></span>
+      <p class="footer-credit">Created by <a href="https://mpointon.com">Matt Pointon</a>
+        <span class="footer-sep" aria-hidden="true">·</span>
+        <a href="https://github.com/matt-pointon/unpolish-app">GitHub</a>
+        <span class="footer-sep" aria-hidden="true">·</span>
+        <a href="https://www.npmjs.com/package/unpolish">npm</a>
+        <span class="footer-sep" aria-hidden="true">·</span>
+        MIT
+        <span class="footer-ver">v<span id="version">0.1.0</span></span>
+      </p>
+      <p class="footer-copy">© 2026 Matt Pointon</p>
     </div>
   </footer>
 
   <div class="toast" role="status" aria-live="polite" id="toast"></div>
+  <script type="application/ld+json" id="faq-jsonld">
+  {
+    "@context": "https://schema.org",
+    "@type": "FAQPage",
+    "mainEntity": [
+      {
+        "@type": "Question",
+        "name": "What is Unpolish?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "Reversible lo-fi themes — Black & White, Sketch, Blueprint, Pastel Blocks — for working web prototypes. Every click, route and form keeps working; Original puts everything back. One framework-independent browser runtime, added with the installer, a script tag, or a downloaded bundle."
+        }
+      },
+      {
+        "@type": "Question",
+        "name": "Does it change my code or styles permanently?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "No. Themes live in one style#unpolish-theme layer, data-up attributes and a hidden SVG filter set. Original removes all of it. They change colours, outlines, backgrounds, radii, shadows and fonts — never size, padding, position or border width. No element is replaced, wrapped or covered, so handlers, focus, form values, scroll and routes stay as they are."
+        }
+      },
+      {
+        "@type": "Question",
+        "name": "Which frameworks are supported?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "Vite with React, Vue and Svelte is tested end to end. Other setups such as vanilla Vite are supported per the docs but not tested end to end."
+        }
+      },
+      {
+        "@type": "Question",
+        "name": "How do I remove it?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "Run npx unpolish@latest remove (add --purge to delete unpolish.config.json too). That takes out the marked install block, generated Next.js client, Unpolish script tags, the vendored bundle and the dependency. Lines you added by hand without markers are reported, not guessed at. A small unpolish:* entry may remain in localStorage; it does nothing without the script."
+        }
+      },
+      {
+        "@type": "Question",
+        "name": "Does it send any data?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "Unpolish does not send your prototype to a server. Panel edits are saved in this browser only. Visitors may keep a small unpolish:* entry in localStorage. If web fonts are left on (the default), the runtime loads fonts from Google Fonts; set webFonts to false to use system fonts instead."
+        }
+      },
+      {
+        "@type": "Question",
+        "name": "Does it work in production builds?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "Yes. The default install scope is every build — local, preview and production — because review links only work where Unpolish is loaded. Use --scope dev or env:NAME to leave it out of some builds, or set enabled to false in a build’s config. Hiding the controls (ui: hidden) is not access control; anyone can still press \\."
+        }
+      },
+      {
+        "@type": "Question",
+        "name": "How do reviewers switch fidelity?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "Copy a review link: the current URL plus ?unpolish=<theme> and, optionally, &unpolish-ui=hidden. Values are original, black-white, sketch, blueprint and pastel. Links keep your app’s own query and hash. On the page, \\ or the launcher opens the panel; 1–4 pick a theme while it’s open, 0 restores Original, Esc closes."
+        }
+      },
+      {
+        "@type": "Question",
+        "name": "Is it free and open source?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "Yes. Unpolish is published as the public npm package unpolish under the MIT License. The source is on GitHub."
+        }
+      }
+    ]
+  }
+  </script>
   <script src="site/release.js"></script>
   <script src="site/site.js"></script>
 </body>
