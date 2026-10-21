@@ -1,6 +1,6 @@
 # Releasing Unpolish
 
-The package and website are prepared and tested locally. The Vercel project already exists; the npm package does not, until the first publish below. This repo does not store npm or Vercel credentials.
+The package `unpolish@0.1.0` is on npm (`latest`, public). The website is `https://unpolishdesign.vercel.app`. This repo does not store npm or Vercel credentials.
 
 ## One source of truth
 
@@ -12,29 +12,36 @@ The package and website are prepared and tested locally. The Vercel project alre
 
 The website builds every command, download link and the agent prompt from `site/release.js`. Never edit install text in `index.html` or `site/site.js` to change a version or location — change the config and run `npm run release`.
 
-`release.config.json`:
+`release.config.json` (today):
+
+```json
+{
+  "published": true,
+  "siteUrl": "https://unpolishdesign.vercel.app",
+  "distUrl": "https://unpolishdesign.vercel.app/unpolish/"
+}
+```
 
 | Setting | Install source on the website |
 | --- | --- |
-| `"published": false` (today) | `unpolish/<name>-<version>.tgz` on the same origin as the page. On `localhost` the install section says the command only works on this machine, and the prompt says the same |
+| `"published": false` | `unpolish/<name>-<version>.tgz` on the same origin as the page. On `localhost` the install section says the command only works on this machine, and the prompt says the same |
 | `"published": false, "distUrl": "https://…/unpolish/"` | That public HTTPS folder. Use it when the tarball is hosted somewhere other than the site |
-| `"published": true` | Visible command `npx unpolish@latest init`. The copied prompt pins `npx unpolish@<version> init --dry-run`, then `init`. No localhost URLs, tarball commands, or “not on npm yet” copy |
-| `"siteUrl": "https://unpolishdesign.vercel.app"` | Production website (set). Package `homepage` uses it. Unpublished installs still use the tarball on the origin serving the page; after `"published": true`, bundle and docs URLs in the prompt use this host |
+| `"published": true` (today) | Visible command `npx unpolish@latest init`. The copied prompt pins `npx unpolish@<version> init --dry-run`, then `init`. No localhost URLs, tarball commands, or “not on npm yet” copy |
+| `"siteUrl": "https://unpolishdesign.vercel.app"` | Production website. Package `homepage` uses it |
+| `"distUrl": "https://unpolishdesign.vercel.app/unpolish/"` | Public folder of self-host files (bundle, schema, config, README, tarball). The prompt’s docs and download links use it; installs still come from npm while `published` is true |
 
-Switching to published mode is one line in `release.config.json` (`"published": true`) plus `npm run release`. Tests cover that object (see `tests/release.spec.js` and `tests/fixtures/release-published.json`) without flipping the committed `published: false`.
-
-`npm run release` rejects a non-HTTPS `distUrl` or `siteUrl`.
+`npm run release` rejects a non-HTTPS `distUrl` or `siteUrl`. If `unpolish/<name>-<version>.tgz` already exists, it is **kept** (0.1.0 on npm is byte-identical to the committed file). Delete that tarball or bump `version` to pack a new one.
 
 ## Build and test
 
 ```sh
 npm install
 npx playwright install chromium   # once, if Chromium is not already on the machine
-npm run release                   # package dist, unpolish/, releases/<version>/, tarball, site/release.js
+npm run release                   # package dist, unpolish/, releases/<version>/, site/release.js (keeps an existing tarball)
 npm run build:examples            # Vite examples into examples/*/dist (local test server)
 npm run build:site                # static site into public/ (Vercel publish dir, gitignored)
 npm test                          # release + both builds + Playwright, including public/ routing
-npm run check:dist -- https://<site>/unpolish/   # after a deploy, byte-compare hosted files
+npm run check:dist                # uses distUrl; byte-compare hosted files and confirm the version is on npm
 ```
 
 `npm run build:site` writes only public files: the marketing site, `site/demo/`, the plain HTML example and shared assets, the built React / Vue / Svelte examples, `unpolish/` downloads (current and `unpolish/<version>/`), and `docs/VALIDATION.md`. It does not copy tests, scripts, package source, fixtures or `node_modules`.
@@ -44,32 +51,34 @@ React and Svelte are built with an absolute Vite `base` (`/examples/react/`, `/e
 ## Bumping the version
 
 1. Set `version` in `packages/unpolish/package.json`.
-2. `npm run release` — rebuilds the tarball, refreshes `unpolish/` and writes `releases/<new-version>/` (keep the old `releases/<version>/` folders so those URLs survive rebuilds).
+2. `npm run release` — packs a new tarball (the previous version’s `.tgz` is not reused), refreshes `unpolish/` and writes `releases/<new-version>/` (keep the old `releases/<version>/` folders so those URLs survive rebuilds).
 3. `npm test`.
 4. Publish and deploy (below).
-5. `npm run check:dist -- https://<site>/unpolish/`.
+5. `npm run check:dist`.
 
 Projects update with `npx unpolish@latest init --upgrade`; their config is kept.
 
 ## Publishing to npm
 
-The package name is `unpolish` (unscoped, public, MIT). npm user `mattpointon`. `npm view unpolish` was a registry 404 on 2026-10-21.
+The package name is `unpolish` (unscoped, public, MIT). npm user `mattpointon`. `unpolish@0.1.0` is on npm with dist-tag `latest`.
 
-### First publish (needs a logged-in npm user)
+npm’s staged-publish flow also created a **`0.0.0-stage` placeholder** version. It is not a real Unpolish release. Do not install it, and do not move the `latest` dist-tag onto it.
 
-A brand-new package cannot use Trusted Publishing until it exists on npmjs.com. From a machine logged in as `mattpointon` (or another owner), using the **tested** tarball (`npm run release` writes it; `npm test` packs it again):
+### First publish (already done for 0.1.0)
+
+A brand-new package cannot use Trusted Publishing until it exists on npmjs.com. 0.1.0 was published from the tested committed tarball:
 
 ```sh
 npm publish unpolish/unpolish-0.1.0.tgz --access public --tag latest
 ```
 
-Then, from a clean folder: `npx unpolish@latest --version` prints `0.1.0`; `npx unpolish@latest init --dry-run` in a fixture.
+Do not republish 0.1.0. Later versions: pack a new tarball (bump `version`, `npm run release`) and publish that file.
 
-CDN copies (check they resolve before mentioning them): `https://cdn.jsdelivr.net/npm/unpolish@0.1.0/dist/unpolish.js`, `https://unpkg.com/unpolish@0.1.0/dist/unpolish.js`.
+CDN copies: `https://cdn.jsdelivr.net/npm/unpolish@0.1.0/dist/unpolish.js`, `https://unpkg.com/unpolish@0.1.0/dist/unpolish.js`. Pin an exact version, never `latest`, in a script tag.
 
 ### Trusted Publishing (later versions)
 
-`.github/workflows/release.yml` publishes that same packed tarball with OIDC. After the first publish, on npmjs.com → **unpolish** → **Settings** → **Trusted Publisher**:
+`.github/workflows/release.yml` publishes the packed tarball with OIDC. On npmjs.com → **unpolish** → **Settings** → **Trusted Publisher**:
 
 | Field | Value |
 | --- | --- |
@@ -82,16 +91,11 @@ CDN copies (check they resolve before mentioning them): `https://cdn.jsdelivr.ne
 
 The first successful publish through that connection must happen within two days or the configuration expires. The workflow needs `id-token: write` (already set) and npm CLI ≥ 11.5.1 (the job uses Node 24). Provenance is generated automatically for trusted publishes from this public repository; the workflow also passes `--provenance`.
 
-Do not store an `NPM_TOKEN` for publishing once Trusted Publishing is in place.
-
-### After npm is live
-
-1. Set `"published": true` in `release.config.json` (`siteUrl` is already `https://unpolishdesign.vercel.app`).
-2. `npm run release && npm test`. Merging to `main` deploys the site.
+Do not store an `NPM_TOKEN` for publishing once Trusted Publishing is in place. Until the trusted publisher is attached on npmjs.com, later versions still need a logged-in `npm publish unpolish/unpolish-<version>.tgz --access public --tag latest`.
 
 ## Deploying the website (Vercel Git integration)
 
-The Vercel project **unpolish** already exists on the Hobby account, linked to `github.com/matt-pointon/unpolish-app`. Do not attach a custom domain. Confirm these settings (they also live in committed `vercel.json`):
+The Vercel project **unpolish** is linked to `github.com/matt-pointon/unpolish-app`. Do not attach a custom domain. Confirm these settings (they also live in committed `vercel.json`):
 
 | Setting | Value |
 | --- | --- |
@@ -133,6 +137,6 @@ No npm client is required at runtime. Download `unpolish.js` and `unpolish.confi
   data-config="unpolish.config.json" defer></script>
 ```
 
-Pin a version: the bundle’s first line names it (`/*! Unpolish v0.1.0 …`). After publication, jsDelivr and unpkg serve every npm version at `https://cdn.jsdelivr.net/npm/unpolish@<version>/dist/unpolish.js` — use an exact version, never `latest`, for a prototype others review.
+Pin a version: the bundle’s first line names it (`/*! Unpolish v0.1.0 …`). jsDelivr and unpkg serve every npm version at `https://cdn.jsdelivr.net/npm/unpolish@<version>/dist/unpolish.js` — use an exact version, never `latest`, for a prototype others review.
 
 Full installer, configuration, update and removal notes: [`packages/unpolish/README.md`](../packages/unpolish/README.md).

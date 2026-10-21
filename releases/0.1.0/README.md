@@ -21,8 +21,6 @@ npx unpolish@latest init
 
 Then start the app and press **`\`**.
 
-> **Before the npm release** `npx unpolish@latest` can't find the package yet. Use the preview build from the Unpolish website instead — the same installer, packed as a tarball: `npx <site>/unpolish/unpolish-<version>.tgz init`. It installs that same tarball into your project.
-
 ### What `init` does
 
 It inspects the project (package manager from the lockfile, framework, entry points, static folder, base path, an existing install) and makes the smallest change that fits:

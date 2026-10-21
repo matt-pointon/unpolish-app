@@ -11,12 +11,13 @@
 //   "siteUrl": "https://….vercel.app"   production URL; homepage, bundle and docs URLs derive from it
 //   "distUrl": null      unpublished tarball is served next to the website (unpolish/ on the same origin)
 //   "distUrl": "https://…/unpolish/"   a public HTTPS folder holding the tarball and self-host files
+//                        (published mode still installs from npm; this is for docs and downloads)
 //
 // 1. Builds packages/unpolish (dist/).
 // 2. Copies the self-host files into unpolish/ and releases/<version>/.
 // 3. Packs the npm tarball to unpolish/<name>-<version>.tgz.
 // 4. Writes site/release.js — every command, download link and the agent prompt is derived from it.
-import { readFileSync, writeFileSync, copyFileSync, readdirSync, rmSync, renameSync, mkdirSync } from 'node:fs';
+import { existsSync, readFileSync, writeFileSync, copyFileSync, readdirSync, rmSync, renameSync, mkdirSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import { join, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
@@ -94,9 +95,20 @@ export function applyRelease({ print = false, config = join(root, 'release.confi
   copySelfHost(pkgDir, pkg, out);
   snapshotVersion(out, pkg.version);
 
-  for (const f of readdirSync(out)) if (/^unpolish-.*\.tgz$/.test(f)) rmSync(join(out, f));
-  const tgz = execFileSync('npm', ['pack', '--silent', '--pack-destination', out], { cwd: pkgDir, encoding: 'utf8' }).trim().split('\n').pop();
-  if (tgz !== release.tarball) renameSync(join(out, tgz), join(out, release.tarball));
+  // Never rewrite a tarball that already exists for this version — 0.1.0 on npm
+  // is byte-identical to the committed file. Bump version (or delete the .tgz)
+  // to pack a new one.
+  const dest = join(out, release.tarball);
+  const keepTarball = existsSync(dest);
+  for (const f of readdirSync(out)) {
+    if (/^unpolish-.*\.tgz$/.test(f) && f !== release.tarball) rmSync(join(out, f));
+  }
+  if (keepTarball) {
+    console.log(`keeping existing unpolish/${release.tarball}`);
+  } else {
+    const tgz = execFileSync('npm', ['pack', '--silent', '--pack-destination', out], { cwd: pkgDir, encoding: 'utf8' }).trim().split('\n').pop();
+    if (tgz !== release.tarball) renameSync(join(out, tgz), join(out, release.tarball));
+  }
 
   writeFileSync(join(root, 'site', 'release.js'), renderReleaseJs(release));
   const where = release.published

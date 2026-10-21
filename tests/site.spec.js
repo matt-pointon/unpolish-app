@@ -22,6 +22,7 @@ async function withRelease(page, release) {
 test('install with your agent copies a prompt that matches the local release', async ({ page, request }) => {
   await page.goto('/');
   expect(await page.evaluate(() => window.UNPOLISH_RELEASE)).toEqual(releaseFrom());
+  await expect(page.locator('#version')).toHaveText('0.1.0');
   const btn = page.locator('.hero [data-copy-prompt]');
   await btn.click();
   await expect(btn).toHaveText('Prompt copied');
@@ -29,17 +30,18 @@ test('install with your agent copies a prompt that matches the local release', a
   await expect(btn).toHaveText('Install with your agent', { timeout: 4000 });
   const text = await clip(page);
   expect(text.startsWith('Install Unpolish in this prototype.')).toBe(true);
-  expect(text).toContain(`npx ${TGZ} init --dry-run`);
-  expect(text).toContain(`npx ${TGZ} remove`);
-  expect(text).toContain('not on the npm registry yet');
-  expect(text).toContain('only works on that machine');
+  expect(text).toContain('npx unpolish@0.1.0 init --dry-run');
+  expect(text).toContain('npx unpolish@0.1.0 init');
+  expect(text).toContain('npx unpolish@0.1.0 remove');
+  expect(text).not.toContain('npx unpolish@latest init --dry-run');
+  expect(text).toContain('Package: unpolish 0.1.0 on npm.');
   expect(text).toContain('The installer needs Node.js 18 or later.');
   expect(text).toMatch(/restart the dev server/i);
   expect(text).toMatch(/rebuilt and redeployed/);
-  expect(text).not.toMatch(/npx unpolish(@| )/);          // never the unpublished registry package
+  expect(text).not.toMatch(/\.tgz|not on the npm registry|only works on that machine|localhost/);
   expect(text.split('\n').length).toBeLessThan(25);
   await expect(page.locator('#prompt-text')).toHaveText(text);
-  for (const u of text.match(/https?:\/\/\S+?\.(tgz|md)(?=\s|$)/gm)) expect((await request.get(u)).status(), u).toBe(200);
+  for (const u of text.match(/https?:\/\/\S+?\.(tgz|md)(?=\s|$)/gm) || []) expect((await request.get(u)).status(), u).toBe(200);
 });
 
 test('the command copies exactly what is shown, and the page has no release commentary', async ({ page, request }) => {
@@ -49,17 +51,17 @@ test('the command copies exactly what is shown, and the page has no release comm
     await expect(btn).toHaveText('Copy');
     await btn.click();
     await expect(btn).toHaveText('Copied');
-    expect(await clip(page)).toBe(`npx ${TGZ} init`);
-    await expect(page.locator(`${where} [data-cmd]`)).toHaveText(`npx ${TGZ} init`);
+    expect(await clip(page)).toBe('npx unpolish@latest init');
+    await expect(page.locator(`${where} [data-cmd]`)).toHaveText('npx unpolish@latest init');
     await expect(btn).toHaveText('Copy', { timeout: 4000 });
   }
   await expect(page.locator('#install')).toContainText('Run from your prototype’s project folder.');
   await expect(page.locator('[data-node-note]')).toHaveText('The command needs Node.js 18 or later. The script tag under Manual installation doesn’t.');
-  await expect(page.locator('[data-local-note]')).toBeVisible();
+  await expect(page.locator('[data-local-note]')).toBeHidden();
   await expect(page.locator('.hero [data-local-note]')).toHaveCount(0);
   await expect(page.locator('.install-lede')).toContainText('No need to rewrite your prototype');
-  await expect(page.locator('[data-cmd-remove]')).toHaveText(`npx ${TGZ} remove`);
-  await expect(page.locator('[data-npm-install]')).toHaveText(`npm install --save-exact ${TGZ}`);
+  await expect(page.locator('[data-cmd-remove]')).toHaveText('npx unpolish@latest remove');
+  await expect(page.locator('[data-npm-install]')).toHaveText('npm install --save-exact unpolish@0.1.0');
   const visible = await page.locator('body').innerText();
   for (const gone of ['Preview build', 'not on npm yet', 'installs v0.1.0 from this site', 'All options', 'pinned dependency', '4-line block', 'Nothing to rebuild', 'inspects the repo', 'Recommended', '$ npx'])
     expect(visible, gone).not.toContain(gone);
@@ -80,7 +82,7 @@ test('when the clipboard fails, nothing claims success and the text is selected 
   await cmdBtn.click();
   await expect(page.locator('#toast')).toContainText('Couldn’t copy automatically');
   await expect(cmdBtn).toHaveText('Copy');
-  expect(await page.evaluate(() => getSelection().toString())).toBe(`npx ${TGZ} init`);
+  expect(await page.evaluate(() => getSelection().toString())).toBe('npx unpolish@latest init');
   const promptBtn = page.locator('.hero [data-copy-prompt]');
   await promptBtn.click();
   await expect(promptBtn).toHaveText('Install with your agent');
@@ -124,7 +126,7 @@ test('disclosures open with keyboard and pointer', async ({ page }) => {
 
 test('a public HTTPS distribution location changes every command, link and the prompt', async ({ page }) => {
   const dist = 'https://downloads.example.org/unpolish/';
-  await withRelease(page, releaseFrom({ distUrl: dist }));
+  await withRelease(page, releaseFrom({ published: false, siteUrl: null, distUrl: dist }));
   await page.goto('/');
   const tgz = `${dist}unpolish-0.1.0.tgz`;
   await expect(page.locator('.hero [data-cmd]')).toHaveText(`npx ${tgz} init`);
@@ -138,6 +140,18 @@ test('a public HTTPS distribution location changes every command, link and the p
   expect(text).toContain('not on the npm registry yet');
   expect(text).not.toContain('only works on that machine');
   expect(text).not.toContain('localhost');
+});
+
+test('unpublished localhost still uses the origin tarball', async ({ page }) => {
+  await withRelease(page, releaseFrom({ published: false, distUrl: null, siteUrl: null }));
+  await page.goto('/');
+  await expect(page.locator('.hero [data-cmd]')).toHaveText(`npx ${TGZ} init`);
+  await expect(page.locator('[data-local-note]')).toBeVisible();
+  const text = await page.locator('#prompt-text').textContent();
+  expect(text).toContain(`npx ${TGZ} init --dry-run`);
+  expect(text).toContain('not on the npm registry yet');
+  expect(text).toContain('only works on that machine');
+  expect(text).not.toMatch(/npx unpolish(@| )/);
 });
 
 test('once published, the site switches to the npm package everywhere', async ({ page }) => {

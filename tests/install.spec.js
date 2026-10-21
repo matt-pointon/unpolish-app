@@ -125,16 +125,21 @@ test('committed release files match a fresh build of the package', () => {
   sh(join(ROOT, 'packages/unpolish'), 'node', ['scripts/build.mjs']);
   const dist = (f) => read(join(ROOT, 'packages/unpolish/dist', f));
   expect(read(join(ROOT, 'unpolish/unpolish.js')), 'unpolish/unpolish.js is stale: run npm run release').toBe(dist('unpolish.js'));
-  const d = fresh('repack');
-  sh(join(ROOT, 'packages/unpolish'), 'npm', ['pack', '--silent', '--pack-destination', d]);
-  const a = fresh('repack/a'), b = fresh('repack/b');
-  execFileSync('tar', ['-xzf', join(d, `${PKG.name}-${PKG.version}.tgz`), '-C', a]);
-  execFileSync('tar', ['-xzf', TGZ, '-C', b]);
-  expect(snapshot(b), 'the committed tarball is stale: run npm run release').toEqual(snapshot(a));
-  // The website reads its commands from site/release.js.
-  const data = parseReleaseJs(read(join(ROOT, 'site/release.js')));
   const settings = loadReleaseSettings(json(join(ROOT, 'release.config.json')));
+  const data = parseReleaseJs(read(join(ROOT, 'site/release.js')));
   expect(data).toEqual(buildRelease(PKG, settings));
+  const pkg = JSON.parse(execFileSync('tar', ['-xzOf', TGZ, 'package/package.json'], { encoding: 'utf8' }));
+  expect(pkg.version).toBe(PKG.version);
+  expect(pkg.homepage).toBe('https://unpolishdesign.vercel.app');
+  // 0.1.0 is on npm; do not repack it. Unpublished mode still requires a fresh pack.
+  if (!settings.published) {
+    const d = fresh('repack');
+    sh(join(ROOT, 'packages/unpolish'), 'npm', ['pack', '--silent', '--pack-destination', d]);
+    const a = fresh('repack/a'), b = fresh('repack/b');
+    execFileSync('tar', ['-xzf', join(d, `${PKG.name}-${PKG.version}.tgz`), '-C', a]);
+    execFileSync('tar', ['-xzf', TGZ, '-C', b]);
+    expect(snapshot(b), 'the committed tarball is stale: run npm run release').toEqual(snapshot(a));
+  }
 });
 
 test('help, version and dry-run of the packed CLI', () => {
@@ -160,6 +165,20 @@ test('the script-tag bundle on its own starts one harness', async ({ page }) => 
   await page.waitForFunction(() => window.Unpolish && document.querySelector('unpolish-harness'));
   expect(await page.locator('unpolish-harness').count()).toBe(1);
   expect(await page.evaluate(() => window.Unpolish.version)).toBe(PKG.version);
+});
+
+test('re-running init when the same version is pinned does not suggest --upgrade', () => {
+  const dir = viteVanilla('already-pinned');
+  const pkgPath = join(dir, 'package.json');
+  const pkg = json(pkgPath);
+  pkg.dependencies = { ...(pkg.dependencies || {}), unpolish: PKG.version };
+  writeFileSync(pkgPath, JSON.stringify(pkg, null, 2) + '\n');
+  const r = spawnSync('node', [join(ROOT, 'packages/unpolish/bin/unpolish.mjs'), 'init', '--dry-run', '--json'], { cwd: dir, encoding: 'utf8' });
+  expect(r.status, r.stdout + r.stderr).toBe(0);
+  const report = JSON.parse(r.stdout);
+  const keep = (report.changes || []).find((c) => c.type === 'keep' && c.path === 'package.json');
+  expect(keep?.detail, JSON.stringify(report.changes)).toBe(`${PKG.name} ${PKG.version} already pinned`);
+  expect(JSON.stringify(report)).not.toMatch(/use --upgrade to pin/);
 });
 
 test('an unpinned @latest-style install still writes an exact version into package.json', () => {
