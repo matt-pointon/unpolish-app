@@ -21,7 +21,14 @@
     /* Leaflet-like: pan the map root (the same node the skip filter is on) so
        the compositor can filter one layer. Per-marker class/transform updates
        inside a filtered 12k-node tree re-flatten every frame and miss 50 fps. */
-    #map { will-change: transform; }
+    #map {
+      will-change: transform;
+      animation: map-drift 0.9s linear infinite alternate;
+    }
+    @keyframes map-drift {
+      from { transform: translate3d(0, 0, 0); }
+      to { transform: translate3d(4px, 3px, 0); }
+    }
     .leaflet-marker-pane { position: absolute; inset: 0; }
     .marker {
       position: absolute;
@@ -100,14 +107,6 @@
       markers: MARKERS,
       nodes: document.querySelectorAll('*').length
     };
-
-    let n = 0;
-    function tick() {
-      n++;
-      map.style.transform = 'translate3d(' + ((n % 8) - 4) + 'px,' + (((n * 3) % 8) - 4) + 'px,0)';
-      requestAnimationFrame(tick);
-    }
-    requestAnimationFrame(tick);
   </script>
 </body>
 </html>

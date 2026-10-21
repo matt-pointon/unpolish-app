@@ -84,15 +84,21 @@ test('Sketch skips the heavy map and stays interactive', async ({ page }) => {
 
   await expect(page.getByTestId('ui-card')).toHaveAttribute('data-up', /bg|box|fill/);
 
+  const sketch = await measure(page, 3000);
+  console.log('heavy-map 0.1.3', JSON.stringify(sketch));
+  expect(sketch.max, `longest Sketch task ${sketch.max}ms`).toBeLessThanOrEqual(50);
+  expect(sketch.fps, `Sketch ${sketch.fps.toFixed(1)} fps`).toBeGreaterThanOrEqual(50);
+
   mkdirSync('/opt/cursor/artifacts', { recursive: true });
   await page.setViewportSize({ width: 1280, height: 860 });
   await settle(page);
   async function shots(theme) {
     const dir = '/opt/cursor/artifacts';
-    await page.screenshot({ path: `${dir}/heavy-map-${theme}-desktop.png`, fullPage: true });
-    await map.screenshot({ path: `${dir}/heavy-map-${theme}-map.png` });
-    await photo.screenshot({ path: `${dir}/heavy-map-${theme}-image.png` });
-    await canvas.screenshot({ path: `${dir}/heavy-map-${theme}-canvas.png` });
+    const shot = { animations: 'disabled' };
+    await page.screenshot({ path: `${dir}/heavy-map-${theme}-desktop.png`, fullPage: true, ...shot });
+    await map.screenshot({ path: `${dir}/heavy-map-${theme}-map.png`, ...shot });
+    await photo.screenshot({ path: `${dir}/heavy-map-${theme}-image.png`, ...shot });
+    await canvas.screenshot({ path: `${dir}/heavy-map-${theme}-canvas.png`, ...shot });
   }
   await shots('sketch');
   await setTheme(page, 'blueprint');
@@ -102,11 +108,7 @@ test('Sketch skips the heavy map and stays interactive', async ({ page }) => {
   await shots('blueprint');
   await setTheme(page, 'sketch');
   await settle(page);
-
-  const sketch = await measure(page, 3000);
-  console.log('heavy-map 0.1.3', JSON.stringify(sketch));
-  expect(sketch.max, `longest Sketch task ${sketch.max}ms`).toBeLessThanOrEqual(50);
-  expect(sketch.fps, `Sketch ${sketch.fps.toFixed(1)} fps`).toBeGreaterThanOrEqual(50);
+  await page.waitForTimeout(400);
 
   const taggedBefore = await page.evaluate(() => document.querySelectorAll('[data-up]').length);
   const skipBefore = await page.evaluate(() => document.querySelectorAll('[data-unpolish-skip]').length);
