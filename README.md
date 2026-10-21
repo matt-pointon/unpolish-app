@@ -25,7 +25,7 @@ npm install
 npm run serve            # http://localhost:4173 — website + demo
 ```
 
-Open the site, use the demo controls, or press `\` inside the demo prototype for the real panel. `npm run build:site` writes the files Vercel serves into `public/` (gitignored). Production: `https://unpolish.vercel.app`. Until the package is on npm, install commands on a locally served page point at the tarball on that origin.
+Open the site, use the demo controls, or press `\` inside the demo prototype for the real panel. `npm run build:site` writes the files Vercel serves into `public/` (gitignored). Production: `https://unpolishdesign.vercel.app`. Until the package is on npm, install commands on a locally served page point at the tarball on that origin.
 
 ## Install into a prototype
 
