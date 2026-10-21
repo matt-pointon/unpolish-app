@@ -168,7 +168,7 @@ test('published mode with a production URL keeps the prompt off localhost', asyn
   await expect(page.locator('.hero [data-cmd]')).toHaveText('npx unpolish@latest init');
   const text = await page.locator('#prompt-text').textContent();
   expect(text).toContain('npx unpolish@0.1.0 init --dry-run');
-  expect(text).toContain('https://unpolish.vercel.app/unpolish/README.md');
+  expect(text).toContain('https://unpolishdesign.vercel.app/unpolish/README.md');
   expect(text).not.toMatch(/localhost|\.tgz|not on the npm registry|Preview build/i);
 });
 

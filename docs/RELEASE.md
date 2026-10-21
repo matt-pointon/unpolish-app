@@ -19,7 +19,7 @@ The website builds every command, download link and the agent prompt from `site/
 | `"published": false` (today) | `unpolish/<name>-<version>.tgz` on the same origin as the page. On `localhost` the install section says the command only works on this machine, and the prompt says the same |
 | `"published": false, "distUrl": "https://…/unpolish/"` | That public HTTPS folder. Use it when the tarball is hosted somewhere other than the site |
 | `"published": true` | Visible command `npx unpolish@latest init`. The copied prompt pins `npx unpolish@<version> init --dry-run`, then `init`. No localhost URLs, tarball commands, or “not on npm yet” copy |
-| `"siteUrl": "https://unpolish.vercel.app"` | Production website (set). Package `homepage` uses it. Unpublished installs still use the tarball on the origin serving the page; after `"published": true`, bundle and docs URLs in the prompt use this host |
+| `"siteUrl": "https://unpolishdesign.vercel.app"` | Production website (set). Package `homepage` uses it. Unpublished installs still use the tarball on the origin serving the page; after `"published": true`, bundle and docs URLs in the prompt use this host |
 
 Switching to published mode is one line in `release.config.json` (`"published": true`) plus `npm run release`. Tests cover that object (see `tests/release.spec.js` and `tests/fixtures/release-published.json`) without flipping the committed `published: false`.
 
@@ -86,7 +86,7 @@ Do not store an `NPM_TOKEN` for publishing once Trusted Publishing is in place.
 
 ### After npm is live
 
-1. Set `"published": true` in `release.config.json` (`siteUrl` is already `https://unpolish.vercel.app`).
+1. Set `"published": true` in `release.config.json` (`siteUrl` is already `https://unpolishdesign.vercel.app`).
 2. `npm run release && npm test`. Merging to `main` deploys the site.
 
 ## Deploying the website (Vercel Git integration)
@@ -104,7 +104,7 @@ The Vercel project **unpolish** already exists on the Hobby account, linked to `
 
 Per-app SPA rewrites for React and Svelte (paths with a file extension are not rewritten), `trailingSlash: true`, immutable cache for `unpolish/<version>/…`, and `no-cache` for HTML, `site/release.js` and unversioned `unpolish/` aliases.
 
-Production deployments are builds of `main`. The production alias is `https://unpolish.vercel.app` (public). Preview deployments of other branches are behind Vercel Standard Deployment Protection (Vercel auth required).
+Production deployments are builds of `main`. The production alias is `https://unpolishdesign.vercel.app` (public). Preview deployments of other branches are behind Vercel Standard Deployment Protection (Vercel auth required).
 
 ## Rolling back the website
 

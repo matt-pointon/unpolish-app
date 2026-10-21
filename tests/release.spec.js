@@ -17,8 +17,8 @@ test('committed site/release.js matches the unpublished config', () => {
   expect(committed).toEqual(expected);
   expect(expected.executable).toBe('unpolish');
   expect(expected.tarballUrl).toBeNull();
-  expect(expected.siteUrl).toBe('https://unpolish.vercel.app/');
-  expect(expected.homepage).toBe('https://unpolish.vercel.app');
+  expect(expected.siteUrl).toBe('https://unpolishdesign.vercel.app/');
+  expect(expected.homepage).toBe('https://unpolishdesign.vercel.app');
   expect(expected.published).toBe(false);
 });
 
@@ -29,12 +29,12 @@ test('published-mode config is derived without localhost or tarball install URLs
   const release = JSON.parse(printed);
   expect(release).toEqual(buildRelease(PKG, loadReleaseSettings(JSON.parse(readFileSync(join(ROOT, 'tests/fixtures/release-published.json'), 'utf8')))));
   expect(release.published).toBe(true);
-  expect(release.siteUrl).toBe('https://unpolish.vercel.app/');
-  expect(release.homepage).toBe('https://unpolish.vercel.app');
+  expect(release.siteUrl).toBe('https://unpolishdesign.vercel.app/');
+  expect(release.homepage).toBe('https://unpolishdesign.vercel.app');
   expect(release.executable).toBe('unpolish');
   expect(release.tarballUrl).toBeNull();
-  expect(release.docsUrl).toBe('https://unpolish.vercel.app/unpolish/README.md');
-  expect(release.bundleUrl).toBe('https://unpolish.vercel.app/unpolish/unpolish.js');
+  expect(release.docsUrl).toBe('https://unpolishdesign.vercel.app/unpolish/README.md');
+  expect(release.bundleUrl).toBe('https://unpolishdesign.vercel.app/unpolish/unpolish.js');
   expect(JSON.stringify(release)).not.toMatch(/localhost|127\.0\.0\.1/);
   // --print must not rewrite the committed unpublished site/release.js
   expect(parseReleaseJs(readFileSync(join(ROOT, 'site/release.js'), 'utf8')).published).toBe(false);
@@ -50,7 +50,7 @@ test('published with no production URL still documents npm, never the page origi
 
 test('non-HTTPS distribution URLs are rejected', () => {
   expect(() => loadReleaseSettings({ distUrl: 'http://example.com/unpolish/' })).toThrow(/https:\/\//);
-  expect(() => loadReleaseSettings({ siteUrl: 'http://unpolish.vercel.app' })).toThrow(/https:\/\//);
+  expect(() => loadReleaseSettings({ siteUrl: 'http://unpolishdesign.vercel.app' })).toThrow(/https:\/\//);
   const dir = join(ROOT, '.tmp');
   mkdirSync(dir, { recursive: true });
   const bad = join(dir, 'bad-release.json');

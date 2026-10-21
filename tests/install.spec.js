@@ -114,7 +114,7 @@ test('the tarball contains the runtime, bundle, types, schema, starter config an
   expect(pkg.exports['./browser']).toBe('./dist/unpolish.js');
   expect(pkg.dependencies).toBeUndefined();
   expect(pkg.repository).toEqual({ type: 'git', url: 'git+https://github.com/matt-pointon/unpolish-app.git' });
-  expect(pkg.homepage).toBe('https://unpolish.vercel.app');
+  expect(pkg.homepage).toBe('https://unpolishdesign.vercel.app');
   expect(pkg.bugs).toEqual({ url: 'https://github.com/matt-pointon/unpolish-app/issues' });
   expect(JSON.stringify(pkg)).not.toMatch(/file:|localhost|workspace:/);
   const starter = JSON.parse(execFileSync('tar', ['-xzOf', TGZ, 'package/templates/unpolish.config.json'], { encoding: 'utf8' }));
