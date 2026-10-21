@@ -13,6 +13,12 @@ function releaseFrom(overrides = {}) {
   return buildRelease(PKG, loadReleaseSettings({ ...CONFIG, ...overrides }));
 }
 
+function localUrl(u) {
+  const site = String(CONFIG.siteUrl || '').replace(/\/$/, '');
+  if (site && u.startsWith(site)) return 'http://localhost:4174' + u.slice(site.length);
+  return u;
+}
+
 /** Serve the page with a generated release.js, as `npm run release` would write it. */
 async function withRelease(page, release) {
   await page.route('**/site/release.js', async (route) => {
@@ -42,7 +48,7 @@ test('install with your agent copies a prompt that matches the local release', a
   expect(text).not.toMatch(/\.tgz|not on the npm registry|only works on that machine|localhost/);
   expect(text.split('\n').length).toBeLessThan(25);
   await expect(page.locator('#prompt-text')).toHaveText(text);
-  for (const u of text.match(/https?:\/\/\S+?\.(tgz|md)(?=\s|$)/gm) || []) expect((await request.get(u)).status(), u).toBe(200);
+  for (const u of text.match(/https?:\/\/\S+?\.(tgz|md)(?=\s|$)/gm) || []) expect((await request.get(localUrl(u))).status(), u).toBe(200);
 });
 
 test('the command copies exactly what is shown, and the page has no release commentary', async ({ page, request }) => {
@@ -70,7 +76,7 @@ test('the command copies exactly what is shown, and the page has no release comm
   expect(html).not.toMatch(/jsdelivr|unpkg|install\.sh/);
   const links = await page.locator('#install a[href]').evaluateAll((as) => as.map((a) => a.href).filter((h) => !h.includes('#')));
   expect(links.length).toBeGreaterThanOrEqual(5);
-  for (const u of links) expect((await request.get(u)).status(), u).toBe(200);
+  for (const u of links) expect((await request.get(localUrl(u))).status(), u).toBe(200);
 });
 
 test('when the clipboard fails, nothing claims success and the text is selected instead', async ({ page }) => {

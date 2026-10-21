@@ -1245,18 +1245,45 @@ function createUnpolish() {
     } finally {
       this.setDisabled(false);
     }
-    var vw = window.innerWidth, vh = window.innerHeight;
-    // Decide in document order so parents are known before children.
-    var self = this;
+    if (window.scrollX !== sx || window.scrollY !== sy) window.scrollTo(sx, sy);
+    this.finishClassify(reads, exempts.length);
+  };
+
+  /* Tag newly inserted nodes without disabling the theme sheet (that invalidates the whole page). */
+  Engine.prototype.ensureProbe = function () {
+    if (this.probe && this.probe.isConnected) return this.probe;
+    var probe = this.probe = document.createElement('div');
+    probe.setAttribute('data-unpolish-ignore', '');
+    probe.setAttribute('aria-hidden', 'true');
+    probe.style.cssText = 'position:absolute;left:-9999px;top:0;width:24rem;pointer-events:none';
+    (document.body || document.documentElement).appendChild(probe);
+    return probe;
+  };
+
+  Engine.prototype.classifyFresh = function (els) {
+    var c = this.classifier, probe = this.ensureProbe();
+    if (!els.length) return;
+    var reads = els.map(function (el) {
+      var clone = el.cloneNode(false);
+      probe.appendChild(clone);
+      var r = c.read(clone);
+      probe.removeChild(clone);
+      r.el = el;
+      return r;
+    });
+    reads.forEach(function (r) { c.parentInfo(r.el); });
+    this.finishClassify(reads, false);
+  };
+
+  Engine.prototype.finishClassify = function (reads, wroteExempt) {
+    var c = this.classifier, vw = window.innerWidth, vh = window.innerHeight;
     var rects = reads.map(function (r) { return r.el.getBoundingClientRect(); });
     reads.forEach(function (r, i) {
       if (!r.el.isConnected) return;
       try { c.write(r.el, c.decide(r, rects[i], vw, vh)); } catch (e) { warn('classify', e); }
     });
-    if (window.scrollX !== sx || window.scrollY !== sy) window.scrollTo(sx, sy);
-    if (exempts.length) this.writeExempt();
+    if (wroteExempt) this.writeExempt();
     if (this.observer) this.observer.takeRecords();
-    void self;
   };
 
   Engine.prototype.writeExempt = function () {
@@ -1319,6 +1346,7 @@ function createUnpolish() {
       this.filters.setAttribute('style', 'position:absolute;width:0;height:0;overflow:hidden;pointer-events:none;left:-9999px;top:0');
     }
     if (!this.filters.isConnected) document.body.appendChild(this.filters);
+    this.ensureProbe();
   };
 
   Engine.prototype.suppressTransitions = function () {
@@ -1382,6 +1410,7 @@ function createUnpolish() {
     if (this.style) this.style.remove();
     if (this.filters) this.filters.remove();
     if (this.exemptStyle) this.exemptStyle.remove();
+    if (this.probe) { this.probe.remove(); this.probe = null; }
     this.exemptRules = [];
     this.lastCSS = '';
     var self = this;
@@ -1405,7 +1434,7 @@ function createUnpolish() {
 
   Engine.prototype.isOwnNode = function (el) {
     if (!el || el.nodeType !== 1) return true;
-    if (el === this.style || el === this.filters || el === this.guard || el === this.exemptStyle) return true;
+    if (el === this.style || el === this.filters || el === this.guard || el === this.exemptStyle || el === this.probe) return true;
     if (el.id && el.id.indexOf('unpolish-') === 0) return true;
     if (el.tagName === 'UNPOLISH-HARNESS') return true;
     return !!(el.closest && el.closest('unpolish-harness, #unpolish-filters, #unpolish-theme, #unpolish-guard, #unpolish-exempt'));
@@ -1516,25 +1545,31 @@ function createUnpolish() {
   Engine.prototype.flushClassify = function (list, start, shadowRoots, t0) {
     this.workScheduled = false;
     if (!this.active) return;
-    var i = start;
-    while (i < list.length) {
+    var fresh = [], known = [], i = start;
+    for (; i < list.length; i++) {
       if (i > start && now() - t0 >= WORK_BUDGET_MS) {
         var later = this;
         this.workScheduled = true;
         raf(function () { later.flushClassify(list, i, shadowRoots, now()); });
+        this.tagBatch(fresh, known, shadowRoots, true);
         return;
       }
-      var end = Math.min(list.length, i + 40);
-      this.classify(list.slice(i, end));
-      if (this.observer) this.observer.takeRecords();
-      i = end;
+      if (this.classifier.tags.get(list[i])) known.push(list[i]);
+      else fresh.push(list[i]);
     }
+    this.tagBatch(fresh, known, shadowRoots, false);
+  };
+
+  Engine.prototype.tagBatch = function (fresh, known, shadowRoots, moreComing) {
+    // Insertions and cheap re-tags never disable the theme sheet (that would
+    // restyle every tagged node). Already-tagged elements whose class/state
+    // changed still need an accurate in-place read.
+    if (fresh.length) this.classifyFresh(fresh);
+    if (known.length) this.classify(known);
+    if ((this.classifier.exemptRoots || []).length) this.classify([]);
+    if (moreComing) return;
     var eng = this;
     shadowRoots.forEach(function (r) { eng.attachShadow(r); });
-    if ((this.classifier.exemptRoots || []).length) {
-      this.classify([]);
-      if (this.observer) this.observer.takeRecords();
-    }
     if (this.pendingRoots.size || this.pendingNodes.size) this.scheduleWork();
   };
 

@@ -11,7 +11,7 @@ async function measure(page, ms = 3000) {
       po = new PerformanceObserver((list) => {
         for (const e of list.getEntries()) longTasks.push({ duration: e.duration, start: e.startTime });
       });
-      po.observe({ type: 'longtask', buffered: true });
+      po.observe({ type: 'longtask', buffered: false });
     } catch (e) { /* longtask not available */ }
     let frames = 0;
     const t0 = performance.now();
@@ -40,6 +40,7 @@ test('Sketch stays responsive on a 3000-element page with per-frame churn', asyn
   await setTheme(page, 'sketch');
   await settle(page);
   await page.waitForFunction(() => document.querySelectorAll('.card[data-up]').length > 1000);
+  await settle(page);
 
   const sketch = await measure(page, 3000);
   const inserted = page.locator('[data-testid="inserted"]').last();
