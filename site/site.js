@@ -36,7 +36,7 @@
       '   - If a script tag doesn\'t fit, import the file once from the client entry and call window.Unpolish.init({ config }) with the imported JSON.',
       '   Respect the base path if the app is served from a sub-path.',
       '4. Configure unpolish.config.json (it is the shared, version-controlled project preset): keep "defaultTheme": "original" unless I say otherwise; set a short project "id"; add "exclude" selectors (or data-unpolish-ignore attributes) for regions that must keep their look, such as logos, maps, charts, video or canvas. Leave theme presets at their defaults.',
-      '5. Verify: run the dev server, open the prototype and press \\ to open the Unpolish panel. Switch through Black & White, Sketch, Blueprint and Pastel Blocks; check that navigation, forms, menus, dialogs and any client-side routes still work; open ?unpolish=sketch&unpolish-roughness=60 and confirm Sketch loads; choose Original and confirm the app looks exactly as before. Run the project\'s existing tests, linters and type checks.',
+      '5. Verify: run the dev server, open the prototype and press \\ to open the Unpolish panel. Switch through Black & White, Sketch, Blueprint and Pastel Blocks; check that navigation, forms, menus, dialogs and any client-side routes still work; open ?unpolish=sketch and confirm Sketch loads; choose Original and confirm the app looks exactly as before. Run the project\'s existing tests, linters and type checks.',
       '6. Report what you changed, anything that may need a role hint or override (see the guide), and how to remove Unpolish: delete the script tag (or import) and the unpolish folder — nothing else.',
       ''
     ].join('\n');
@@ -101,10 +101,8 @@
   /* ---------------- Live demo ---------------- */
   var frame = $('#demo-frame');
   var seg = $('#demo-themes');
-  var rough = $('#rough'), roughVal = $('#rough-val'), roughHint = $('#rough-hint');
   var badge = $('#demo-badge');
   var labels = { original: 'Original', 'black-white': 'Black & White', sketch: 'Sketch', blueprint: 'Blueprint', pastel: 'Pastel Blocks' };
-  var hints = { 'black-white': 'Contrast and simplification', sketch: 'Stroke wobble and shading', blueprint: 'Grid and drafting marks', pastel: 'Surface simplification' };
   var api = null;
 
   function sync(state) {
@@ -116,12 +114,6 @@
     });
     badge.textContent = labels[t];
     badge.setAttribute('data-theme', t);
-    var themed = t !== 'original' && state.settings;
-    rough.disabled = !themed;
-    if (themed && document.activeElement !== rough) rough.value = state.settings.roughness;
-    roughVal.textContent = themed ? state.settings.roughness : '—';
-    rough.style.setProperty('--p', (themed ? rough.value : 0) + '%');
-    roughHint.textContent = themed ? hints[t] : 'Pick a theme to adjust';
   }
 
   function connect() {
@@ -157,10 +149,5 @@
     var n = bs[(i + d + bs.length) % bs.length];
     api.setTheme(n.getAttribute('data-theme'));
     n.focus();
-  });
-  rough.addEventListener('input', function () {
-    rough.style.setProperty('--p', rough.value + '%');
-    roughVal.textContent = rough.value;
-    if (api) api.setRoughness(+rough.value);
   });
 })();

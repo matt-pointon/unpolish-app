@@ -53,7 +53,7 @@ To ship a build without it, set `"enabled": false` in the config or leave the ta
 
 - Press **`\`** (or the launcher in the corner) to open the panel.
 - **1–4** pick Black & White, Sketch, Blueprint, Pastel Blocks while the panel is open. **0** restores Original. **Esc** closes.
-- **Roughness** adjusts the selected theme's treatment. **Edit theme** reveals palette, typography, border weight and style, corners, shadows, details and image treatment.
+- **Edit theme** reveals palette, typography, border weight and style, corners, shadows, details and image treatment.
 - **Shortcuts** shows every binding and lets you reassign them. Shortcuts never fire while typing in inputs, textareas, selects or contenteditable regions.
 
 ## Configuration
@@ -74,7 +74,6 @@ Precedence for a page view: **review-link URL → local draft (this browser) →
   "shortcuts": { "toggle": "\\", "themes": { "sketch": "Alt+S" } },
   "themes": {
     "sketch": {
-      "roughness": 60,
       "palette": { "accent": "#2563c9" },
       "typography": "hand",            // original | neutral | hand | technical | rounded
       "border": { "weight": 1.6, "style": "hand" },  // solid | dashed | hand | none
@@ -118,18 +117,16 @@ The classifier reads each element's rendered styles (background, borders, shadow
 | Parameter | Values |
 | --- | --- |
 | `unpolish` | `original`, `black-white`, `sketch`, `blueprint`, `pastel` (aliases: `bw`, `pastel-blocks`) |
-| `unpolish-roughness` | `0`–`100` |
 | `unpolish-ui` | `visible` or `hidden` (hides panel and launcher; the shortcut still opens them) |
 
-Example: `/plan?tab=venues&unpolish=blueprint&unpolish-roughness=60&unpolish-ui=hidden#schedule`
+Example: `/plan?tab=venues&unpolish=blueprint&unpolish-ui=hidden#schedule`
 
-Links apply the **saved project preset** for the theme; the recipient's own local drafts are ignored for that session. If your current theme has unsaved edits a URL can't carry (anything but roughness), the panel asks you to save first. The review session is kept in `sessionStorage`, so it survives client-side navigation and reloads in that tab. Invalid values fall back to the project defaults with a console warning. *Exit* in the panel ends the session.
+Links apply the **saved project preset** for the theme; the recipient's own local drafts are ignored for that session. Links carry only the theme, so if your current theme has unsaved edits the panel asks you to save them first. The review session is kept in `sessionStorage`, so it survives client-side navigation and reloads in that tab. Invalid values fall back to the project defaults with a console warning. *Exit* in the panel ends the session.
 
 ## JavaScript API
 
 ```js
 Unpolish.setTheme('sketch');          // 'original' restores
-Unpolish.setRoughness(70);
 Unpolish.update({ images: 'placeholder', border: { style: 'dashed' } });
 Unpolish.getSettings('pastel');
 Unpolish.getConfig();                 // config object incl. local edits

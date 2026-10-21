@@ -30,40 +30,36 @@
   var THEMES = {
     'black-white': {
       label: 'Black & White', short: 'B&W', scheme: 'light',
-      roughHint: 'Contrast and simplification',
+      intensity: 0.45,
       detailsHint: 'Status patterns',
       defaults: {
-        roughness: 45,
         palette: { paper: '#ffffff', surface: '#ffffff', ink: '#141414', muted: '#5c5c5c', line: '#1c1c1c', accent: '#141414', danger: '#141414', success: '#141414', warning: '#141414' },
         typography: 'neutral', border: { weight: 1.25, style: 'solid' }, radius: 4, shadows: 'none', details: true, images: 'original'
       }
     },
     sketch: {
       label: 'Sketch', short: 'Sketch', scheme: 'light',
-      roughHint: 'Stroke wobble',
+      intensity: 0.5,
       detailsHint: 'Pencil shading',
       defaults: {
-        roughness: 50,
         palette: { paper: '#fbfaf5', surface: '#ffffff', ink: '#232323', muted: '#646464', line: '#2a2a2a', accent: '#2563c9', danger: '#c8423b', success: '#2f7d45', warning: '#b7791f' },
         typography: 'hand', border: { weight: 1.6, style: 'hand' }, radius: 4, shadows: 'none', details: true, images: 'original'
       }
     },
     blueprint: {
       label: 'Blueprint', short: 'Blueprint', scheme: 'dark',
-      roughHint: 'Drafting density',
+      intensity: 0.45,
       detailsHint: 'Grid and corner marks',
       defaults: {
-        roughness: 45,
         palette: { paper: '#1d4b8f', surface: '#235aa3', ink: '#f2f7ff', muted: '#b7cff0', line: '#d4e4fb', accent: '#ffffff', danger: '#ffb4a8', success: '#a8e6bd', warning: '#ffe08f' },
         typography: 'technical', border: { weight: 1, style: 'solid' }, radius: 2, shadows: 'none', details: true, images: 'original'
       }
     },
     pastel: {
       label: 'Pastel Blocks', short: 'Pastel', scheme: 'light',
-      roughHint: 'Surface simplification',
+      intensity: 0.5,
       detailsHint: 'Rotating color blocks',
       defaults: {
-        roughness: 50,
         palette: { paper: '#fbf8f3', surface: '#ffffff', ink: '#2b2733', muted: '#665f70', line: '#e4dbcf', accent: '#cbc0ff', danger: '#ffc4ba', success: '#c3eacc', warning: '#ffe2a3', block1: '#ffe0d3', block2: '#d6e9ff', block3: '#d9f1df', block4: '#ebe1ff', block5: '#fff0c2' },
         typography: 'rounded', border: { weight: 0, style: 'none' }, radius: 12, shadows: 'none', details: true, images: 'original'
       }
@@ -265,7 +261,7 @@
   function normalizeSettings(id, s) {
     var d = THEMES[id].defaults;
     var out = merge(d, s || {});
-    out.roughness = clamp(Math.round(+out.roughness || 0), 0, 100);
+    delete out.roughness; // retired setting; older configs and drafts may still carry it
     Object.keys(out.palette).forEach(function (k) {
       if (!(k in d.palette) || !isColor(out.palette[k])) out.palette[k] = d.palette[k];
     });
@@ -378,7 +374,8 @@
   }
 
   function derive(id, s, lite) {
-    var p = s.palette, r = s.roughness / 100, T = THEMES[id];
+    // Each theme's treatment strength is fixed (0–1); it tunes wobble, grid density, tints, etc.
+    var p = s.palette, T = THEMES[id], r = T.intensity;
     var v = { id: id, r: r, scheme: T.scheme };
     v.paper = p.paper;
     v.surface = id === 'blueprint' ? mix(p.surface, p.paper, r * 0.65) : p.surface;
@@ -1795,11 +1792,6 @@
       '<div data-view="main">' +
         '<div class="banner" data-review hidden><span><b>Review link</b> · project preset</span><button type="button" data-act="exit-review">Exit</button></div>' +
         '<div class="themes" role="radiogroup" aria-label="Theme"></div>' +
-        '<div class="group" data-rough>' +
-          '<div class="row"><label class="label" for="up-rough">Roughness</label><span class="hint" data-rough-hint></span><output class="val" for="up-rough" data-rough-val></output></div>' +
-          '<input id="up-rough" type="range" min="0" max="100" step="1" aria-describedby="up-rough-hint">' +
-          '<span class="sr" id="up-rough-hint"></span>' +
-        '</div>' +
         '<div class="actions">' +
           '<button class="btn" type="button" data-act="edit" aria-expanded="false" aria-controls="up-editor">Edit theme' + ICONS.chev + '</button>' +
           '<button class="btn" type="button" data-act="share"><span class="swap">' + ICONS.link + '<span>Review link</span></span></button>' +
@@ -1825,7 +1817,6 @@
 
     this.q = function (s) { return p.querySelector(s); };
     this.tiles = this.q('.themes');
-    this.rough = this.q('#up-rough');
     this.toast = this.q('.toast');
 
     var ids = ['original'].concat(THEME_IDS);
@@ -1851,7 +1842,6 @@
       list[n].focus();
     });
 
-    this.rough.addEventListener('input', function () { app.updateSettings({ roughness: +self.rough.value }); });
 
     p.addEventListener('click', function (e) {
       var b = e.target.closest('[data-act]'); if (!b) return;
@@ -2066,13 +2056,6 @@
       if (pv._html !== html) { pv.innerHTML = html; pv._html = html; }
     });
     var themed = active !== 'original';
-    var s = themed ? app.settingsFor(active) : null;
-    this.rough.disabled = !themed;
-    this.rough.value = themed ? s.roughness : 0;
-    this.rough.style.setProperty('--p', (themed ? s.roughness : 0) + '%');
-    this.q('[data-rough-val]').textContent = themed ? s.roughness : '—';
-    this.q('[data-rough-hint]').textContent = themed ? THEMES[active].roughHint : 'Pick a theme to adjust';
-    this.q('#up-rough-hint').textContent = themed ? THEMES[active].roughHint : '';
     this.q('[data-act="edit"]').disabled = !themed;
     if (!themed && this.editOpen) this.setEdit(false);
     if (this.editOpen) this.renderEditor();
@@ -2415,6 +2398,9 @@
     var key = 'unpolish:' + (this.config.id || 'default');
     this.keys = { local: key, review: key + ':review' };
     this.local = merge({ themes: {}, shortcuts: {} }, storage.get('localStorage', this.keys.local) || {});
+    // Drop retired settings from older drafts so they don't read as unsaved changes.
+    var lt = this.local.themes;
+    Object.keys(lt).forEach(function (id) { if (lt[id]) delete lt[id].roughness; if (!lt[id] || !Object.keys(lt[id]).length) delete lt[id]; });
     this.engine.configure(this.config);
     this.readURL();
     var self = this;
@@ -2432,17 +2418,13 @@
   App.prototype.readURL = function () {
     var params;
     try { params = new URL(window.location.href).searchParams; } catch (e) { params = null; }
-    var has = params && (params.has('unpolish') || params.has('unpolish-roughness') || params.has('unpolish-ui'));
+    var has = params && (params.has('unpolish') || params.has('unpolish-ui'));
     if (has) {
       var theme = normTheme(params.get('unpolish'));
       if (params.has('unpolish') && !theme) warn('Unknown theme in URL:', params.get('unpolish'), '— using the project default.');
-      var rough = params.get('unpolish-roughness');
-      var r = rough != null && rough !== '' && isFinite(+rough) ? clamp(Math.round(+rough), 0, 100) : null;
-      if (rough != null && r == null) warn('Invalid roughness in URL:', rough);
       var ui = params.get('unpolish-ui');
       this.state.review = {
         theme: theme || this.config.defaultTheme,
-        roughness: r,
         ui: ui === 'hidden' ? 'hidden' : 'visible',
         edits: {}
       };
@@ -2469,7 +2451,6 @@
     var base = this.projectSettings(id);
     var rv = this.state.review;
     if (rv) {
-      if (rv.roughness != null && id === rv.theme) base.roughness = rv.roughness;
       return normalizeSettings(id, merge(base, rv.edits[id] || {}));
     }
     return normalizeSettings(id, merge(base, this.local.themes[id] || {}));
@@ -2528,14 +2509,9 @@
     var self = this;
     var bucket = this.state.review ? this.state.review.edits : this.local.themes;
     var next = merge(bucket[id] || {}, partial);
-    if (this.state.review && partial.roughness != null && id === this.state.review.theme) {
-      this.state.review.roughness = partial.roughness;
-      delete next.roughness;
-    }
     // Keep only what differs from the project preset, so a "draft" means a real difference.
     var proj = this.projectSettings(id);
     var d = diff(proj, normalizeSettings(id, merge(proj, next)));
-    if (this.state.review && this.state.review.roughness != null && id === this.state.review.theme) delete d.roughness;
     if (Object.keys(d).length) bucket[id] = d; else delete bucket[id];
     this.persist();
     clearTimeout(this.persistTimer);
@@ -2547,10 +2523,8 @@
 
   App.prototype.resetTheme = function () {
     var id = this.state.active;
-    if (this.state.review) {
-      delete this.state.review.edits[id];
-      if (id === this.state.review.theme) this.state.review.roughness = null;
-    } else delete this.local.themes[id];
+    if (this.state.review) delete this.state.review.edits[id];
+    else delete this.local.themes[id];
     this.persist();
     this.ui.q('[data-editor]')._sig = '';
     this.apply();
@@ -2584,21 +2558,18 @@
     return !!(this.state.review && Object.keys(this.state.review.edits || {}).length);
   };
 
-  /* True when the active theme differs from the saved preset in ways a URL cannot carry. */
+  /* True when the active theme differs from the saved preset (links only carry the theme). */
   App.prototype.unsavedForLink = function () {
     var id = this.state.active;
     if (id === 'original') return false;
-    var d = diff(this.projectSettings(id), this.settingsFor(id));
-    delete d.roughness;
-    return Object.keys(d).length > 0;
+    return Object.keys(diff(this.projectSettings(id), this.settingsFor(id))).length > 0;
   };
 
   App.prototype.reviewLink = function (opts) {
     var u = new URL(window.location.href);
     var id = this.state.active;
     u.searchParams.set('unpolish', id);
-    if (id !== 'original') u.searchParams.set('unpolish-roughness', String(this.settingsFor(id).roughness));
-    else u.searchParams.delete('unpolish-roughness');
+    u.searchParams.delete('unpolish-roughness'); // retired parameter
     if (opts && opts.hideUI) u.searchParams.set('unpolish-ui', 'hidden');
     else u.searchParams.delete('unpolish-ui');
     return u.toString();
@@ -2734,7 +2705,6 @@
     init: function (opts) { app.init(opts); return api; },
     setTheme: function (id) { app.setTheme(id, { source: 'api' }); return api; },
     getTheme: function () { return app.state.active; },
-    setRoughness: function (n) { if (app.state.active !== 'original') app.updateSettings({ roughness: clamp(+n || 0, 0, 100) }); return api; },
     update: function (partial) { app.updateSettings(partial || {}); return api; },
     getSettings: function (id) { id = normTheme(id || app.state.active); return id && id !== 'original' ? app.settingsFor(id) : null; },
     getConfig: function () { return app.exportConfig(); },

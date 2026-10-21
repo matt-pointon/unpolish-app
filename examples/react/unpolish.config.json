@@ -5,6 +5,6 @@
   "exclude": ["[data-brand-logo]"],
   "shortcuts": { "toggle": "\\", "themes": { "sketch": "Alt+S" } },
   "themes": {
-    "blueprint": { "roughness": 70 }
+    "blueprint": { "shadows": "flat" }
   }
 }

@@ -20,14 +20,10 @@ test('copy installation prompt: real file links, visible feedback', async ({ pag
 test('demo controls drive the real harness inside the prototype frame', async ({ page }) => {
   await page.goto('/');
   const frame = page.frameLocator('#demo-frame');
-  await expect(page.locator('#rough')).toBeDisabled();
   await page.waitForFunction(() => document.getElementById('demo-frame').contentWindow?.Unpolish?.state);
   await page.locator('#demo-themes [data-theme="blueprint"]').click();
   await expect(page.locator('#demo-badge')).toHaveText('Blueprint');
   await expect(frame.locator('html')).toHaveAttribute('data-unpolish', 'blueprint');
-  await expect(page.locator('#rough')).toBeEnabled();
-  await page.locator('#rough').fill('80');
-  await expect.poll(() => page.evaluate(() => document.getElementById('demo-frame').contentWindow.Unpolish.getSettings().roughness)).toBe(80);
   // The outer site is untouched
   expect(await page.getAttribute('html', 'data-unpolish')).toBeNull();
   // Changes made inside the frame's own panel sync back out

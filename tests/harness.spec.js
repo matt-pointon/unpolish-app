@@ -57,13 +57,13 @@ test.describe('keyboard', () => {
     // Config binds Alt+B to Blueprint
     await page.keyboard.press('Alt+KeyB');
     expect(await theme(page)).toBe('blueprint');
-    await page.evaluate(() => window.Unpolish.setRoughness(12));
+    await page.evaluate(() => window.Unpolish.update({ images: 'placeholder' }));
     await page.keyboard.press('\\');
     await page.keyboard.press('0');
     await page.keyboard.press('Escape');
     await page.keyboard.press('Alt+KeyB');
     expect(await theme(page)).toBe('blueprint');
-    expect((await page.evaluate(() => window.Unpolish.getSettings())).roughness).toBe(12);
+    expect((await page.evaluate(() => window.Unpolish.getSettings())).images).toBe('placeholder');
     // Not while typing
     await setTheme(page, 'original');
     await page.getByTestId('name').click();
@@ -112,13 +112,15 @@ test.describe('keyboard', () => {
 });
 
 test.describe('panel', () => {
-  test('pointer flow: launcher, theme tile, roughness, edit, reset, discard', async ({ page }) => {
+  test('pointer flow: launcher, theme tile, edit, reset, discard', async ({ page }) => {
     await open(page, EXAMPLES.demo);
     await shadow(page, '.launcher').click();
     expect(await isOpen(page)).toBe(true);
     await shadow(page, '.tile[data-theme="sketch"]').click();
     expect(await theme(page)).toBe('sketch');
     await expect(shadow(page, '.source')).toHaveText('Project');
+    // The initial view is just themes and two actions — no roughness slider.
+    expect(await shadow(page, '[data-view="main"] input[type="range"]').count()).toBe(0);
     // Edit is hidden until asked for
     await expect(shadow(page, '[data-editor]')).toBeHidden();
     await shadow(page, '[data-act="edit"]').click();
@@ -143,8 +145,7 @@ test.describe('panel', () => {
     expect((await page.evaluate(() => window.Unpolish.getSettings())).images).toBe('original');
     await expect(shadow(page, '.source')).toHaveText('Project');
     // Discard local changes
-    const range = shadow(page, '#up-rough');
-    await range.fill('90');
+    await shadow(page, '[data-k="radius"][data-v="0"]').click();
     await expect(shadow(page, '.source')).toHaveText('Local draft');
     await shadow(page, '[data-draft] [data-act="discard"]').click();
     await expect(shadow(page, '.source')).toHaveText('Project');
@@ -153,15 +154,15 @@ test.describe('panel', () => {
 
   test('drafts persist locally and are clearly separate from the project config', async ({ page }) => {
     await open(page, EXAMPLES.react);
-    // Project config sets Blueprint roughness 70
+    // Project config sets Blueprint shadows to flat
     await setTheme(page, 'blueprint');
-    expect((await page.evaluate(() => window.Unpolish.getSettings())).roughness).toBe(70);
-    await page.evaluate(() => window.Unpolish.setRoughness(33));
+    expect((await page.evaluate(() => window.Unpolish.getSettings())).shadows).toBe('flat');
+    await page.evaluate(() => window.Unpolish.update({ radius: 0 }));
     await settle(page);
     await page.reload();
     await page.waitForFunction(() => window.Unpolish?.state?.().theme === 'blueprint');
     const st = await page.evaluate(() => window.Unpolish.state());
-    expect(st.settings.roughness).toBe(33);
+    expect(st.settings.radius).toBe(0);
     expect(st.source).toBe('draft');
     // Copy configuration produces JSON + agent instructions with the tuned value
     await page.keyboard.press('\\');
@@ -169,7 +170,8 @@ test.describe('panel', () => {
     const clip = await page.evaluate(() => navigator.clipboard.readText());
     expect(clip).toContain('Update the Unpolish configuration in this repository.');
     const json = JSON.parse(clip.match(/```json\n([\s\S]+?)```/)[1]);
-    expect(json.themes.blueprint.roughness).toBe(33);
+    expect(json.themes.blueprint).toMatchObject({ radius: 0, shadows: 'flat' });
+    expect(json.themes.blueprint.roughness).toBeUndefined();
     expect(json.exclude).toEqual(['[data-brand-logo]']);
     expect(json.shortcuts.themes.sketch).toBe('Alt+S');
     // "Saving" it (feeding the config back) makes the draft match the project
@@ -232,10 +234,10 @@ test.describe('panel', () => {
 });
 
 test.describe('review links', () => {
-  test('URL selects theme + roughness, hides UI, survives client-side navigation and reloads', async ({ page }) => {
-    await open(page, EXAMPLES.react + 'clients?ref=mail&unpolish=blueprint&unpolish-roughness=60&unpolish-ui=hidden#team');
+  test('URL selects theme, hides UI, survives client-side navigation and reloads', async ({ page }) => {
+    await open(page, EXAMPLES.react + 'clients?ref=mail&unpolish=blueprint&unpolish-ui=hidden#team');
     expect(await theme(page)).toBe('blueprint');
-    expect((await page.evaluate(() => window.Unpolish.getSettings())).roughness).toBe(60);
+    expect((await page.evaluate(() => window.Unpolish.getSettings())).shadows).toBe('flat');
     await expect(shadow(page, '.launcher')).toBeHidden();
     // Hidden is a preference, not a lock
     await page.keyboard.press('\\');
@@ -248,7 +250,7 @@ test.describe('review links', () => {
     expect(await theme(page)).toBe('blueprint');
     await page.reload();
     await page.waitForFunction(() => document.documentElement.getAttribute('data-unpolish') === 'blueprint');
-    expect((await page.evaluate(() => window.Unpolish.getSettings())).roughness).toBe(60);
+    await expect(shadow(page, '.launcher')).toBeHidden();
   });
 
   test('links use the saved project preset, never the recipient\'s local edits', async ({ page }) => {
@@ -261,7 +263,7 @@ test.describe('review links', () => {
     const s = await page.evaluate(() => window.Unpolish.getSettings());
     expect(s.images).toBe('simplified'); // project config value
     expect(s.typography).toBe('hand');
-    expect(s.roughness).toBe(70);
+    expect(s.border.weight).toBe(2);
     // Session continues across full page loads (multi-page site)
     await page.getByTestId('nav-about').click();
     await page.waitForFunction(() => document.documentElement.getAttribute('data-unpolish') === 'sketch');
@@ -272,15 +274,17 @@ test.describe('review links', () => {
     expect((await page.evaluate(() => window.Unpolish.getSettings())).images).toBe('placeholder');
   });
 
-  test('invalid values fall back gracefully', async ({ page }) => {
+  test('invalid and retired values fall back gracefully', async ({ page }) => {
     const warnings = [];
     page.on('console', (m) => m.type() === 'warning' && warnings.push(m.text()));
-    await open(page, EXAMPLES.demo + '?unpolish=neon&unpolish-roughness=lots&unpolish-ui=sideways');
+    await open(page, EXAMPLES.demo + '?unpolish=neon&unpolish-ui=sideways');
     expect(await theme(page)).toBeNull(); // project default is Original
     await expect(shadow(page, '.launcher')).toBeVisible();
+    // Older links may still carry unpolish-roughness; it is ignored.
     await open(page, EXAMPLES.demo + '?unpolish=pastel-blocks&unpolish-roughness=250');
     expect(await theme(page)).toBe('pastel');
-    expect((await page.evaluate(() => window.Unpolish.getSettings())).roughness).toBe(100);
+    expect((await page.evaluate(() => window.Unpolish.getSettings())).roughness).toBeUndefined();
+    expect(new URL(await page.evaluate(() => window.Unpolish.getReviewLink())).searchParams.has('unpolish-roughness')).toBe(false);
     expect(warnings.some((w) => w.includes('Unknown theme'))).toBe(true);
   });
 
@@ -295,17 +299,12 @@ test.describe('review links', () => {
     expect(u.searchParams.get('view')).toBe('compact');
     expect(u.hash).toBe('#/about');
     expect(u.searchParams.get('unpolish')).toBe('pastel');
-    expect(u.searchParams.get('unpolish-roughness')).toBe('65');
+    expect(u.searchParams.has('unpolish-roughness')).toBe(false);
     // Hide controls option re-copies
     await shadow(page, '[data-hide-ui]').check();
     link = await page.evaluate(() => navigator.clipboard.readText());
     expect(new URL(link).searchParams.get('unpolish-ui')).toBe('hidden');
-    // Roughness-only edits travel in the URL — no warning
-    await shadow(page, '#up-rough').fill('20');
-    await shadow(page, '[data-act="share"]').click();
-    await expect(shadow(page, '[data-share-warn]')).toBeHidden();
-    expect(new URL(await page.evaluate(() => navigator.clipboard.readText())).searchParams.get('unpolish-roughness')).toBe('20');
-    // Other edits can't travel: ask to save first
+    // Local edits can't travel in a link: ask to save first
     await page.evaluate(() => window.Unpolish.update({ radius: 0 }));
     await page.evaluate(() => navigator.clipboard.writeText('unchanged'));
     await shadow(page, '[data-act="share"]').click();

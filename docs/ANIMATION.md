@@ -16,7 +16,7 @@ Motion was planned with Emil Kowalski's skills, in order: `find-animation-opport
 
 - **Panel open/close via `\` and Esc** — keyboard-initiated, used constantly while presenting. Instant, no animation.
 - **Theme switches on the prototype** — keyboard-driven and would move the very thing being reviewed. Switches are instant, and Unpolish pauses the host's own transitions for two frames so nothing crossfades.
-- **Roughness slider** — direct manipulation; the prototype follows the thumb with no easing.
+- **Panel edit controls** (sliders, swatches, segmented options) — direct manipulation; the prototype follows with no easing.
 - **Direct-shortcut HUD** — appears instantly (keyboard-triggered); only a 150ms fade on the way out.
 - **Theme tile selection** — tens per session; colour/ring change only (150ms `ease`), no movement.
 

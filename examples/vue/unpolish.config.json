@@ -5,7 +5,7 @@
   "exclude": [".map-embed"],
   "roles": { ".chip": "fill" },
   "themes": {
-    "pastel": { "roughness": 65 }
+    "pastel": { "radius": 8 }
   },
   "overrides": {
     "sketch": ".hero h1 { letter-spacing: 0 !important; }"

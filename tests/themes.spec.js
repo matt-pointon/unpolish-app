@@ -33,7 +33,7 @@ for (const [name, url] of Object.entries(EXAMPLES)) {
       expect(errors).toEqual([]);
     });
 
-    test('layout is identical across themes when typography is kept, and roughness never moves elements', async ({ page }) => {
+    test('layout is identical across themes and detailed settings when typography is kept', async ({ page }) => {
       await open(page, url);
       await settle(page);
       const base = await rects(page);
@@ -42,11 +42,6 @@ for (const [name, url] of Object.entries(EXAMPLES)) {
         await page.evaluate(() => window.Unpolish.update({ typography: 'original' }));
         await settle(page);
         expect(await rects(page), `${id} with original type`).toEqual(base);
-        for (const roughness of [0, 100]) {
-          await page.evaluate((r) => window.Unpolish.setRoughness(r), roughness);
-          await settle(page);
-          expect(await rects(page), `${id} roughness ${roughness}`).toEqual(base);
-        }
         for (const partial of [{ images: 'placeholder' }, { images: 'simplified' }, { border: { weight: 4, style: 'hand' } }, { radius: 0 }, { shadows: 'flat' }, { details: false }]) {
           await page.evaluate((p) => window.Unpolish.update(p), partial);
           await settle(page);
@@ -84,9 +79,9 @@ test('exempt regions, canvas and project overrides are respected', async ({ page
   // Canvas pixels are left alone.
   expect(await page.getByTestId('canvas').getAttribute('data-up')).toBe('media-opaque');
   expect(await page.getByTestId('canvas').evaluate((e) => getComputedStyle(e).filter)).toBe('none');
-  // Project config: sketch roughness 70 + simplified images.
+  // Project config: sketch with 2px strokes + simplified images.
   const s = await page.evaluate(() => window.Unpolish.getSettings('sketch'));
-  expect(s.roughness).toBe(70);
+  expect(s.border.weight).toBe(2);
   expect(s.images).toBe('simplified');
   expect(await page.locator('img[data-up~="media"]').first().evaluate((e) => getComputedStyle(e).filter)).toContain('url');
 
@@ -97,7 +92,7 @@ test('exempt regions, canvas and project overrides are respected', async ({ page
   expect(await page.getByTestId('map').getAttribute('data-up')).toBeNull();
   expect(await page.locator('.chip').first().getAttribute('data-up')).toContain('fill-2');
   expect(await page.locator('.hero h1').evaluate((e) => getComputedStyle(e).letterSpacing)).toBe('normal');
-  expect((await page.evaluate(() => window.Unpolish.getSettings('pastel'))).roughness).toBe(65);
+  expect((await page.evaluate(() => window.Unpolish.getSettings('pastel'))).radius).toBe(8);
 });
 
 test('open shadow roots are themed', async ({ page }) => {
