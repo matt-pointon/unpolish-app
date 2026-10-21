@@ -15,6 +15,7 @@
     "webFonts": { "type": "boolean", "default": true, "description": "Load Balsamiq Sans, IBM Plex and Nunito from Google Fonts when a theme uses them. When false, system fallbacks are used." },
     "exclude": { "type": "array", "items": { "type": "string" }, "description": "CSS selectors for extra regions Unpolish must not restyle (original look, no filter). Always ignored: data-unpolish-ignore and the Unpolish UI. Maps, images, canvas, video, iframe, svg internals, object and embed are skipped automatically and shown with a single CSS filter on the container." },
     "include": { "type": "array", "items": { "type": "string" }, "description": "CSS selectors that opt a skipped region back into classification. Equivalent to data-unpolish=\"keep\" on the element. Do not include huge maps." },
+    "mapMarkers": { "enum": ["original", "pane", "img"], "default": "original", "description": "How map marker icons are themed. original keeps them full color. pane applies one cheap CSS filter on the Leaflet marker pane (or OpenLayers overlay container). img applies a stylesheet filter to marker images so the browser can cache the icon raster. Never classifies or inline-filters each marker. data-unpolish-ignore on a marker (img mode) or the marker pane (pane mode) opts that region out." },
     "roles": {
       "type": "object",
       "description": "Selector → role hints for custom components the automatic classifier gets wrong.",

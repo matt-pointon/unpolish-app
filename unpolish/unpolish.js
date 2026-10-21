@@ -105,7 +105,8 @@
       roles: {},
       shortcuts: { toggle: '\\', themes: {} },
       themes: {},
-      overrides: {}
+      overrides: {},
+      mapMarkers: 'original'
     };
 
     /* ------------------------------------------------------------------ *
@@ -385,6 +386,7 @@
         if (id && typeof sc.themes[k] === 'string' && sc.themes[k]) themeKeys[id] = sc.themes[k];
       });
       cfg.shortcuts = { toggle: typeof sc.toggle === 'string' && sc.toggle ? sc.toggle : '\\', themes: themeKeys };
+      cfg.mapMarkers = cfg.mapMarkers === 'pane' || cfg.mapMarkers === 'img' ? cfg.mapMarkers : 'original';
       return cfg;
     }
 
@@ -902,6 +904,21 @@
         rule(S(skipLive + '[data-unpolish-busy] .leaflet-tile-pane'),
           'filter:' + v.skipFilterBusy + I);
       }
+      // Marker icons: cheap CSS only (never SVG edge). Gated by html[data-unpolish-markers].
+      // pane = one filter on the marker pane; img = stylesheet rule on marker imgs (raster cache).
+      var markerCheap = id === 'sketch'
+        ? 'grayscale(1) contrast(1.35) brightness(1.05)'
+        : id === 'blueprint' ? v.skipFilter : '';
+      if (markerCheap) {
+        var markerSel = function (mode, sel) {
+          var prefix = opts.shadow ? '' : 'html[data-unpolish][data-unpolish-markers="' + mode + '"] ';
+          return splitSel(sel).map(function (x) { return prefix + x; }).join(',');
+        };
+        var markerPanes = skipLive + ' :is(.leaflet-marker-pane, .ol-overlaycontainer)' + NOTEX;
+        var markerImgs = skipLive + ' :is(.leaflet-marker-pane, .mapboxgl-marker, .maplibregl-marker) img' + NOTEX;
+        rule(markerSel('pane', markerPanes), 'filter:' + markerCheap + I + ';isolation:isolate' + I);
+        rule(markerSel('img', markerImgs), 'filter:' + markerCheap + I);
+      }
       rule(S(skipLive), 'position:relative' + I);
       rule(S(':is(' + MAP_WIDGET_SEL + ', [data-unpolish-skip="map"])' + NOTKEEP + NOTEX + '::after'),
         'content:"Map"' + I + ';position:absolute' + I + ';top:6px' + I + ';left:6px' + I +
@@ -1353,6 +1370,7 @@
       this.churn = new WeakMap();
       this.skipBusyTimers = new WeakMap();
       this.skipWatched = new WeakSet();
+      this.mapMarkers = 'original';
     }
 
     Engine.prototype.configure = function (cfg) {
@@ -1361,6 +1379,7 @@
       this.includeSelector = (cfg.include || []).join(', ');
       this.overrides = cfg.overrides || {};
       this.webFonts = cfg.webFonts !== false;
+      this.mapMarkers = cfg.mapMarkers === 'pane' || cfg.mapMarkers === 'img' ? cfg.mapMarkers : 'original';
       var roles = {};
       Object.keys(cfg.roles || {}).forEach(function (sel) {
         var role = cfg.roles[sel];
@@ -1623,7 +1642,20 @@
         this.observe();
       }
       if (html.getAttribute('data-unpolish') !== id) html.setAttribute('data-unpolish', id);
+      this.applyMapMarkers();
       if (id !== 'sketch') this.clearSkipBusy();
+    };
+
+    Engine.prototype.applyMapMarkers = function () {
+      var html = document.documentElement;
+      var mode = this.mapMarkers;
+      if (mode === 'pane' || mode === 'img') html.setAttribute('data-unpolish-markers', mode);
+      else html.removeAttribute('data-unpolish-markers');
+    };
+
+    Engine.prototype.setMapMarkers = function (mode) {
+      this.mapMarkers = mode === 'pane' || mode === 'img' ? mode : 'original';
+      this.applyMapMarkers();
     };
 
     Engine.prototype.teardown = function () {
@@ -1635,6 +1667,7 @@
       this.pendingNodes.clear();
       this.workScheduled = false;
       document.documentElement.removeAttribute('data-unpolish');
+      document.documentElement.removeAttribute('data-unpolish-markers');
       if (this.style) this.style.remove();
       if (this.skipStyle) this.skipStyle.remove();
       this.lastSkipCSS = '';
@@ -1990,7 +2023,7 @@
             if (html.getAttribute('data-unpolish') !== this.active) html.setAttribute('data-unpolish', this.active);
             continue;
           }
-          if (name === 'data-up' || name === 'data-unpolish-x' || name === 'data-unpolish-skip' || name === 'data-unpolish-busy') continue;
+          if (name === 'data-up' || name === 'data-unpolish-x' || name === 'data-unpolish-skip' || name === 'data-unpolish-busy' || name === 'data-unpolish-markers') continue;
           if (t === html || t === document.body) {
             if (name === 'class' || name === 'data-state') this.scheduleFullPass();
             continue;
@@ -3292,6 +3325,7 @@
       if (cfg.webFonts === false) out.webFonts = false;
       out.exclude = cfg.exclude;
       if (cfg.include && cfg.include.length) out.include = cfg.include;
+      if (cfg.mapMarkers && cfg.mapMarkers !== 'original') out.mapMarkers = cfg.mapMarkers;
       if (Object.keys(cfg.roles || {}).length) out.roles = cfg.roles;
       out.shortcuts = this.shortcuts();
       out.themes = {};
@@ -3388,7 +3422,8 @@
         queueSize: function () {
           var e = app.engine;
           return { pending: e.pendingRoots.size + e.pendingNodes.size, roots: e.pendingRoots.size, nodes: e.pendingNodes.size };
-        }
+        },
+        setMapMarkers: function (mode) { app.engine.setMapMarkers(mode); }
       }
     };
     /* ------------------------------------------------------------------ *

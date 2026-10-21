@@ -31,15 +31,19 @@
     }
   </style>
   <script>
-    window.UnpolishConfig = {
-      version: 1,
-      id: 'leaflet-fleet',
-      defaultTheme: 'original',
-      ui: 'hidden',
-      webFonts: false,
-      exclude: [],
-      include: []
-    };
+    (function () {
+      var m = new URLSearchParams(location.search).get('markers');
+      window.UnpolishConfig = {
+        version: 1,
+        id: 'leaflet-fleet',
+        defaultTheme: 'original',
+        ui: 'hidden',
+        webFonts: false,
+        exclude: [],
+        include: [],
+        mapMarkers: m === 'pane' || m === 'img' ? m : 'original'
+      };
+    })();
   </script>
   <script src="/unpolish/unpolish.js" defer></script>
 </head>

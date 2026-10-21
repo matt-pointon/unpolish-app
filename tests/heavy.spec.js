@@ -356,6 +356,55 @@ test('Sketch fleet map: gray tiles while cars move, car imgs unfiltered, queue i
   await page.evaluate(() => window.__fleet.stopPan());
 });
 
+test('mapMarkers pane and img filter icons without classify', async ({ page }) => {
+  test.setTimeout(60_000);
+  await page.goto('/tests/fixtures/leaflet-fleet.html?n=50&kind=div&icon=img');
+  await page.waitForFunction(() => window.Unpolish && window.__mapReady && window.__fleet && window.__fleet.carsOn, { timeout: 20_000 });
+  await setTheme(page, 'sketch');
+  await settle(page);
+
+  for (const mode of ['pane', 'img']) {
+    await page.evaluate((mode) => window.Unpolish._internal.setMapMarkers(mode), mode);
+    await page.waitForTimeout(200);
+    const look = await page.evaluate(() => {
+      const map = document.getElementById('map');
+      const pane = map.querySelector('.leaflet-marker-pane');
+      const img = map.querySelector('.car-dot img');
+      return {
+        attr: document.documentElement.getAttribute('data-unpolish-markers'),
+        paneFilter: pane ? getComputedStyle(pane).filter : null,
+        imgFilter: img ? getComputedStyle(img).filter : null,
+        imgSkip: img ? img.getAttribute('data-unpolish-skip') : 'missing',
+        imgUp: img ? img.getAttribute('data-up') : 'missing',
+        queue: window.Unpolish._internal.queueSize().pending
+      };
+    });
+    expect(look.attr).toBe(mode);
+    expect(look.imgSkip).toBeNull();
+    expect(look.imgUp).toBeNull();
+    expect(look.queue).toBeLessThanOrEqual(2);
+    if (mode === 'pane') {
+      expect(look.paneFilter).toMatch(/grayscale/);
+    } else {
+      expect(look.imgFilter).toMatch(/grayscale/);
+    }
+  }
+
+  await page.evaluate(() => window.Unpolish._internal.setMapMarkers('original'));
+  const off = await page.evaluate(() => {
+    const img = document.querySelector('.car-dot img');
+    const pane = document.querySelector('.leaflet-marker-pane');
+    return {
+      attr: document.documentElement.getAttribute('data-unpolish-markers'),
+      paneFilter: getComputedStyle(pane).filter,
+      imgFilter: getComputedStyle(img).filter
+    };
+  });
+  expect(off.attr).toBeNull();
+  expect(off.paneFilter === 'none' || off.paneFilter === '').toBeTruthy();
+  expect(off.imgFilter === 'none' || off.imgFilter === '').toBeTruthy();
+});
+
 test('0.1.2 baseline on the same fixture (logged)', async ({ page }) => {
   test.setTimeout(20_000);
   await page.route('**/unpolish/unpolish.js', (route) => {
