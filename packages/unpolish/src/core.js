@@ -882,10 +882,16 @@ function createUnpolish() {
     var NOTINSIDE = ':not(:is(' + MAP_WIDGET_SEL + ', [data-unpolish-skip]) *)';
     var skipReplaced = ':is(video, iframe, embed, object, [data-unpolish-skip="video"], [data-unpolish-skip="media"])' + NOTKEEP + NOTEX + NOTINSIDE;
     var skipStill = ':is(img, picture, canvas, input[type="image"], [data-unpolish-skip="image"], [data-unpolish-skip="canvas"])' + NOTKEEP + NOTEX + NOTINSIDE;
+    // Leaflet: filter the tile pane only so moving markers stay crisp on top.
+    var skipTiles = skipLive + ' .leaflet-tile-pane';
+    var skipLiveBare = skipLive + ':not(:has(.leaflet-tile-pane))';
     rule(S(skipStill), 'filter:' + v.skipFilterStill + I);
-    rule(S(skipReplaced + ', ' + skipLive), 'filter:' + v.skipFilter + I);
+    rule(S(skipReplaced + ', ' + skipLiveBare), 'filter:' + v.skipFilter + I);
+    rule(S(skipTiles), 'filter:' + v.skipFilter + I + ';isolation:isolate' + I);
     if (v.skipFilterBusy && v.skipFilterBusy !== v.skipFilter) {
-      rule(S(skipStill + '[data-unpolish-busy], ' + skipReplaced + '[data-unpolish-busy], ' + skipLive + '[data-unpolish-busy]'),
+      rule(S(skipStill + '[data-unpolish-busy], ' + skipReplaced + '[data-unpolish-busy], ' + skipLiveBare + '[data-unpolish-busy]'),
+        'filter:' + v.skipFilterBusy + I);
+      rule(S(skipLive + '[data-unpolish-busy] .leaflet-tile-pane'),
         'filter:' + v.skipFilterBusy + I);
     }
     rule(S(skipLive), 'position:relative' + I);
@@ -1652,7 +1658,7 @@ function createUnpolish() {
     void self;
   };
 
-  var ATTRS = ['class', 'style', 'open', 'hidden', 'disabled', 'checked', 'selected', 'aria-selected', 'aria-current', 'aria-pressed', 'aria-checked', 'aria-expanded', 'aria-invalid', 'aria-disabled', 'aria-busy', 'data-state', 'data-active', 'data-selected', 'data-highlighted', 'data-disabled', 'data-up', 'data-unpolish', 'data-unpolish-role'];
+  var ATTRS = ['class', 'style', 'open', 'hidden', 'disabled', 'checked', 'selected', 'aria-selected', 'aria-current', 'aria-pressed', 'aria-checked', 'aria-expanded', 'aria-invalid', 'aria-disabled', 'aria-busy', 'data-state', 'data-active', 'data-selected', 'data-highlighted', 'data-disabled', 'data-up', 'data-unpolish', 'data-unpolish-role', 'd', 'cx', 'cy', 'r', 'points', 'transform'];
 
   Engine.prototype.isOwnNode = function (el) {
     if (!el || el.nodeType !== 1) return true;
@@ -1935,12 +1941,13 @@ function createUnpolish() {
   Engine.prototype.onMutations = function (recs) {
     if (!this.active) return;
     var html = document.documentElement;
+    var busyHint = null;
     for (var i = 0; i < recs.length; i++) {
       var rec = recs[i], t = rec.target;
       if (t.nodeType === 1 && this.isOwnNode(t)) continue;
       if (rec.type === 'childList') {
         if (t.nodeType === 1 && (MEDIA_LEAF[t.tagName] || this.inSkipTree(t))) {
-          this.skipBusy(t);
+          busyHint = t;
           continue;
         }
         for (var j = 0; j < rec.addedNodes.length; j++) {
@@ -1960,7 +1967,7 @@ function createUnpolish() {
             this.classifier.markSkip(n);
             continue;
           }
-          if (this.inSkipTree(n)) { this.skipBusy(n); continue; }
+          if (this.inSkipTree(n)) { busyHint = n; continue; }
           if (n.getRootNode && n.getRootNode() instanceof ShadowRoot && n.getRootNode() === this.app.ui.root) continue;
           this.noteChurn(n);
           this.queueRoot(n);
@@ -1981,12 +1988,13 @@ function createUnpolish() {
           continue;
         }
         if (this.inExemptTree(t)) continue;
-        if (this.inSkipTree(t) || MEDIA_LEAF[t.tagName]) { this.skipBusy(t); continue; }
+        if (this.inSkipTree(t) || MEDIA_LEAF[t.tagName]) { busyHint = t; continue; }
         if (name === 'style' && !styleAffectsTheme(rec.oldValue, t.getAttribute('style'))) continue;
         this.noteChurn(t);
         this.queueAttr(t, name === 'class' || name === 'open' || name === 'hidden' || name === 'data-state');
       }
     }
+    if (busyHint) this.skipBusy(busyHint);
   };
 
   /* ------------------------------------------------------------------ *
@@ -3366,7 +3374,14 @@ function createUnpolish() {
       if (app.ui.host) app.ui.host.remove();
       app.started = false;
     },
-    _internal: { derive: derive, buildCSS: buildCSS, normalizeConfig: normalizeConfig, normalizeSettings: normalizeSettings, THEMES: THEMES, comboFromEvent: comboFromEvent, checkCombo: checkCombo }
+    _internal: {
+      derive: derive, buildCSS: buildCSS, normalizeConfig: normalizeConfig, normalizeSettings: normalizeSettings,
+      THEMES: THEMES, comboFromEvent: comboFromEvent, checkCombo: checkCombo,
+      queueSize: function () {
+        var e = app.engine;
+        return { pending: e.pendingRoots.size + e.pendingNodes.size, roots: e.pendingRoots.size, nodes: e.pendingNodes.size };
+      }
+    }
   };
   /* ------------------------------------------------------------------ *
    * Auto-start for classic <script> tags

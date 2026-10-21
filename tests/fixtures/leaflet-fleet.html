@@ -1,0 +1,225 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Unpolish — Seattle fleet map</title>
+  <link rel="stylesheet" href="/tests/fixtures/vendor/leaflet/leaflet.css">
+  <style>
+    html, body { margin: 0; height: 100%; font: 14px/1.4 ui-sans-serif, system-ui, sans-serif; background: #f4f1ea; color: #1c1914; }
+    #app { display: grid; grid-template-columns: 280px 1fr; height: 100%; }
+    .sidebar { padding: 16px 18px; background: #fff; border-right: 1px solid #ddd6c8; overflow: auto; }
+    .sidebar h1 { margin: 0 0 6px; font-size: 20px; }
+    .sidebar p { margin: 0 0 12px; color: #57534e; }
+    .lead { font-size: 13px; }
+    .fleet-list { display: flex; flex-direction: column; gap: 8px; }
+    .veh { background: #faf8f3; border: 1px solid #e0d8c8; border-radius: 8px; padding: 8px 10px; }
+    .veh b { display: block; }
+    .veh .meta { color: #57534e; font-size: 12px; }
+    .leaflet-container { height: 100%; min-height: 640px; background: #d4d9dc; }
+    .car-dot {
+      width: 22px; height: 22px; border-radius: 50%;
+      box-shadow: 0 0 0 1px rgba(255,255,255,.9), 0 1px 2px rgba(0,0,0,.35);
+      display: grid; place-items: center;
+      overflow: hidden;
+    }
+    .car-dot img { width: 14px; height: 14px; display: block; pointer-events: none; }
+    .car-dot-bg {
+      background-image: url("/tests/fixtures/vehicle-icon.svg");
+      background-repeat: no-repeat;
+      background-position: center;
+      background-size: 14px 14px;
+    }
+  </style>
+  <script>
+    window.UnpolishConfig = {
+      version: 1,
+      id: 'leaflet-fleet',
+      defaultTheme: 'original',
+      ui: 'hidden',
+      webFonts: false,
+      exclude: [],
+      include: []
+    };
+  </script>
+  <script src="/unpolish/unpolish.js" defer></script>
+</head>
+<body>
+  <div id="app">
+    <aside class="sidebar">
+      <h1>Fleet</h1>
+      <p class="lead" id="fleet-lead">Seattle cars on OSM tiles.</p>
+      <div class="fleet-list" id="fleet-list" data-testid="fleet-list"></div>
+    </aside>
+    <div id="map" class="leaflet-container" data-testid="map" role="application" aria-label="Seattle fleet map"></div>
+  </div>
+  <script src="/tests/fixtures/vendor/leaflet/leaflet.js"></script>
+  <script>
+    const params = new URLSearchParams(location.search);
+    const N = Math.max(1, Math.min(4000, Number(params.get('n') || 500)));
+    const KIND = params.get('kind') === 'circle' ? 'circle' : 'div';
+    const ICON = params.get('icon') === 'bg' ? 'bg' : 'img';
+    const SIDEBAR = 16;
+    const CENTER = [47.6205, -122.3493];
+    const COLORS = ['#c2410c', '#1d4ed8', '#15803d', '#a21caf', '#b45309', '#0f766e'];
+    const STATUSES = ['en route', 'idle', 'pickup', 'dropoff'];
+    const ROUTES_LL = [
+      [[47.6095, -122.3510], [47.6148, -122.3522], [47.6205, -122.3550], [47.6272, -122.3680], [47.6320, -122.3765]],
+      [[47.6080, -122.3360], [47.6155, -122.3425], [47.6220, -122.3450], [47.6305, -122.3478]],
+      [[47.6120, -122.3220], [47.6160, -122.3320], [47.6205, -122.3420], [47.6240, -122.3550], [47.6180, -122.3650]],
+      [[47.6055, -122.3450], [47.6110, -122.3480], [47.6175, -122.3495], [47.6255, -122.3510], [47.6330, -122.3530]],
+      [[47.6290, -122.3250], [47.6260, -122.3380], [47.6220, -122.3493], [47.6180, -122.3600], [47.6140, -122.3700]],
+      [[47.6070, -122.3600], [47.6130, -122.3520], [47.6205, -122.3420], [47.6280, -122.3320]]
+    ];
+
+    document.getElementById('fleet-lead').textContent =
+      N + ' cars · ' + KIND + ' · icon ' + ICON + ' · zoom 14';
+
+    const map = L.map('map', {
+      center: CENTER,
+      zoom: 14,
+      minZoom: 14,
+      maxZoom: 14,
+      zoomControl: true,
+      attributionControl: true,
+      fadeAnimation: false,
+      zoomAnimation: false,
+      markerZoomAnimation: false,
+      inertia: false
+    });
+    L.tileLayer('/tests/fixtures/seattle-tiles/{z}/{x}/{y}.png', {
+      minZoom: 14,
+      maxZoom: 14,
+      tileSize: 256,
+      attribution: '&copy; OpenStreetMap'
+    }).addTo(map);
+    map.doubleClickZoom.disable();
+    map.boxZoom.disable();
+    map.keyboard.disable();
+    if (map.tap) map.tap.disable();
+
+    const ICON_URL = '/tests/fixtures/vehicle-icon.svg';
+    const routes = ROUTES_LL.map((lls) => lls.map((ll) => map.latLngToLayerPoint(ll)));
+    function at(route, u) {
+      const scaled = u * (route.length - 1);
+      const i = Math.min(route.length - 2, Math.floor(scaled));
+      const t = scaled - i;
+      const a = route[i], b = route[i + 1];
+      return L.point(a.x + (b.x - a.x) * t, a.y + (b.y - a.y) * t);
+    }
+
+    const list = document.getElementById('fleet-list');
+    const sideEls = [];
+    for (let i = 0; i < SIDEBAR; i++) {
+      const el = document.createElement('div');
+      el.className = 'veh';
+      el.dataset.testid = i === 0 ? 'ui-card' : undefined;
+      el.innerHTML = '<b>Car ' + String(i + 1).padStart(3, '0') + '</b><span class="meta"><span class="st">en route</span> · <span class="mph">12</span> mph</span>';
+      list.appendChild(el);
+      sideEls.push({ st: el.querySelector('.st'), mph: el.querySelector('.mph') });
+    }
+
+    const cars = [];
+    for (let i = 0; i < N; i++) {
+      const route = routes[i % routes.length];
+      const u0 = (i * 0.137) % 1;
+      const pt = at(route, u0);
+      const ll = map.layerPointToLatLng(pt);
+      const color = COLORS[i % COLORS.length];
+      let marker, el = null;
+      if (KIND === 'circle') {
+        marker = L.circleMarker(ll, {
+          radius: 7,
+          color: '#fff',
+          weight: 1,
+          fillColor: color,
+          fillOpacity: 1,
+          interactive: false
+        }).addTo(map);
+      } else {
+        const html = ICON === 'bg'
+          ? '<div class="car-dot car-dot-bg" style="background-color:' + color + '"></div>'
+          : '<div class="car-dot" style="background-color:' + color + '"><img src="' + ICON_URL + '" width="14" height="14" alt=""></div>';
+        marker = L.marker(ll, {
+          icon: L.divIcon({ className: 'car-marker', html, iconSize: [22, 22], iconAnchor: [11, 11] }),
+          keyboard: false,
+          interactive: false
+        }).addTo(map);
+        el = marker._icon;
+      }
+      cars.push({ route, u: u0, speed: 0.0012 + (i % 7) * 0.00015, marker, el });
+    }
+
+    let carRaf = 0, panRaf = 0, panT = 0, frame = 0;
+    const pane = map.getPane('mapPane');
+    function carTick() {
+      if (!window.__fleet.carsOn) return;
+      for (let i = 0; i < cars.length; i++) {
+        const c = cars[i];
+        c.u += c.speed;
+        if (c.u >= 1) c.u -= 1;
+        const pt = at(c.route, c.u);
+        if (c.el) L.DomUtil.setPosition(c.el, pt);
+        else c.marker.setLatLng(map.layerPointToLatLng(pt));
+      }
+      frame++;
+      if (frame % 8 === 0) {
+        for (let i = 0; i < sideEls.length; i++) {
+          const mph = 8 + ((frame + i * 3) % 27);
+          sideEls[i].mph.textContent = String(mph);
+          sideEls[i].st.textContent = STATUSES[(frame + i) % STATUSES.length];
+        }
+      }
+      carRaf = requestAnimationFrame(carTick);
+    }
+    function panTick() {
+      if (!window.__fleet.panning) return;
+      panT += 1;
+      pane.style.transform = 'translate3d(' + ((panT % 24) - 12) + 'px,' + (((panT * 2) % 16) - 8) + 'px,0)';
+      panRaf = requestAnimationFrame(panTick);
+    }
+
+    window.__fleet = {
+      n: N, kind: KIND, icon: ICON, cars: N,
+      carsOn: false, panning: false, map,
+      startCars() {
+        if (this.carsOn) return;
+        this.carsOn = true;
+        carTick();
+      },
+      stopCars() {
+        this.carsOn = false;
+        cancelAnimationFrame(carRaf);
+      },
+      startPan() {
+        if (this.panning) return;
+        this.panning = true;
+        panTick();
+      },
+      stopPan() {
+        this.panning = false;
+        cancelAnimationFrame(panRaf);
+        pane.style.transform = '';
+      }
+    };
+
+    window.__mapReady = false;
+    function tilesLoaded() {
+      const imgs = [...document.querySelectorAll('.leaflet-tile-pane img.leaflet-tile')];
+      return imgs.length >= 6 && imgs.every((img) => img.complete && img.naturalWidth > 0);
+    }
+    function waitTiles() {
+      if (tilesLoaded() && cars.length === N) {
+        window.__mapReady = true;
+        window.__fleet.startCars();
+        return;
+      }
+      requestAnimationFrame(waitTiles);
+    }
+    map.whenReady(() => {
+      map.invalidateSize();
+      waitTiles();
+      setTimeout(() => { window.__mapReady = tilesLoaded() || window.__mapReady; if (window.__mapReady) window.__fleet.startCars(); }, 1500);
+    });
+  </script>
+</body>
+</html>

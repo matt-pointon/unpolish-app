@@ -61,14 +61,16 @@ async function measure(page, ms = 3000) {
 async function mapFilter(page) {
   return page.evaluate(() => {
     const el = document.getElementById('map');
-    return { filter: getComputedStyle(el).filter, busy: el.hasAttribute('data-unpolish-busy') };
+    const vis = el.querySelector('.leaflet-tile-pane') || el;
+    return { filter: getComputedStyle(vis).filter, busy: el.hasAttribute('data-unpolish-busy'), vis: vis === el ? 'root' : 'tiles' };
   });
 }
 
 async function waitBusy(page, wantBusy) {
   await page.waitForFunction((wantBusy) => {
     const el = document.getElementById('map');
-    const f = getComputedStyle(el).filter;
+    const vis = el.querySelector('.leaflet-tile-pane') || el;
+    const f = getComputedStyle(vis).filter;
     const busy = el.hasAttribute('data-unpolish-busy');
     if (wantBusy) return busy && /grayscale/.test(f);
     return !busy && /up-f-skip-edge/.test(f);
@@ -88,10 +90,11 @@ async function switchback(page, stop) {
     } catch (e) { /* noop */ }
     if (stop === 'heavy') window.__heavy.stopPan();
     else window.__seattle.stopPan();
+    const vis = el.querySelector('.leaflet-tile-pane') || el;
     const t0 = performance.now();
     await new Promise((resolve) => {
       function tick() {
-        const f = getComputedStyle(el).filter;
+        const f = getComputedStyle(vis).filter;
         if (/up-f-skip-edge/.test(f) && !el.hasAttribute('data-unpolish-busy')) {
           resolve();
           return;
@@ -106,7 +109,7 @@ async function switchback(page, stop) {
       ms: performance.now() - t0,
       max: longTasks.reduce((m, d) => Math.max(m, d), 0),
       count: longTasks.length,
-      filter: getComputedStyle(el).filter,
+      filter: getComputedStyle(vis).filter,
       busy: el.hasAttribute('data-unpolish-busy')
     };
   }, stop);

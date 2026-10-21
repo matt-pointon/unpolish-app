@@ -215,7 +215,10 @@ test('Sketch hybrid on the Seattle Leaflet map', async ({ page }) => {
   await page.waitForTimeout(400);
   const map = page.getByTestId('map');
   await expect(map).toHaveAttribute('data-unpolish-skip', 'map');
-  expect(await map.evaluate((el) => getComputedStyle(el).filter)).toMatch(/up-f-skip-edge/);
+  expect(await map.evaluate((el) => {
+    const vis = el.querySelector('.leaflet-tile-pane') || el;
+    return getComputedStyle(vis).filter;
+  })).toMatch(/up-f-skip-edge/);
 
   const idle = await measure(page, 2000);
   console.log('seattle 0.1.3 idle-edge', JSON.stringify(idle));
@@ -224,7 +227,8 @@ test('Sketch hybrid on the Seattle Leaflet map', async ({ page }) => {
   await page.evaluate(() => window.__seattle.startPan());
   await page.waitForFunction(() => {
     const el = document.getElementById('map');
-    return el.hasAttribute('data-unpolish-busy') && /grayscale/.test(getComputedStyle(el).filter);
+    const vis = el.querySelector('.leaflet-tile-pane') || el;
+    return el.hasAttribute('data-unpolish-busy') && /grayscale/.test(getComputedStyle(vis).filter);
   }, { timeout: 3000 });
   const pan = await measure(page, 2000);
   console.log('seattle 0.1.3 pan-gray', JSON.stringify(pan));
@@ -241,10 +245,11 @@ test('Sketch hybrid on the Seattle Leaflet map', async ({ page }) => {
       po.observe({ type: 'longtask', buffered: false });
     } catch (e) { /* noop */ }
     window.__seattle.stopPan();
+    const vis = el.querySelector('.leaflet-tile-pane') || el;
     const t0 = performance.now();
     await new Promise((resolve) => {
       function tick() {
-        const f = getComputedStyle(el).filter;
+        const f = getComputedStyle(vis).filter;
         if (/up-f-skip-edge/.test(f) && !el.hasAttribute('data-unpolish-busy')) {
           resolve();
           return;
@@ -258,7 +263,7 @@ test('Sketch hybrid on the Seattle Leaflet map', async ({ page }) => {
     return {
       ms: performance.now() - t0,
       max: longTasks.reduce((m, d) => Math.max(m, d), 0),
-      filter: getComputedStyle(el).filter,
+      filter: getComputedStyle(vis).filter,
       busy: el.hasAttribute('data-unpolish-busy')
     };
   });
@@ -266,6 +271,89 @@ test('Sketch hybrid on the Seattle Leaflet map', async ({ page }) => {
   expect(switched.filter).toMatch(/up-f-skip-edge/);
   expect(switched.ms).toBeGreaterThanOrEqual(180);
   expect(switched.ms).toBeLessThanOrEqual(900);
+});
+
+test('Sketch fleet map: gray tiles while cars move, car imgs unfiltered, queue idle', async ({ page }) => {
+  test.setTimeout(90_000);
+  await page.goto('/tests/fixtures/leaflet-fleet.html?n=500&kind=div&icon=img');
+  await page.waitForFunction(() => window.Unpolish && window.__mapReady && window.__fleet && window.__fleet.carsOn, { timeout: 20_000 });
+  await setTheme(page, 'sketch');
+  await settle(page);
+  await page.waitForTimeout(400);
+
+  const map = page.getByTestId('map');
+  await expect(map).toHaveAttribute('data-unpolish-skip', 'map');
+  const look = await map.evaluate((el) => {
+    const tiles = el.querySelector('.leaflet-tile-pane');
+    const img = el.querySelector('.car-dot img');
+    return {
+      tileFilter: tiles ? getComputedStyle(tiles).filter : null,
+      mapFilter: getComputedStyle(el).filter,
+      busy: el.hasAttribute('data-unpolish-busy'),
+      imgFilter: img ? getComputedStyle(img).filter : null,
+      imgSkip: img ? img.getAttribute('data-unpolish-skip') : 'missing',
+      imgUp: img ? img.getAttribute('data-up') : 'missing',
+      carCount: el.querySelectorAll('.car-marker').length
+    };
+  });
+  expect(look.carCount).toBeGreaterThanOrEqual(500);
+  expect(look.mapFilter === 'none' || look.mapFilter === '').toBeTruthy();
+  expect(look.imgFilter === 'none' || look.imgFilter === '').toBeTruthy();
+  expect(look.imgSkip).toBeNull();
+  expect(look.imgUp).toBeNull();
+  expect(look.tileFilter).toMatch(/grayscale|up-f-skip-edge/);
+  await expect(page.getByTestId('ui-card')).toHaveAttribute('data-up', /bg|box|fill/);
+
+  const moving = await page.evaluate(async () => {
+    const longTasks = [];
+    const queue = [];
+    let po = null;
+    try {
+      po = new PerformanceObserver((list) => {
+        for (const e of list.getEntries()) longTasks.push(e.duration);
+      });
+      po.observe({ type: 'longtask', buffered: false });
+    } catch (e) { /* noop */ }
+    let frames = 0;
+    const t0 = performance.now();
+    await new Promise((resolve) => {
+      function tick() {
+        frames++;
+        queue.push(window.Unpolish._internal.queueSize().pending);
+        if (performance.now() - t0 < 3000) requestAnimationFrame(tick);
+        else resolve();
+      }
+      requestAnimationFrame(tick);
+    });
+    if (po) po.disconnect();
+    const el = document.getElementById('map');
+    const tiles = el.querySelector('.leaflet-tile-pane');
+    const elapsed = performance.now() - t0;
+    return {
+      frames, elapsed, fps: frames / (elapsed / 1000),
+      max: longTasks.reduce((m, d) => Math.max(m, d), 0),
+      queueMax: queue.reduce((m, n) => Math.max(m, n), 0),
+      queueLast: queue[queue.length - 1],
+      busy: el.hasAttribute('data-unpolish-busy'),
+      tileFilter: getComputedStyle(tiles).filter
+    };
+  });
+  console.log('fleet 500 sketch cars', JSON.stringify(moving));
+  expect(moving.busy).toBeTruthy();
+  expect(moving.tileFilter).toMatch(/grayscale/);
+  expect(moving.queueMax, `classify queue grew to ${moving.queueMax}`).toBeLessThanOrEqual(2);
+  expect(moving.fps, `Sketch fleet ${moving.fps.toFixed(1)} fps`).toBeGreaterThanOrEqual(15);
+
+  await page.evaluate(() => window.__fleet.startPan());
+  await page.waitForFunction(() => {
+    const el = document.getElementById('map');
+    const tiles = el.querySelector('.leaflet-tile-pane');
+    return el.hasAttribute('data-unpolish-busy') && /grayscale/.test(getComputedStyle(tiles).filter);
+  }, { timeout: 3000 });
+  const pan = await measure(page, 2000);
+  console.log('fleet 500 sketch pan', JSON.stringify(pan));
+  expect(pan.fps).toBeGreaterThanOrEqual(15);
+  await page.evaluate(() => window.__fleet.stopPan());
 });
 
 test('0.1.2 baseline on the same fixture (logged)', async ({ page }) => {
