@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Unpolish — Seattle map (Leaflet + OSM)</title>
+  <link rel="stylesheet" href="/tests/fixtures/vendor/leaflet/leaflet.css">
+  <style>
+    html, body { margin: 0; height: 100%; font: 14px/1.4 ui-sans-serif, system-ui, sans-serif; background: #f4f1ea; color: #1c1914; }
+    #app { display: grid; grid-template-columns: 260px 1fr; height: 100%; }
+    .sidebar { padding: 16px 18px; background: #fff; border-right: 1px solid #ddd6c8; }
+    .sidebar h1 { margin: 0 0 6px; font-size: 20px; }
+    .sidebar p { margin: 0 0 12px; color: #57534e; }
+    .leaflet-container { height: 100%; min-height: 640px; background: #d4d9dc; }
+  </style>
+  <script>
+    window.UnpolishConfig = {
+      version: 1,
+      id: 'leaflet-seattle',
+      defaultTheme: 'original',
+      ui: 'hidden',
+      webFonts: false,
+      exclude: [],
+      include: []
+    };
+  </script>
+  <script src="/unpolish/unpolish.js" defer></script>
+</head>
+<body>
+  <div id="app">
+    <aside class="sidebar">
+      <h1>Field visit</h1>
+      <p>Space Needle, Seattle. Raster OSM tiles, one pin, popup open.</p>
+      <p class="lead">Zoom 14 · frozen for review.</p>
+    </aside>
+    <div id="map" class="leaflet-container" data-testid="map" role="application" aria-label="Seattle map"></div>
+  </div>
+  <script src="/tests/fixtures/vendor/leaflet/leaflet.js"></script>
+  <script>
+    const CENTER = [47.6205, -122.3493];
+    const map = L.map('map', {
+      center: CENTER,
+      zoom: 14,
+      minZoom: 14,
+      maxZoom: 14,
+      zoomControl: true,
+      attributionControl: true,
+      fadeAnimation: false,
+      zoomAnimation: false,
+      markerZoomAnimation: false,
+      inertia: false
+    });
+    L.tileLayer('/tests/fixtures/seattle-tiles/{z}/{x}/{y}.png', {
+      minZoom: 14,
+      maxZoom: 14,
+      tileSize: 256,
+      attribution: '&copy; OpenStreetMap'
+    }).addTo(map);
+    const icon = L.icon({
+      iconUrl: '/tests/fixtures/vendor/leaflet/images/marker-icon.png',
+      iconRetinaUrl: '/tests/fixtures/vendor/leaflet/images/marker-icon-2x.png',
+      shadowUrl: '/tests/fixtures/vendor/leaflet/images/marker-shadow.png',
+      iconSize: [25, 41],
+      iconAnchor: [12, 41],
+      popupAnchor: [1, -34],
+      shadowSize: [41, 41]
+    });
+    const marker = L.marker(CENTER, { icon, keyboard: false }).addTo(map);
+    marker.bindPopup('<b>Space Needle</b><br>Site pin', { autoClose: false, closeOnClick: false, autoPan: false }).openPopup();
+    map.dragging.disable();
+    map.scrollWheelZoom.disable();
+    map.doubleClickZoom.disable();
+    map.boxZoom.disable();
+    map.keyboard.disable();
+    if (map.tap) map.tap.disable();
+
+    window.__mapReady = false;
+    function tilesLoaded() {
+      const imgs = [...document.querySelectorAll('.leaflet-tile-pane img.leaflet-tile')];
+      return imgs.length >= 6 && imgs.every((img) => img.complete && img.naturalWidth > 0);
+    }
+    function waitTiles() {
+      if (tilesLoaded()) { window.__mapReady = true; return; }
+      requestAnimationFrame(waitTiles);
+    }
+    map.whenReady(() => {
+      map.invalidateSize();
+      marker.openPopup();
+      waitTiles();
+      setTimeout(() => { window.__mapReady = tilesLoaded() || window.__mapReady; }, 1500);
+    });
+  </script>
+</body>
+</html>

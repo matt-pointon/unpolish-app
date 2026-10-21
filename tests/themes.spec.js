@@ -28,7 +28,7 @@ for (const [name, url] of Object.entries(EXAMPLES)) {
       await settle(page);
       expect(await page.getAttribute('html', 'data-unpolish')).toBeNull();
       expect(await page.locator('[data-up]').count()).toBe(0);
-      expect(await page.locator('#unpolish-theme, #unpolish-skip, #unpolish-filters').count()).toBe(0);
+      expect(await page.locator('#unpolish-theme, #unpolish-skip, #unpolish-filters, #unpolish-probe').count()).toBe(0);
       expect(await styles(page)).toEqual(before);
       expect(errors).toEqual([]);
     });

@@ -187,7 +187,7 @@ function createUnpolish() {
   var CHURN_MARK_MIN = 30;
   // Regions that must keep their own look. data-unpolish-ignore and project exclude
   // win over skip filters. Maps and media are skipped separately (filter on the root, no walk).
-  var BUILTIN_EXEMPT = ['[data-unpolish-ignore]', 'unpolish-harness', '#unpolish-filters'];
+  var BUILTIN_EXEMPT = ['[data-unpolish-ignore]', 'unpolish-harness', '#unpolish-filters', '#unpolish-probe'];
   var MEDIA_LEAF = { IMG: 1, PICTURE: 1, VIDEO: 1, CANVAS: 1, IFRAME: 1, EMBED: 1, OBJECT: 1 };
   var MAP_WIDGET_SEL = '.leaflet-container, .mapboxgl-map, .maplibregl-map, .gm-style, gmp-map, .ol-viewport, [class*="deckgl"], [class*="deck-gl"], [role="application"]:not(html, body)';
   var SKIP_MEDIA_SEL = 'img, picture, video, canvas, iframe, object, embed';
@@ -915,7 +915,15 @@ function createUnpolish() {
       '<feComponentTransfer><feFuncR type="discrete" tableValues="' + steps + '"/><feFuncG type="discrete" tableValues="' + steps + '"/><feFuncB type="discrete" tableValues="' + steps + '"/></feComponentTransfer>' +
       '<feComponentTransfer>' + duo(ink, blk) + '</feComponentTransfer></filter>' +
       '<filter id="up-f-skip-still" color-interpolation-filters="sRGB" x="0" y="0" width="100%" height="100%">' +
-      '<feComponentTransfer><feFuncR type="discrete" tableValues="0 0.22 0.45 0.68 1"/><feFuncG type="discrete" tableValues="0 0.22 0.45 0.68 1"/><feFuncB type="discrete" tableValues="0 0.22 0.45 0.68 1"/></feComponentTransfer></filter>';
+      '<feComponentTransfer><feFuncR type="discrete" tableValues="0 0.22 0.45 0.68 1"/><feFuncG type="discrete" tableValues="0 0.22 0.45 0.68 1"/><feFuncB type="discrete" tableValues="0 0.22 0.45 0.68 1"/></feComponentTransfer></filter>' +
+      // Comparison-only: edge/pencil lines for skipped maps. Not the default skip filter.
+      '<filter id="up-f-skip-edge" color-interpolation-filters="sRGB" x="-2%" y="-2%" width="104%" height="104%">' +
+      '<feColorMatrix type="saturate" values="0" result="g"/>' +
+      '<feComponentTransfer in="g" result="paper"><feFuncR type="linear" slope="0.22" intercept="0.78"/><feFuncG type="linear" slope="0.20" intercept="0.76"/><feFuncB type="linear" slope="0.16" intercept="0.72"/></feComponentTransfer>' +
+      '<feConvolveMatrix in="g" order="3" kernelMatrix="-1 -1 -1 -1 8 -1 -1 -1 -1" preserveAlpha="true" result="e"/>' +
+      '<feComponentTransfer in="e" result="inv"><feFuncR type="linear" slope="-10" intercept="1"/><feFuncG type="linear" slope="-10" intercept="1"/><feFuncB type="linear" slope="-10" intercept="1"/></feComponentTransfer>' +
+      '<feComponentTransfer in="inv" result="lines"><feFuncR type="discrete" tableValues="0 0 1"/><feFuncG type="discrete" tableValues="0 0 1"/><feFuncB type="discrete" tableValues="0 0 1"/></feComponentTransfer>' +
+      '<feBlend in="lines" in2="paper" mode="multiply"/></filter>';
   }
 
   /* ------------------------------------------------------------------ *
@@ -1298,6 +1306,7 @@ function createUnpolish() {
     this.active = null;
     this.style = null;
     this.skipStyle = null;
+    this.probe = null;
     this.guard = null;
     this.filters = null;
     this.classifier = new Classifier(this);
@@ -1391,11 +1400,45 @@ function createUnpolish() {
     this.finishClassify(reads, exempts.length);
   };
 
-  /* Mutation-path classify: same live read as the first pass (theme sheet off)
-   * so prototype colours are visible. Skip filters live in a separate sheet
-   * that stays enabled — no clone, no restyle of skipped maps. */
+  /* Mutation-path classify: read original colours without disabling the theme
+   * sheet (that restyles the whole page). Clones only this batch into an
+   * exempt off-screen probe — skipped maps are never in the batch. */
+  Engine.prototype.ensureProbe = function () {
+    if (this.probe && this.probe.isConnected) return this.probe;
+    var probe = this.probe = document.createElement('div');
+    probe.id = 'unpolish-probe';
+    probe.setAttribute('data-unpolish-ignore', '');
+    probe.setAttribute('aria-hidden', 'true');
+    probe.style.cssText = 'position:absolute;left:-9999px;top:0;width:0;height:0;overflow:hidden;pointer-events:none';
+    (document.body || document.documentElement).appendChild(probe);
+    return probe;
+  };
+
   Engine.prototype.classifyLive = function (els) {
-    this.classify(els);
+    var c = this.classifier, probe = this.ensureProbe();
+    els = (els || []).filter(function (el) { return el && el.isConnected; });
+    if (!els.length) return;
+    var htmlClass = document.documentElement.className || '';
+    var bodyClass = (document.body && document.body.className) || '';
+    var reads = els.map(function (el) {
+      var chain = [];
+      for (var n = el; n && n !== document.body && n !== document.documentElement; n = parentEl(n)) chain.unshift(n);
+      var wrap = document.createElement('div');
+      wrap.className = (htmlClass + ' ' + bodyClass).trim();
+      var leaf = wrap;
+      chain.forEach(function (orig) {
+        var copy = orig.cloneNode(false);
+        leaf.appendChild(copy);
+        leaf = copy;
+      });
+      probe.appendChild(wrap);
+      var r = c.read(leaf === wrap ? el : leaf);
+      probe.removeChild(wrap);
+      r.el = el;
+      return r;
+    });
+    reads.forEach(function (r) { c.parentInfo(r.el); });
+    this.finishClassify(reads, false);
   };
 
   Engine.prototype.finishClassify = function (reads, wroteExempt) {
@@ -1567,6 +1610,7 @@ function createUnpolish() {
     if (this.style) this.style.remove();
     if (this.skipStyle) this.skipStyle.remove();
     this.lastSkipCSS = '';
+    if (this.probe) this.probe.remove();
     if (this.filters) this.filters.remove();
     if (this.exemptStyle) this.exemptStyle.remove();
     this.exemptRules = [];
@@ -1596,10 +1640,10 @@ function createUnpolish() {
 
   Engine.prototype.isOwnNode = function (el) {
     if (!el || el.nodeType !== 1) return true;
-    if (el === this.style || el === this.skipStyle || el === this.filters || el === this.guard || el === this.exemptStyle) return true;
+    if (el === this.style || el === this.skipStyle || el === this.filters || el === this.guard || el === this.exemptStyle || el === this.probe) return true;
     if (el.id && el.id.indexOf('unpolish-') === 0) return true;
     if (el.tagName === 'UNPOLISH-HARNESS') return true;
-    return !!(el.closest && el.closest('unpolish-harness, #unpolish-filters, #unpolish-theme, #unpolish-skip, #unpolish-guard, #unpolish-exempt'));
+    return !!(el.closest && el.closest('unpolish-harness, #unpolish-filters, #unpolish-theme, #unpolish-skip, #unpolish-guard, #unpolish-exempt, #unpolish-probe'));
   };
 
   Engine.prototype.inExemptTree = function (el) {
