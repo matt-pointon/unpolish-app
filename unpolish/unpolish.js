@@ -1,4 +1,4 @@
-/*! Unpolish v0.1.1 — reversible lo-fi themes for working web prototypes. MIT License. */
+/*! Unpolish v0.1.2 — reversible lo-fi themes for working web prototypes. MIT License. */
 (function () {
   'use strict';
   // Script-tag build. Does nothing outside a browser; if Unpolish is already
@@ -15,7 +15,7 @@
   function createUnpolish() {
     'use strict';
 
-    var VERSION = '0.1.1';
+    var VERSION = '0.1.2';
 
     /* ------------------------------------------------------------------ *
      * Themes
@@ -179,6 +179,24 @@
       for (var k in a) if (changed(k)) return true;
       for (var k2 in b) if (changed(k2)) return true;
       return false;
+    }
+    /* Signature of attributes that can change a node's theme role. Class churn
+     * that repeats a previously seen signature is replayed from cache. */
+    function attrSig(el) {
+      return el.tagName + '\0' + (el.className || '') + '\0' +
+        (el.getAttribute('role') || '') + '\0' +
+        (el.hasAttribute('open') ? '1' : '0') + '\0' +
+        (el.hasAttribute('hidden') ? '1' : '0') + '\0' +
+        (el.getAttribute('data-state') || '') + '\0' +
+        (el.getAttribute('data-active') || '') + '\0' +
+        (el.getAttribute('data-selected') || '') + '\0' +
+        (el.getAttribute('aria-selected') || '') + '\0' +
+        (el.getAttribute('aria-current') || '') + '\0' +
+        (el.getAttribute('aria-pressed') || '') + '\0' +
+        (el.getAttribute('aria-checked') || '') + '\0' +
+        (el.getAttribute('aria-expanded') || '') + '\0' +
+        (el.getAttribute('aria-invalid') || '') + '\0' +
+        (el.getAttribute('disabled') || '');
     }
     var isMac = /Mac|iPhone|iPad/.test(navigator.platform || navigator.userAgent || '');
 
@@ -834,6 +852,7 @@
     function Classifier(engine) {
       this.engine = engine;
       this.tags = new WeakMap();      // el -> token string we wrote
+      this.memo = new WeakMap();      // el -> { sig -> { tokens, rect } }
       this.info = new WeakMap();      // el -> { bg (effective, opaque), color }
       this.blockCount = new WeakMap(); // sibling group -> pastel block colour
       this.stable = new WeakMap();     // el -> { v, blk, anc }
@@ -1269,7 +1288,7 @@
       return probe;
     };
 
-    Engine.prototype.classifyFresh = function (els) {
+    Engine.prototype.classifyFresh = function (els, reuseLayout) {
       var c = this.classifier, probe = this.ensureProbe();
       if (!els.length) return;
       var htmlClass = document.documentElement.className || '';
@@ -1292,15 +1311,29 @@
         return r;
       });
       reads.forEach(function (r) { c.parentInfo(r.el); });
-      this.finishClassify(reads, false);
+      this.finishClassify(reads, false, reuseLayout);
     };
 
-    Engine.prototype.finishClassify = function (reads, wroteExempt) {
+    Engine.prototype.finishClassify = function (reads, wroteExempt, reuseLayout) {
       var c = this.classifier, vw = window.innerWidth, vh = window.innerHeight;
-      var rects = reads.map(function (r) { return r.el.getBoundingClientRect(); });
+      var rects = reads.map(function (r) {
+        if (reuseLayout) {
+          var memo = c.memo.get(r.el);
+          if (memo) {
+            for (var k in memo) if (memo[k] && memo[k].rect) return memo[k].rect;
+          }
+        }
+        return r.el.getBoundingClientRect();
+      });
       reads.forEach(function (r, i) {
         if (!r.el.isConnected) return;
-        try { c.write(r.el, c.decide(r, rects[i], vw, vh)); } catch (e) { warn('classify', e); }
+        try {
+          var tokens = c.decide(r, rects[i], vw, vh);
+          c.write(r.el, tokens);
+          var bag = c.memo.get(r.el) || Object.create(null);
+          bag[attrSig(r.el)] = { tokens: tokens, rect: rects[i] };
+          c.memo.set(r.el, bag);
+        } catch (e) { warn('classify', e); }
       });
       if (wroteExempt) this.writeExempt();
       if (this.observer) this.observer.takeRecords();
@@ -1322,6 +1355,7 @@
       var roots = [];
       var els = this.classifier.collect(document.body, [], roots);
       this.classifier.info = new WeakMap();
+      this.classifier.memo = new WeakMap();
       this.classify(els);
       if (this.observer) this.observer.takeRecords();
       var self = this;
@@ -1565,7 +1599,7 @@
     Engine.prototype.flushClassify = function (list, start, shadowRoots, t0) {
       this.workScheduled = false;
       if (!this.active) return;
-      var fresh = [], known = [], i = start;
+      var fresh = [], known = [], i = start, c = this.classifier;
       for (; i < list.length; i++) {
         if (i > start && now() - t0 >= WORK_BUDGET_MS) {
           var later = this;
@@ -1574,18 +1608,23 @@
           this.tagBatch(fresh, known, shadowRoots, true);
           return;
         }
-        if (this.classifier.tags.get(list[i])) known.push(list[i]);
-        else fresh.push(list[i]);
+        var el = list[i], sig = attrSig(el), bag = c.memo.get(el), hit = bag && bag[sig];
+        if (hit) {
+          if (c.tags.get(el) !== hit.tokens) c.write(el, hit.tokens);
+          continue;
+        }
+        if (c.tags.get(el)) known.push(el);
+        else fresh.push(el);
       }
       this.tagBatch(fresh, known, shadowRoots, false);
     };
 
     Engine.prototype.tagBatch = function (fresh, known, shadowRoots, moreComing) {
-      // Insertions and cheap re-tags never disable the theme sheet (that would
-      // restyle every tagged node). Already-tagged elements whose class/state
-      // changed still need an accurate in-place read.
-      if (fresh.length) this.classifyFresh(fresh);
-      if (known.length) this.classify(known);
+      // Mutation-path tagging never disables the theme sheet: that would force a
+      // full-document style recalc. New nodes and first-seen class/state signatures
+      // are read from the ignore probe; repeats hit Classifier.memo.
+      if (fresh.length) this.classifyFresh(fresh, false);
+      if (known.length) this.classifyFresh(known, true);
       if ((this.classifier.exemptRoots || []).length) this.classify([]);
       if (moreComing) return;
       var eng = this;

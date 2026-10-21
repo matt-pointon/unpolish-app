@@ -50,6 +50,6 @@ test('Sketch stays responsive on a 3000-element page with per-frame churn', asyn
 
   const report = { original, sketch, ratio: original.fps ? sketch.fps / original.fps : 0 };
   console.log('churn perf', JSON.stringify(report));
-  expect(sketch.max, `longest Sketch task ${sketch.max}ms (Original max ${original.max}ms)`).toBeLessThanOrEqual(200);
-  expect(sketch.fps, `Sketch ${sketch.fps.toFixed(1)} fps vs Original ${original.fps.toFixed(1)}`).toBeGreaterThanOrEqual(Math.min(original.fps * 0.4, 24));
+  expect(sketch.max, `longest Sketch task ${sketch.max}ms (Original max ${original.max}ms)`).toBeLessThanOrEqual(100);
+  expect(sketch.fps, `Sketch ${sketch.fps.toFixed(1)} fps vs Original ${original.fps.toFixed(1)}`).toBeGreaterThanOrEqual(original.fps * 0.8);
 });
