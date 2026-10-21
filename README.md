@@ -25,18 +25,16 @@ npm install
 npm run serve            # http://localhost:4173 — website + demo
 ```
 
-Open the site, use the demo controls, or press `\` inside the demo prototype for the real panel. `npm run build:site` writes the files Vercel serves into `public/` (gitignored). Production: `https://unpolishdesign.vercel.app`. Until the package is on npm, install commands on a locally served page point at the tarball on that origin.
+Open the site, use the demo controls, or press `\` inside the demo prototype for the real panel. `npm run build:site` writes the files Vercel serves into `public/` (gitignored). Production: `https://unpolishdesign.vercel.app`. Install commands on the site are `npx unpolish@latest init`; the copied agent prompt pins `npx unpolish@0.1.0`.
 
 ## Install into a prototype
 
-Not on npm yet. Until it is, use the preview build the website serves — the same package, packed:
-
 ```sh
-npx <site>/unpolish/unpolish-0.1.0.tgz init --dry-run   # see the plan
-npx <site>/unpolish/unpolish-0.1.0.tgz init
+npx unpolish@latest init --dry-run   # see the plan
+npx unpolish@latest init
 ```
 
-After publication this becomes `npx unpolish@latest init` (the copied agent prompt pins `npx unpolish@<version>`). Where installs come from is set in one place, [`release.config.json`](release.config.json); the website derives every command and the agent prompt from it.
+The copied agent prompt pins `npx unpolish@<version>` so a reviewable prototype does not float on `latest`. Where installs come from is set in one place, [`release.config.json`](release.config.json); the website derives every command and the agent prompt from it.
 
 **Script tag** (no Node at runtime): put `unpolish.js` and `unpolish.config.json` next to the pages and add:
 
@@ -50,7 +48,7 @@ Setup, configuration, updates and removal: [`packages/unpolish/README.md`](packa
 ## Test
 
 ```sh
-npm run release          # rebuild the package, unpolish/ files, releases/<version>/, tarball and site/release.js
+npm run release          # rebuild the package, unpolish/ files, releases/<version>/ and site/release.js (keeps an existing tarball)
 npm run build:site       # static site into public/
 npm run check:dist       # confirm a public copy of unpolish/ matches the build
 npm test                 # release artifacts, example builds, site build, then Playwright

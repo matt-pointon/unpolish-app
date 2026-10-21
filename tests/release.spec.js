@@ -9,17 +9,21 @@ const ROOT = fileURLToPath(new URL('..', import.meta.url));
 const PKG = JSON.parse(readFileSync(join(ROOT, 'packages/unpolish/package.json'), 'utf8'));
 const CONFIG = JSON.parse(readFileSync(join(ROOT, 'release.config.json'), 'utf8'));
 
-test('committed site/release.js matches the unpublished config', () => {
+test('committed site/release.js matches the published config', () => {
   const settings = loadReleaseSettings(CONFIG);
-  expect(settings.published).toBe(false);
+  expect(settings.published).toBe(true);
   const expected = buildRelease(PKG, settings);
   const committed = parseReleaseJs(readFileSync(join(ROOT, 'site/release.js'), 'utf8'));
   expect(committed).toEqual(expected);
   expect(expected.executable).toBe('unpolish');
+  expect(expected.published).toBe(true);
   expect(expected.tarballUrl).toBeNull();
   expect(expected.siteUrl).toBe('https://unpolishdesign.vercel.app/');
   expect(expected.homepage).toBe('https://unpolishdesign.vercel.app');
-  expect(expected.published).toBe(false);
+  expect(expected.distUrl).toBe('https://unpolishdesign.vercel.app/unpolish/');
+  expect(expected.docsUrl).toBe('https://unpolishdesign.vercel.app/unpolish/README.md');
+  expect(expected.bundleUrl).toBe('https://unpolishdesign.vercel.app/unpolish/unpolish.js');
+  expect(JSON.stringify(expected)).not.toMatch(/localhost|127\.0\.0\.1/);
 });
 
 test('published-mode config is derived without localhost or tarball install URLs', () => {
@@ -36,8 +40,8 @@ test('published-mode config is derived without localhost or tarball install URLs
   expect(release.docsUrl).toBe('https://unpolishdesign.vercel.app/unpolish/README.md');
   expect(release.bundleUrl).toBe('https://unpolishdesign.vercel.app/unpolish/unpolish.js');
   expect(JSON.stringify(release)).not.toMatch(/localhost|127\.0\.0\.1/);
-  // --print must not rewrite the committed unpublished site/release.js
-  expect(parseReleaseJs(readFileSync(join(ROOT, 'site/release.js'), 'utf8')).published).toBe(false);
+  // --print must not rewrite the committed site/release.js
+  expect(parseReleaseJs(readFileSync(join(ROOT, 'site/release.js'), 'utf8')).published).toBe(true);
 });
 
 test('published with no production URL still documents npm, never the page origin', () => {

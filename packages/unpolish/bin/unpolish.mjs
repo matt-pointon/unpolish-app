@@ -554,7 +554,12 @@ function initPackage(opts, report, info, spec, kind) {
   const plan = [];
   const add = addCommand(info.pm.name, spec);
   const needDep = !info.installed || opts.upgrade;
-  if (!needDep) report.change('keep', 'package.json', `${NAME} ${info.installed} already pinned (use --upgrade to pin ${VERSION})`);
+  if (!needDep) {
+    const pin = info.installed.replace(/^[~^]/, '');
+    report.change('keep', 'package.json', pin === VERSION
+      ? `${NAME} ${info.installed} already pinned`
+      : `${NAME} ${info.installed} already pinned (use --upgrade to pin ${VERSION})`);
+  }
   const configFile = path.join(info.staticDir, 'unpolish.config.json');
   const legacyConfig = info.existing.configs.find((c) => c !== configFile && c.startsWith(info.staticDir + path.sep));
   const useConfig = exists(configFile) ? configFile : legacyConfig || configFile;
