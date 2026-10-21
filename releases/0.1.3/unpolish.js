@@ -860,9 +860,27 @@
         rule(S('[data-up~="media-bg"]'), ph);
       }
 
-      // Skipped maps and media: content stays visible. One CSS filter on the
-      // skipped root via a stylesheet selector — no per-child JS, never descendants.
+      // Project overrides
+      var ov = opts.overrides || {};
+      if (!opts.shadow) {
+        if (ov['*']) css.push('html[data-unpolish]{' + ov['*'] + '}');
+        if (ov[v.id]) css.push('html[data-unpolish="' + v.id + '"]{' + ov[v.id] + '}');
+      }
+      return '@layer unpolish{' + css.join('\n') + '}';
+    }
+
+    /* Always-on skip filters. Kept in a separate sheet so mutation-path classify
+     * can disable token CSS without restyling skipped maps. */
+    function buildSkipCSS(v, opts) {
+      var P = opts.shadow ? '' : 'html[data-unpolish] ';
+      var EXQ = ':is(' + opts.exempt + ')';
+      var KEPTQ = keptWhere(opts.include);
+      var NOTKEEP = ':not(' + KEPTQ + ')';
       var NOTEX = ':not(' + EXQ + ', ' + EXQ + ' *)';
+      var I = ' !important';
+      var css = [];
+      function rule(sel, body) { css.push(sel + '{' + body + '}'); }
+      function S(sel) { return splitSel(sel).map(function (x) { return P + x; }).join(','); }
       var skipLive = ':is(' + MAP_WIDGET_SEL + ', [data-unpolish-skip="map"], [data-unpolish-skip="heavy"])' + NOTKEEP + NOTEX;
       var skipReplaced = ':is(video, iframe, embed, object, [data-unpolish-skip="video"], [data-unpolish-skip="media"])' + NOTKEEP + NOTEX;
       var skipStill = ':is(img, picture, canvas, input[type="image"], [data-unpolish-skip="image"], [data-unpolish-skip="canvas"])' + NOTKEEP + NOTEX;
@@ -875,13 +893,6 @@
         ';letter-spacing:0.06em' + I + ';text-transform:uppercase' + I +
         ';color:var(--up-ink)' + I + ';background:color-mix(in srgb, var(--up-surface) 86%, transparent)' + I +
         ';border:1px solid var(--up-line)' + I + ';pointer-events:none' + I + ';z-index:2' + I);
-
-      // Project overrides
-      var ov = opts.overrides || {};
-      if (!opts.shadow) {
-        if (ov['*']) css.push('html[data-unpolish]{' + ov['*'] + '}');
-        if (ov[v.id]) css.push('html[data-unpolish="' + v.id + '"]{' + ov[v.id] + '}');
-      }
       return '@layer unpolish{' + css.join('\n') + '}';
     }
 
@@ -1294,6 +1305,7 @@
       this.app = app;
       this.active = null;
       this.style = null;
+      this.skipStyle = null;
       this.guard = null;
       this.filters = null;
       this.classifier = new Classifier(this);
@@ -1307,6 +1319,7 @@
       this.includeSelector = '';
       this.roleSelectors = {};
       this.lastCSS = '';
+      this.lastSkipCSS = '';
       this.fontsLoaded = {};
       this.exemptRules = [];
       this.exemptCount = 0;
@@ -1386,35 +1399,11 @@
       this.finishClassify(reads, exempts.length);
     };
 
-    /* Mutation-path classify: read live styles without disabling the theme sheet
-     * (that would restyle the whole page, including skipped maps) and without
-     * cloning into the document. Drop our tokens and roll back @layer unpolish
-     * on just this batch so we see the prototype's colours. */
+    /* Mutation-path classify: same live read as the first pass (theme sheet off)
+     * so prototype colours are visible. Skip filters live in a separate sheet
+     * that stays enabled — no clone, no restyle of skipped maps. */
     Engine.prototype.classifyLive = function (els) {
-      var c = this.classifier;
-      els = (els || []).filter(function (el) { return el && el.isConnected; });
-      if (!els.length) return;
-      var stripped = [];
-      els.forEach(function (el) {
-        var up = el.hasAttribute('data-up') ? el.getAttribute('data-up') : null;
-        var prev = el.getAttribute('style');
-        if (up != null) el.removeAttribute('data-up');
-        el.style.cssText = 'all:revert-layer !important;' + (prev || '');
-        stripped.push([el, up, prev]);
-      });
-      var reads;
-      try {
-        reads = els.map(function (el) { return c.read(el); });
-        reads.forEach(function (r) { c.parentInfo(r.el); });
-      } finally {
-        stripped.forEach(function (pair) {
-          var el = pair[0], up = pair[1], prev = pair[2];
-          if (prev == null || prev === '') el.removeAttribute('style');
-          else el.setAttribute('style', prev);
-          if (up != null) el.setAttribute('data-up', up);
-        });
-      }
-      this.finishClassify(reads, false);
+      this.classify(els);
     };
 
     Engine.prototype.finishClassify = function (reads, wroteExempt) {
@@ -1504,6 +1493,12 @@
       // First in <head> so the "unpolish" cascade layer is declared first: for
       // !important rules, earlier layers win over later layers and unlayered CSS.
       if (head.firstChild !== this.style) head.insertBefore(this.style, head.firstChild);
+      if (!this.skipStyle) {
+        this.skipStyle = document.createElement('style');
+        this.skipStyle.id = 'unpolish-skip';
+        this.skipStyle.setAttribute('data-unpolish-ignore', '');
+      }
+      if (this.style.nextSibling !== this.skipStyle) this.style.after(this.skipStyle);
       if (!this.filters) {
         var ns = 'http://www.w3.org/2000/svg';
         this.filters = document.createElementNS(ns, 'svg');
@@ -1549,9 +1544,12 @@
       var v = derive(id, settings);
       this.loadFont(v.typography);
       var css = buildCSS(v, { exempt: this.exemptSelector, include: this.includeSelector, overrides: this.overrides });
-      this.shadowCSS = buildCSS(v, { exempt: this.exemptSelector, include: this.includeSelector, shadow: true });
+      var skipCss = buildSkipCSS(v, { exempt: this.exemptSelector, include: this.includeSelector });
+      this.shadowCSS = buildCSS(v, { exempt: this.exemptSelector, include: this.includeSelector, shadow: true }) +
+        buildSkipCSS(v, { exempt: this.exemptSelector, include: this.includeSelector, shadow: true });
       if (changedTheme) this.suppressTransitions();
       if (css !== this.lastCSS) { this.style.textContent = css; this.lastCSS = css; }
+      if (skipCss !== this.lastSkipCSS) { this.skipStyle.textContent = skipCss; this.lastSkipCSS = skipCss; }
       var fx = buildFilters(v);
       if (this.filters.innerHTML !== fx) this.filters.innerHTML = fx;
       var self = this;
@@ -1575,6 +1573,8 @@
       this.workScheduled = false;
       document.documentElement.removeAttribute('data-unpolish');
       if (this.style) this.style.remove();
+      if (this.skipStyle) this.skipStyle.remove();
+      this.lastSkipCSS = '';
       if (this.filters) this.filters.remove();
       if (this.exemptStyle) this.exemptStyle.remove();
       this.exemptRules = [];
@@ -1604,10 +1604,10 @@
 
     Engine.prototype.isOwnNode = function (el) {
       if (!el || el.nodeType !== 1) return true;
-      if (el === this.style || el === this.filters || el === this.guard || el === this.exemptStyle) return true;
+      if (el === this.style || el === this.skipStyle || el === this.filters || el === this.guard || el === this.exemptStyle) return true;
       if (el.id && el.id.indexOf('unpolish-') === 0) return true;
       if (el.tagName === 'UNPOLISH-HARNESS') return true;
-      return !!(el.closest && el.closest('unpolish-harness, #unpolish-filters, #unpolish-theme, #unpolish-guard, #unpolish-exempt'));
+      return !!(el.closest && el.closest('unpolish-harness, #unpolish-filters, #unpolish-theme, #unpolish-skip, #unpolish-guard, #unpolish-exempt'));
     };
 
     Engine.prototype.inExemptTree = function (el) {

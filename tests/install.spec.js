@@ -226,7 +226,7 @@ test('init runs once: repeated init, a second import and a script tag share one 
   const result = await page.evaluate(async () => {
     const m = await import('/packages/unpolish/dist/unpolish.mjs');
     const a = m.init(); const b = m.init({ config: { defaultTheme: 'sketch' } });
-    return { same: a === b && a === window.Unpolish && m.getUnpolish() === a, hosts: document.querySelectorAll('unpolish-harness').length, styles: document.querySelectorAll('#unpolish-theme, #unpolish-filters').length <= 2 };
+    return { same: a === b && a === window.Unpolish && m.getUnpolish() === a, hosts: document.querySelectorAll('unpolish-harness').length, styles: document.querySelectorAll('#unpolish-theme, #unpolish-skip, #unpolish-filters').length <= 3 };
   });
   expect(result).toEqual({ same: true, hosts: 1, styles: true });
 });

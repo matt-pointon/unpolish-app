@@ -159,7 +159,7 @@ Removes only what it can identify: the marked `unpolish:start…end` block, the 
 
 ## How it stays safe
 
-Themes live in one `<style id="unpolish-theme">` (an `@layer`), `data-up` attributes and a hidden SVG filter set — Original removes all of it. They change colours, outlines, backgrounds, radii, shadows and fonts, never size, padding, position or border width. No element is replaced, wrapped or covered, so handlers, focus, form values, scroll and routes are untouched. New content is classified as it appears; open shadow roots get the theme too. The panel lives in its own shadow root.
+Themes live in `<style id="unpolish-theme">` (an `@layer`), skip filters in `#unpolish-skip`, `data-up` attributes and a hidden SVG filter set — Original removes all of it. They change colours, outlines, backgrounds, radii, shadows and fonts, never size, padding, position or border width. No element is replaced, wrapped or covered, so handlers, focus, form values, scroll and routes are untouched. New content is classified as it appears; open shadow roots get the theme too. The panel lives in its own shadow root.
 
 ## Limitations
 
