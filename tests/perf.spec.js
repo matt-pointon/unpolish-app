@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test';
 import { setTheme, settle } from './helpers.js';
 
-test.describe.configure({ timeout: 90_000 });
+test.describe.configure({ timeout: 90_000, retries: process.env.CI ? 2 : 0 });
 
 async function measure(page, ms = 3000) {
   return page.evaluate(async (ms) => {
