@@ -8,15 +8,25 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
           cache: npm
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version: latest
       - run: npm ci
+      - name: Check package managers used by installer fixtures
+        run: |
+          command -v yarn || npm install -g yarn@1.22.22
+          yarn --version
+          pnpm --version
+          bun --version
       - run: npx playwright install chromium --with-deps
       - run: npm test

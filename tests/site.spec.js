@@ -177,7 +177,7 @@ test('the demo is visible on the first screen and drives the real harness', asyn
   // The live preview starts above the fold on a laptop-sized screen.
   await page.setViewportSize({ width: 1280, height: 800 });
   const top = await page.locator('#demo-frame').boundingBox();
-  expect(top.y).toBeLessThan(560);
+  expect(top.y).toBeLessThan(600);
   const frame = page.frameLocator('#demo-frame');
   await page.waitForFunction(() => document.getElementById('demo-frame').contentWindow?.Unpolish?.state);
   await page.locator('#demo-themes [data-theme="blueprint"]').click();

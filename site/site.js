@@ -17,7 +17,12 @@
   var files = R.distUrl ? new URL(R.distUrl) : here;
   var tarball = R.tarballUrl || new URL(R.tarball || (name + '-' + version + '.tgz'), files).href;
   var docs = R.docsUrl || new URL('README.md', files).href;
-  var localOnly = !published && !R.distUrl && !R.siteUrl && (files.protocol === 'file:' || /^(localhost|127\.|0\.0\.0\.0|\[::1\])/.test(files.hostname));
+  var localOnly = !published && (function () {
+    try {
+      var u = new URL(tarball);
+      return u.protocol === 'file:' || /^(localhost|127\.|0\.0\.0\.0|\[::1\])/.test(u.hostname);
+    } catch (e) { return false; }
+  })();
   var latestSpec = exe + '@latest';
   var pinnedSpec = exe + '@' + version;
   var runSpec = published ? latestSpec : tarball;

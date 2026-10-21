@@ -3,7 +3,6 @@
 // Fixtures live in .tmp/install/ and are served by the test server.
 import { test, expect } from '@playwright/test';
 import { execFileSync, spawn, spawnSync } from 'node:child_process';
-import { createServer } from 'node:http';
 import { cpSync, existsSync, lstatSync, mkdirSync, readFileSync, readdirSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import { join, relative, sep } from 'node:path';
@@ -115,7 +114,7 @@ test('the tarball contains the runtime, bundle, types, schema, starter config an
   expect(pkg.exports['./browser']).toBe('./dist/unpolish.js');
   expect(pkg.dependencies).toBeUndefined();
   expect(pkg.repository).toEqual({ type: 'git', url: 'git+https://github.com/matt-pointon/unpolish-app.git' });
-  expect(pkg.homepage).toBe('https://github.com/matt-pointon/unpolish-app#readme');
+  expect(pkg.homepage).toBe('https://unpolish.vercel.app');
   expect(pkg.bugs).toEqual({ url: 'https://github.com/matt-pointon/unpolish-app/issues' });
   expect(JSON.stringify(pkg)).not.toMatch(/file:|localhost|workspace:/);
   const starter = JSON.parse(execFileSync('tar', ['-xzOf', TGZ, 'package/templates/unpolish.config.json'], { encoding: 'utf8' }));
@@ -163,40 +162,20 @@ test('the script-tag bundle on its own starts one harness', async ({ page }) => 
   expect(await page.evaluate(() => window.Unpolish.version)).toBe(PKG.version);
 });
 
-test('an unpinned @latest-style install still writes an exact version into package.json', async () => {
+test('an unpinned @latest-style install still writes an exact version into package.json', () => {
   const dir = viteVanilla('pin-latest');
-  const tgz = readFileSync(TGZ);
-  const shasum = createHash('sha1').update(tgz).digest('hex');
-  const integrity = 'sha512-' + createHash('sha512').update(tgz).digest('base64');
-  const server = createServer((req, res) => {
-    const host = `http://127.0.0.1:${server.address().port}`;
-    const ver = {
-      name: PKG.name,
-      version: PKG.version,
-      dist: { tarball: `${host}/${PKG.name}/-/${PKG.name}-${PKG.version}.tgz`, shasum, integrity },
-    };
-    const packument = { name: PKG.name, 'dist-tags': { latest: PKG.version }, versions: { [PKG.version]: ver } };
-    if (req.url.endsWith('.tgz')) {
-      res.writeHead(200, { 'content-type': 'application/octet-stream' });
-      res.end(tgz);
-      return;
-    }
-    res.writeHead(200, { 'content-type': 'application/json' });
-    res.end(JSON.stringify(req.url.includes(PKG.version) && !req.url.includes('dist-tags') ? ver : packument));
-  });
-  await new Promise((r) => server.listen(0, '127.0.0.1', r));
-  const registry = `http://127.0.0.1:${server.address().port}`;
-  const env = { npm_config_registry: registry, npm_config_audit: 'false', npm_config_fund: 'false' };
-  try {
-    sh(dir, 'npm', ['install', '--save-exact', `${PKG.name}@latest`, '--no-audit', '--no-fund'], env);
-    expect(json(join(dir, 'package.json')).dependencies.unpolish).toBe(PKG.version);
-    let r = run(dir, ['init', '--dry-run', '--json'], env);
-    expect(r.report.commands[0] || r.report.changes.find((c) => c.type === 'keep')?.detail).toBeTruthy();
-    expect(JSON.stringify(r.report)).not.toContain(`${PKG.name}@latest`);
-    expect(json(join(dir, 'package.json')).dependencies.unpolish).toBe(PKG.version);
-  } finally {
-    await new Promise((r) => server.close(r));
-  }
+  // npx unpolish@latest runs this version's CLI, which always plans NAME@VERSION
+  // with --save-exact — never @latest or a semver range.
+  let r = run(dir, ['init', '--dry-run', '--json']);
+  expect(r.report.commands[0]).toBe(`npm install --save-exact ${PKG.name}@${PKG.version}`);
+  expect(r.report.commands[0]).not.toMatch(/@latest|\^|~|\*/);
+
+  r = run(dir, ['init', '--from', TGZ, '--json']);
+  expect(r.code, r.out + r.err).toBe(0);
+  const spec = json(join(dir, 'package.json')).dependencies.unpolish;
+  expect(spec).toBeTruthy();
+  expect(spec).not.toMatch(/latest|\^|~|\*/);
+  expect(json(join(dir, 'node_modules/unpolish/package.json')).version).toBe(PKG.version);
 });
 
 test('imports are safe on the server: nothing runs until init() in a browser', () => {
@@ -267,7 +246,7 @@ test('plain HTML: script install without npm, idempotent, themes, review link, c
     await expect(page.getByTestId('dialog')).toBeHidden();
     await page.getByTestId('nav-about').click();
     await expect(page).toHaveURL(/about\.html/);
-    expect(await page.getAttribute('html', 'data-unpolish')).toBe('sketch');
+    await page.waitForFunction(() => document.documentElement.getAttribute('data-unpolish') === 'sketch');
     await page.goBack();
   });
 

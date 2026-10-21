@@ -17,7 +17,9 @@ test('committed site/release.js matches the unpublished config', () => {
   expect(committed).toEqual(expected);
   expect(expected.executable).toBe('unpolish');
   expect(expected.tarballUrl).toBeNull();
-  expect(expected.homepage).toBe('https://github.com/matt-pointon/unpolish-app#readme');
+  expect(expected.siteUrl).toBe('https://unpolish.vercel.app/');
+  expect(expected.homepage).toBe('https://unpolish.vercel.app');
+  expect(expected.published).toBe(false);
 });
 
 test('published-mode config is derived without localhost or tarball install URLs', () => {

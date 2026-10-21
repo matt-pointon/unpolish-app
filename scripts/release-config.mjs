@@ -30,7 +30,7 @@ export function withTrailingSlash(href) {
 export function loadReleaseSettings(raw) {
   return {
     published: raw.published === true,
-    siteUrl: withTrailingSlash(normalizeHttpsUrl(raw.siteUrl, 'siteUrl')),
+    siteUrl: withTrailingSlash(normalizeHttpsUrl(raw.siteUrl || raw.productionUrl, 'siteUrl')),
     distUrl: withTrailingSlash(normalizeHttpsUrl(raw.distUrl, 'distUrl')),
   };
 }
@@ -45,7 +45,9 @@ export function executableName(pkg) {
 
 function filesBase(settings) {
   if (settings.distUrl) return settings.distUrl;
-  if (settings.siteUrl) return `${settings.siteUrl}unpolish/`;
+  // siteUrl is the production website. Unpublished installs stay on the origin
+  // serving the page (localhost in tests, *.vercel.app in production).
+  if (settings.published && settings.siteUrl) return `${settings.siteUrl}unpolish/`;
   return null;
 }
 

@@ -1,6 +1,6 @@
 # Releasing Unpolish
 
-The package, the hosted files and the website are prepared and tested locally. Publication to npm and the first Vercel project still need credentials (this repo does not store them).
+The package and website are prepared and tested locally. The Vercel project already exists; the npm package does not, until the first publish below. This repo does not store npm or Vercel credentials.
 
 ## One source of truth
 
@@ -19,9 +19,9 @@ The website builds every command, download link and the agent prompt from `site/
 | `"published": false` (today) | `unpolish/<name>-<version>.tgz` on the same origin as the page. On `localhost` the install section says the command only works on this machine, and the prompt says the same |
 | `"published": false, "distUrl": "https://…/unpolish/"` | That public HTTPS folder. Use it when the tarball is hosted somewhere other than the site |
 | `"published": true` | Visible command `npx unpolish@latest init`. The copied prompt pins `npx unpolish@<version> init --dry-run`, then `init`. No localhost URLs, tarball commands, or “not on npm yet” copy |
-| `"siteUrl": "https://unpolish.vercel.app"` | Production website. Package `homepage`, bundle and docs URLs in `site/release.js` derive from it. Until it is set, `homepage` is the GitHub README |
+| `"siteUrl": "https://unpolish.vercel.app"` | Production website (set). Package `homepage` uses it. Unpublished installs still use the tarball on the origin serving the page; after `"published": true`, bundle and docs URLs in the prompt use this host |
 
-Switching to published mode is one line in `release.config.json` (`"published": true`) plus `npm run release`. Tests cover that object (see `tests/release.spec.js` and `tests/fixtures/release-published.json`) without changing the committed unpublished config.
+Switching to published mode is one line in `release.config.json` (`"published": true`) plus `npm run release`. Tests cover that object (see `tests/release.spec.js` and `tests/fixtures/release-published.json`) without flipping the committed `published: false`.
 
 `npm run release` rejects a non-HTTPS `distUrl` or `siteUrl`.
 
@@ -53,11 +53,11 @@ Projects update with `npx unpolish@latest init --upgrade`; their config is kept.
 
 ## Publishing to npm
 
-The package name is `unpolish` (unscoped, public, MIT). `npm view unpolish` was a registry 404 on 2026-10-21.
+The package name is `unpolish` (unscoped, public, MIT). npm user `mattpointon`. `npm view unpolish` was a registry 404 on 2026-10-21.
 
 ### First publish (needs a logged-in npm user)
 
-A brand-new package cannot use Trusted Publishing until it exists on npmjs.com. From a machine logged in with publish rights, using the **tested** tarball (`npm run release` writes it; `npm test` packs it again):
+A brand-new package cannot use Trusted Publishing until it exists on npmjs.com. From a machine logged in as `mattpointon` (or another owner), using the **tested** tarball (`npm run release` writes it; `npm test` packs it again):
 
 ```sh
 npm publish unpolish/unpolish-0.1.0.tgz --access public --tag latest
@@ -86,26 +86,25 @@ Do not store an `NPM_TOKEN` for publishing once Trusted Publishing is in place.
 
 ### After npm is live
 
-1. Set `"published": true` in `release.config.json`.
-2. Once the Vercel URL is known, set `"siteUrl": "https://<project>.vercel.app"`.
-3. `npm run release && npm test`, then deploy. Package `homepage` becomes the site URL.
+1. Set `"published": true` in `release.config.json` (`siteUrl` is already `https://unpolish.vercel.app`).
+2. `npm run release && npm test`. Merging to `main` deploys the site.
 
 ## Deploying the website (Vercel Git integration)
 
-Create a Vercel project named `unpolish` linked to this GitHub repository. Do not attach a custom domain.
+The Vercel project **unpolish** already exists on the Hobby account, linked to `github.com/matt-pointon/unpolish-app`. Do not attach a custom domain. Confirm these settings (they also live in committed `vercel.json`):
 
 | Setting | Value |
 | --- | --- |
-| Framework Preset | Other (`framework: null` in `vercel.json`) |
+| Framework Preset | Other / None (`framework: null`) |
 | Build Command | `npm run build:site` |
 | Output Directory | `public` |
 | Install Command | `npm install` (default) |
 | Production Branch | `main` |
 | Root Directory | repository root |
 
-`vercel.json` is committed with those values, per-app SPA rewrites for React and Svelte (paths with a file extension are not rewritten), `trailingSlash: true`, immutable cache for `unpolish/<version>/…`, and `no-cache` for HTML, `site/release.js` and unversioned `unpolish/` aliases.
+Per-app SPA rewrites for React and Svelte (paths with a file extension are not rewritten), `trailingSlash: true`, immutable cache for `unpolish/<version>/…`, and `no-cache` for HTML, `site/release.js` and unversioned `unpolish/` aliases.
 
-Production deployments are builds of `main`. Preview deployments are other branches.
+Production deployments are builds of `main`. The production alias is `https://unpolish.vercel.app` (public). Preview deployments of other branches are behind Vercel Standard Deployment Protection (Vercel auth required).
 
 ## Rolling back the website
 
