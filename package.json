@@ -6,7 +6,7 @@
   "type": "module",
   "license": "MIT",
   "scripts": {
-    "serve": "node scripts/serve.mjs 4173",
+    "serve": "node scripts/serve.mjs",
     "build:examples": "node scripts/build-examples.mjs",
     "test": "npm run build:examples && playwright test",
     "test:only": "playwright test"

@@ -1,12 +1,14 @@
 // Minimal static file server for the site, examples and tests.
 // Usage: node scripts/serve.mjs [port]
+// Without a port it starts at 4173 and moves to the next free port if that one is taken.
 import { createServer } from 'node:http';
 import { readFile, stat } from 'node:fs/promises';
 import { extname, join, normalize, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const root = resolve(fileURLToPath(new URL('..', import.meta.url)));
-const port = Number(process.argv[2] || process.env.PORT || 4173);
+const fixed = process.argv[2] || process.env.PORT;
+let port = Number(fixed || 4173);
 const types = {
   '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.mjs': 'text/javascript; charset=utf-8',
   '.css': 'text/css; charset=utf-8', '.json': 'application/json; charset=utf-8', '.svg': 'image/svg+xml',
@@ -14,7 +16,7 @@ const types = {
   '.woff2': 'font/woff2', '.txt': 'text/plain; charset=utf-8'
 };
 
-createServer(async (req, res) => {
+const server = createServer(async (req, res) => {
   try {
     const url = new URL(req.url, 'http://localhost');
     let path = normalize(decodeURIComponent(url.pathname)).replace(/^(\.\.[/\\])+/, '');
@@ -34,4 +36,18 @@ createServer(async (req, res) => {
   } catch (e) {
     res.writeHead(500).end(String(e));
   }
-}).listen(port, () => console.log(`Serving ${root} at http://localhost:${port}`));
+});
+
+server.on('error', (e) => {
+  if (e.code !== 'EADDRINUSE') throw e;
+  if (fixed) {
+    console.error(`Port ${port} is already in use — probably an earlier server is still running.`);
+    console.error(`Stop it (Ctrl+C in its terminal, or: lsof -ti :${port} | xargs kill), or pick another port: node scripts/serve.mjs ${port + 1}`);
+    process.exit(1);
+  }
+  console.log(`Port ${port} is busy (an earlier server may still be running); trying ${port + 1}…`);
+  port += 1;
+  server.listen(port);
+});
+server.on('listening', () => console.log(`Unpolish site running at http://localhost:${port}  (Ctrl+C to stop)`));
+server.listen(port);
