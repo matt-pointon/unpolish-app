@@ -148,7 +148,7 @@ function createUnpolish() {
   var WORK_BUDGET_MS = 8;
   // Regions that churn or must keep their own look. data-unpolish-ignore is always honoured;
   // Google Maps (gmp-* / .gm-style) is skipped even without a project exclude.
-  var BUILTIN_EXEMPT = ['[data-unpolish-ignore]', 'unpolish-harness', '#unpolish-filters', 'gmp-map', 'gmp-advanced-marker', '.gm-style'];
+  var BUILTIN_EXEMPT = ['[data-unpolish-ignore]', 'unpolish-harness', '#unpolish-filters', '#unpolish-probe', 'gmp-map', 'gmp-advanced-marker', '.gm-style'];
   var MEDIA_LEAF = { CANVAS: 1, VIDEO: 1, IFRAME: 1, EMBED: 1, OBJECT: 1 };
   var ANIM_STYLE = /^(transform|translate|rotate|scale|offset|opacity|filter|perspective|perspective-origin|transform-origin|will-change|left|top|right|bottom|x|y|cx|cy|d|points|transition|animation|offset-path|offset-distance|offset-rotate|contain|content-visibility)$/i;
   function styleDecls(s) {
@@ -1253,9 +1253,10 @@ function createUnpolish() {
   Engine.prototype.ensureProbe = function () {
     if (this.probe && this.probe.isConnected) return this.probe;
     var probe = this.probe = document.createElement('div');
+    probe.id = 'unpolish-probe';
     probe.setAttribute('data-unpolish-ignore', '');
     probe.setAttribute('aria-hidden', 'true');
-    probe.style.cssText = 'position:absolute;left:-9999px;top:0;width:24rem;pointer-events:none';
+    probe.style.cssText = 'position:absolute;left:-9999px;top:0;width:0;height:0;overflow:hidden;pointer-events:none';
     (document.body || document.documentElement).appendChild(probe);
     return probe;
   };
@@ -1263,11 +1264,22 @@ function createUnpolish() {
   Engine.prototype.classifyFresh = function (els) {
     var c = this.classifier, probe = this.ensureProbe();
     if (!els.length) return;
+    var htmlClass = document.documentElement.className || '';
+    var bodyClass = (document.body && document.body.className) || '';
     var reads = els.map(function (el) {
-      var clone = el.cloneNode(false);
-      probe.appendChild(clone);
-      var r = c.read(clone);
-      probe.removeChild(clone);
+      var chain = [];
+      for (var n = el; n && n !== document.body && n !== document.documentElement; n = parentEl(n)) chain.unshift(n);
+      var wrap = document.createElement('div');
+      wrap.className = (htmlClass + ' ' + bodyClass).trim();
+      var leaf = wrap;
+      chain.forEach(function (orig) {
+        var copy = orig.cloneNode(false);
+        leaf.appendChild(copy);
+        leaf = copy;
+      });
+      probe.appendChild(wrap);
+      var r = c.read(leaf === wrap ? el : leaf);
+      probe.removeChild(wrap);
       r.el = el;
       return r;
     });
@@ -1437,7 +1449,7 @@ function createUnpolish() {
     if (el === this.style || el === this.filters || el === this.guard || el === this.exemptStyle || el === this.probe) return true;
     if (el.id && el.id.indexOf('unpolish-') === 0) return true;
     if (el.tagName === 'UNPOLISH-HARNESS') return true;
-    return !!(el.closest && el.closest('unpolish-harness, #unpolish-filters, #unpolish-theme, #unpolish-guard, #unpolish-exempt'));
+    return !!(el.closest && el.closest('unpolish-harness, #unpolish-filters, #unpolish-theme, #unpolish-guard, #unpolish-exempt, #unpolish-probe'));
   };
 
   Engine.prototype.inExemptTree = function (el) {
