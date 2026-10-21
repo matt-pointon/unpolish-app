@@ -128,15 +128,15 @@ Precedence: **review link → local draft (this browser) → project config → 
 }
 ```
 
-`exclude` is additive and keeps the original look (no placeholder). Unpolish already ignores `[data-unpolish-ignore]` and its own UI.
+`exclude` is additive and keeps the original look (no theme filter). Unpolish already ignores `[data-unpolish-ignore]` and its own UI.
 
-Maps, images and other heavy widgets are skipped automatically — they are not classified and Sketch draws one hatched placeholder on the container (`Map`, `Image`, `Canvas`, `Media`) instead of walking the subtree:
+Maps, images and other heavy widgets are skipped automatically — they are not classified. One CSS `filter` is applied on the container so the content stays visible but looks sketch- or blueprint-like. Descendants are never walked or restyled:
 
 - **Media:** `img`, `picture`, `video`, `canvas`, `iframe`, `svg` internals, `object`, `embed`
 - **Map widgets:** Leaflet (`.leaflet-container`), Mapbox/MapLibre (`.mapboxgl-map`, `.maplibregl-map`), Google Maps (`.gm-style`, `gmp-map`, `gmp-*`), OpenLayers (`.ol-viewport`), deck.gl, and `[role="application"]`
 - **Heavy subtrees:** a node with a very high count of absolutely positioned children, or a lot of mutation churn, is marked skipped at runtime
 
-To classify a skipped region anyway, set `data-unpolish="keep"` on it or list a selector in `include`. Do not do that on a map with thousands of markers. Put `data-unpolish-ignore` or an `exclude` selector on a region that must keep its real pixels with no placeholder.
+To classify a skipped region anyway, set `data-unpolish="keep"` on it or list a selector in `include`. Do not do that on a map with thousands of markers. Put `data-unpolish-ignore` or an `exclude` selector on a region that must keep its real pixels with no filter.
 
 The schema (`schema/unpolish.config.schema.json`) documents every field and gives editors autocomplete.
 

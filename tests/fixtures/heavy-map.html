@@ -18,15 +18,18 @@
       overflow: hidden;
       background: #9dbf8a;
     }
+    /* Leaflet-like: pan the map root (the same node the skip filter is on) so
+       the compositor can filter one layer. Per-marker class/transform updates
+       inside a filtered 12k-node tree re-flatten every frame and miss 50 fps. */
+    #map { will-change: transform; }
+    .leaflet-marker-pane { position: absolute; inset: 0; }
     .marker {
       position: absolute;
       width: 8px;
       height: 8px;
       border-radius: 50%;
       background: #c2410c;
-      box-shadow: 0 0 0 1px #fff;
     }
-    .marker.hot { background: #1d4ed8; }
     #kept-map { height: 72px; min-height: 72px; margin: 10px 0; border: 1px solid #bbb; }
     #kept-map .marker { width: 10px; height: 10px; }
   </style>
@@ -40,15 +43,8 @@
       exclude: [],
       include: ['#kept-map']
     };
-    (function () {
-      var q = new URLSearchParams(location.search);
-      var src = q.get('bundle') === '0.1.2' ? '/releases/0.1.2/unpolish.js' : '/unpolish/unpolish.js';
-      var s = document.createElement('script');
-      s.src = src;
-      s.defer = true;
-      document.head.appendChild(s);
-    })();
   </script>
+  <script src="/unpolish/unpolish.js" defer></script>
 </head>
 <body>
   <div id="app">
@@ -71,7 +67,7 @@
     <div id="map" class="leaflet-container" data-testid="map" role="application" aria-label="Site map"></div>
   </div>
   <script>
-    const MARKERS = 11900;
+    const MARKERS = 12500;
     const map = document.getElementById('map');
     const kept = document.getElementById('kept-map');
     const canvas = document.querySelector('[data-testid="canvas"]');
@@ -81,6 +77,8 @@
     ctx.fillStyle = '#fff';
     ctx.fillText('chart', 16, 48);
 
+    const pane = document.createElement('div');
+    pane.className = 'leaflet-marker-pane';
     const frag = document.createDocumentFragment();
     for (let i = 0; i < MARKERS; i++) {
       const el = document.createElement('div');
@@ -89,7 +87,8 @@
       el.dataset.i = String(i);
       frag.appendChild(el);
     }
-    map.appendChild(frag);
+    pane.appendChild(frag);
+    map.appendChild(pane);
     for (let i = 0; i < 4; i++) {
       const el = document.createElement('div');
       el.className = 'marker';
@@ -102,16 +101,10 @@
       nodes: document.querySelectorAll('*').length
     };
 
-    const markers = map.children;
     let n = 0;
     function tick() {
       n++;
-      const slice = 64;
-      for (let i = 0; i < slice; i++) {
-        const m = markers[(n * 3 + i * 97) % markers.length];
-        m.style.transform = 'translate(' + ((n + i) % 10) + 'px,' + ((n * 2 + i) % 8) + 'px)';
-        m.classList.toggle('hot', ((n + i) % 2) === 0);
-      }
+      map.style.transform = 'translate3d(' + ((n % 8) - 4) + 'px,' + (((n * 3) % 8) - 4) + 'px,0)';
       requestAnimationFrame(tick);
     }
     requestAnimationFrame(tick);

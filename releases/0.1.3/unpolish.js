@@ -194,7 +194,7 @@
     var CHURN_WINDOW_MS = 1000;
     var CHURN_MARK_MIN = 30;
     // Regions that must keep their own look. data-unpolish-ignore and project exclude
-    // win over skip-placeholders. Maps and media are skipped separately (placeholder, no walk).
+    // win over skip filters. Maps and media are skipped separately (filter on the root, no walk).
     var BUILTIN_EXEMPT = ['[data-unpolish-ignore]', 'unpolish-harness', '#unpolish-filters'];
     var MEDIA_LEAF = { IMG: 1, PICTURE: 1, VIDEO: 1, CANVAS: 1, IFRAME: 1, EMBED: 1, OBJECT: 1 };
     var MAP_WIDGET_SEL = '.leaflet-container, .mapboxgl-map, .maplibregl-map, .gm-style, gmp-map, .ol-viewport, [class*="deckgl"], [class*="deck-gl"], [role="application"]:not(html, body)';
@@ -531,6 +531,21 @@
       var mono = 'grayscale(1) contrast(' + round(1.05 + r * 0.3, 2) + ')';
       v.imgFilter = s.images === 'mono' || id === 'black-white' ? mono : 'url(#up-f-' + id + ')';
       v.imgTint = s.images === 'mono' || id === 'black-white' ? '#ffffff' : id === 'blueprint' ? v.paper : id === 'pastel' ? p.block4 : '#ffffff';
+      // One CSS filter on each skipped root. Live maps use filter functions only —
+      // SVG displacement on a 12k-node animating subtree tanks fps. Stills may add
+      // a cheap SVG posterize / blueprint matrix on that one replaced element.
+      v.skipFilter = id === 'sketch'
+        ? 'grayscale(1) contrast(1.35) brightness(1.05)'
+        : id === 'blueprint'
+          ? 'grayscale(1) sepia(0.9) hue-rotate(185deg) saturate(2.8) brightness(0.9) contrast(1.15)'
+          : id === 'black-white'
+            ? 'grayscale(1) contrast(1.4)'
+            : 'grayscale(0.4) saturate(0.7) contrast(1.08) brightness(1.04)';
+      v.skipFilterStill = id === 'sketch'
+        ? v.skipFilter + ' url(#up-f-skip-still)'
+        : id === 'blueprint'
+          ? 'url(#up-f-blueprint)'
+          : v.skipFilter;
       v.ph = placeholderSvg(id, v);
       v.phBg = id === 'blueprint' ? mix(v.paper, '#000000', 0.12) : id === 'pastel' ? p.block2 : id === 'sketch' ? mix(v.surface, v.ink, 0.04) : mix(v.surface, v.ink, 0.05);
       v.phIcon = placeholderIcon(id === 'blueprint' ? v.line : mix(v.ink, v.surface, 0.45));
@@ -845,31 +860,21 @@
         rule(S('[data-up~="media-bg"]'), ph);
       }
 
-      // Skipped maps and media: one placeholder on the container, nothing restyled inside.
-      var hatch = 'repeating-linear-gradient(135deg, color-mix(in srgb, var(--up-line) 35%, transparent) 0 1px, transparent 1px 9px)';
-      var skipBox = 'position:relative' + I + ';isolation:isolate' + I + ';overflow:hidden' + I +
-        ';background-color:var(--up-ph-bg)' + I + ';background-image:' + hatch + ', var(--up-ph)' + I +
-        ';background-size:auto, 100% 100%' + I + ';background-repeat:repeat, no-repeat' + I +
-        ';border-radius:var(--up-radius, 4px)' + I + ';box-shadow:inset 0 0 0 100vmax color-mix(in srgb, var(--up-ph-bg) 82%, transparent)' + I;
-      var skipLabelCss = 'position:absolute' + I + ';inset:0' + I + ';display:flex' + I + ';align-items:center' + I +
-        ';justify-content:center' + I + ';margin:0' + I + ';padding:0.35em 0.6em' + I +
-        ';font:600 12px/1 var(--up-font, ui-sans-serif, system-ui, sans-serif)' + I +
-        ';letter-spacing:0.08em' + I + ';text-transform:uppercase' + I + ';color:var(--up-ink)' + I +
-        ';background:transparent' + I + ';pointer-events:none' + I + ';z-index:1' + I;
+      // Skipped maps and media: content stays visible. One CSS filter on the
+      // skipped root via a stylesheet selector — no per-child JS, never descendants.
       var NOTEX = ':not(' + EXQ + ', ' + EXQ + ' *)';
-      var skipRoots = ':is(' + MAP_WIDGET_SEL + ', [data-unpolish-skip="map"], [data-unpolish-skip="heavy"])' + NOTKEEP + NOTEX;
-      var skipMedia = ':is(' + SKIP_MEDIA_SEL + ', [data-unpolish-skip="image"], [data-unpolish-skip="video"], [data-unpolish-skip="canvas"], [data-unpolish-skip="media"], input[type="image"])' + NOTKEEP + NOTEX;
-      rule(S(skipRoots), skipBox);
-      rule(S(skipRoots + ' > *'), 'visibility:hidden' + I);
-      rule(S(skipRoots + '::after'), 'content:"Map"' + I + ';' + skipLabelCss + ';visibility:visible' + I);
-      rule(S('[data-unpolish-skip="heavy"]' + NOTKEEP + NOTEX + '::after'), 'content:"Skipped"' + I);
-      rule(S(skipMedia), skipBox + ';object-position:-99999px -99999px' + I + ';object-fit:none' + I);
-      rule(S('img' + NOTKEEP + NOTEX + ', picture' + NOTKEEP + NOTEX + ', [data-unpolish-skip="image"]' + NOTKEEP + NOTEX), skipBox);
-      rule(S('picture' + NOTKEEP + NOTEX + ' > *'), 'visibility:hidden' + I);
-      rule(S('picture' + NOTKEEP + NOTEX + '::after, [data-unpolish-skip="image"]' + NOTKEEP + NOTEX + '::after'), 'content:"Image"' + I + ';' + skipLabelCss);
-      rule(S('video' + NOTKEEP + NOTEX + '::after, [data-unpolish-skip="video"]' + NOTKEEP + NOTEX + '::after'), 'content:"Video"' + I + ';' + skipLabelCss);
-      rule(S('canvas' + NOTKEEP + NOTEX + '::after, [data-unpolish-skip="canvas"]' + NOTKEEP + NOTEX + '::after'), 'content:"Canvas"' + I + ';' + skipLabelCss);
-      rule(S(':is(iframe, embed, object)' + NOTKEEP + NOTEX + '::after, [data-unpolish-skip="media"]' + NOTKEEP + NOTEX + '::after'), 'content:"Media"' + I + ';' + skipLabelCss);
+      var skipLive = ':is(' + MAP_WIDGET_SEL + ', [data-unpolish-skip="map"], [data-unpolish-skip="heavy"])' + NOTKEEP + NOTEX;
+      var skipReplaced = ':is(video, iframe, embed, object, [data-unpolish-skip="video"], [data-unpolish-skip="media"])' + NOTKEEP + NOTEX;
+      var skipStill = ':is(img, picture, canvas, input[type="image"], [data-unpolish-skip="image"], [data-unpolish-skip="canvas"])' + NOTKEEP + NOTEX;
+      rule(S(skipStill), 'filter:' + v.skipFilterStill + I);
+      rule(S(skipReplaced + ', ' + skipLive), 'filter:' + v.skipFilter + I);
+      rule(S(skipLive), 'position:relative' + I);
+      rule(S(':is(' + MAP_WIDGET_SEL + ', [data-unpolish-skip="map"])' + NOTKEEP + NOTEX + '::after'),
+        'content:"Map"' + I + ';position:absolute' + I + ';top:6px' + I + ';left:6px' + I +
+        ';padding:2px 6px' + I + ';font:600 10px/1.2 var(--up-font, ui-sans-serif, system-ui, sans-serif)' + I +
+        ';letter-spacing:0.06em' + I + ';text-transform:uppercase' + I +
+        ';color:var(--up-ink)' + I + ';background:color-mix(in srgb, var(--up-surface) 86%, transparent)' + I +
+        ';border:1px solid var(--up-line)' + I + ';pointer-events:none' + I + ';z-index:2' + I);
 
       // Project overrides
       var ov = opts.overrides || {};
@@ -905,7 +910,9 @@
         '<filter id="up-f-pastel" color-interpolation-filters="sRGB" x="0" y="0" width="100%" height="100%">' +
         '<feColorMatrix type="matrix" values="0.3 0.59 0.11 0 0 0.3 0.59 0.11 0 0 0.3 0.59 0.11 0 0 0 0 0 1 0"/>' +
         '<feComponentTransfer><feFuncR type="discrete" tableValues="' + steps + '"/><feFuncG type="discrete" tableValues="' + steps + '"/><feFuncB type="discrete" tableValues="' + steps + '"/></feComponentTransfer>' +
-        '<feComponentTransfer>' + duo(ink, blk) + '</feComponentTransfer></filter>';
+        '<feComponentTransfer>' + duo(ink, blk) + '</feComponentTransfer></filter>' +
+        '<filter id="up-f-skip-still" color-interpolation-filters="sRGB" x="0" y="0" width="100%" height="100%">' +
+        '<feComponentTransfer><feFuncR type="discrete" tableValues="0 0.22 0.45 0.68 1"/><feFuncG type="discrete" tableValues="0 0.22 0.45 0.68 1"/><feFuncB type="discrete" tableValues="0 0.22 0.45 0.68 1"/></feComponentTransfer></filter>';
     }
 
     /* ------------------------------------------------------------------ *
