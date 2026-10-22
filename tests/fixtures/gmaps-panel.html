@@ -1,0 +1,185 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Unpolish Google Maps panel fixture</title>
+  <script>
+    window.UnpolishConfig = {
+      version: 1,
+      id: 'skittles-research-prototype',
+      defaultTheme: 'original',
+      ui: 'hidden',
+      webFonts: false,
+      exclude: [],
+      shortcuts: { toggle: '\\', themes: {} },
+      themes: {}
+    };
+    (function () {
+      var v = new URLSearchParams(location.search).get('runtime');
+      var s = document.createElement('script');
+      s.src = v ? '/releases/' + encodeURIComponent(v) + '/unpolish.js' : '/unpolish/unpolish.js';
+      s.defer = true;
+      document.head.appendChild(s);
+    })();
+  </script>
+  <style id="host">
+    :root { --probe: 0; --paper: #f4f1ea; --ink: #1c1914; --line: #ddd6c8; --accent: #2563eb; }
+    html, body { margin: 0; height: 100%; background: var(--paper); color: var(--ink); font: 13px/1.4 ui-sans-serif, system-ui, sans-serif; }
+    #app { display: grid; grid-template-columns: 56px 1fr 420px; height: 100%; }
+    .rail { background: #111827; color: #e5e7eb; display: flex; flex-direction: column; gap: 8px; padding: 10px 8px; }
+    .rail button { background: #1f2937; color: #f9fafb; border: 0; border-radius: 8px; height: 36px; }
+    .map-wrap { position: relative; background: #93c5fd; overflow: hidden; }
+    gmp-map, .gm-style { display: block; width: 100%; height: 100%; position: relative; }
+    gmp-advanced-marker { position: absolute; width: 28px; height: 28px; display: block; }
+    .marker-dot { width: 18px; height: 18px; border-radius: 50%; background: #dc2626; border: 2px solid #fff; box-shadow: 0 1px 4px rgba(0,0,0,.35); }
+    .marker-label { position: absolute; left: 20px; top: -2px; background: #fff; border: 1px solid #d1d5db; border-radius: 4px; padding: 1px 6px; font-size: 11px; white-space: nowrap; }
+    .panel { background: #fff; border-left: 1px solid var(--line); display: flex; flex-direction: column; min-width: 0; }
+    .command { display: flex; gap: 8px; align-items: center; padding: 10px 12px; background: rgba(255,255,255,.82); border-bottom: 1px solid var(--line); backdrop-filter: blur(8px); }
+    .command input { flex: 1; border: 1px solid #e5e7eb; border-radius: 8px; padding: 6px 10px; background: #f9fafb; }
+    .command .chip, .row .chip { display: inline-flex; align-items: center; border-radius: 999px; padding: 2px 8px; font-size: 11px; background: #dbeafe; color: #1e40af; }
+    .command button, .row button { border: 1px solid #e5e7eb; background: #fff; border-radius: 8px; padding: 4px 8px; font-size: 12px; }
+    .command button.primary, .row button.primary { background: var(--accent); color: #fff; border-color: var(--accent); }
+    #devices { overflow: auto; flex: 1; }
+    .row { display: grid; grid-template-columns: 32px 1fr auto auto; gap: 8px; align-items: center; padding: 8px 12px; border-bottom: 1px solid #f3f4f6; }
+    .row:nth-child(odd) { background: #fafafa; }
+    .icon-wrap { width: 28px; height: 28px; border-radius: 8px; background: #eff6ff; display: grid; place-items: center; }
+    .title-row { display: flex; gap: 6px; align-items: baseline; }
+    .name-tag { font-size: 10px; color: #6b7280; max-width: var(--tag-w, none); overflow: hidden; }
+    .meta-row { display: flex; gap: 8px; color: #6b7280; font-size: 11px; }
+    .badges, .actions { display: flex; gap: 4px; }
+  </style>
+</head>
+<body>
+  <div id="app">
+    <nav class="rail" id="rail"></nav>
+    <div class="map-wrap">
+      <gmp-map id="map">
+        <div class="gm-style" id="gm"></div>
+      </gmp-map>
+    </div>
+    <aside class="panel">
+      <div class="command" id="command">
+        <input type="search" placeholder="Search devices" value="">
+        <span class="chip">Fleet</span>
+        <span class="chip">Live</span>
+        <button class="primary" type="button">Dispatch</button>
+        <button type="button">Filter</button>
+      </div>
+      <div id="devices"></div>
+    </aside>
+  </div>
+  <script>
+    (function () {
+      var ROWS = 470;
+      var MARKERS = 90;
+      var css = [];
+      var i, j;
+      for (i = 0; i < 520; i++) {
+        css.push('#devices .row:nth-child(' + ((i % 19) + 1) + 'n) .cell :is(.name,.meta,.chip,.name-tag){letter-spacing:0.' + (i % 9) + 'px}');
+        css.push('.u' + (i % 60) + ' .row .badges .chip:nth-child(' + ((i % 3) + 1) + '){box-shadow:0 0 ' + (i % 5) + 'px rgba(37,99,235,.0' + (i % 8) + ')}');
+        css.push('#app :is(.command,.row,.rail) :is(button,.chip,input):nth-of-type(' + ((i % 4) + 1) + '){outline-color:rgb(' + (i % 255) + ',' + ((i * 3) % 255) + ',40)}');
+      }
+      var st = document.createElement('style');
+      st.id = 'tailwind-like';
+      st.textContent = css.join('\n');
+      document.head.appendChild(st);
+
+      var rail = document.getElementById('rail');
+      for (i = 0; i < 12; i++) {
+        var b = document.createElement('button');
+        b.type = 'button';
+        b.textContent = ['Map', 'List', 'Alerts', 'Cam', 'Geo', 'User'][i % 6];
+        rail.appendChild(b);
+      }
+
+      var gm = document.getElementById('gm');
+      var markers = [];
+      for (i = 0; i < MARKERS; i++) {
+        var m = document.createElement('gmp-advanced-marker');
+        m.style.left = (8 + (i * 37) % 520) + 'px';
+        m.style.top = (12 + (i * 53) % 420) + 'px';
+        m.innerHTML = '<div class="marker-dot"></div><span class="marker-label name-tag">Unit ' + i + '</span>';
+        gm.appendChild(m);
+        markers.push(m);
+      }
+
+      var devices = document.getElementById('devices');
+      window.__buildPanel = function (force) {
+        if (devices.childElementCount && !force) return;
+        if (force) devices.textContent = '';
+        var frag = document.createDocumentFragment();
+        for (i = 0; i < ROWS; i++) {
+          var row = document.createElement('div');
+          row.className = 'row u' + (i % 60);
+          row.innerHTML =
+            '<div class="icon-wrap"><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6" fill="#2563eb"/></svg></div>' +
+            '<div class="cell">' +
+              '<div class="title-row"><b class="name">Device ' + i + '</b><span class="name-tag">tag-' + i + '-alpha</span></div>' +
+              '<div class="meta-row"><span class="meta">id ' + (1000 + i) + '</span><span class="meta">' + (i % 3 ? 'online' : 'idle') + '</span><span class="meta">-6' + (i % 9) + ' dBm</span></div>' +
+            '</div>' +
+            '<div class="badges"><span class="chip">LTE</span><span class="chip">' + (i % 2 ? 'live' : 'park') + '</span></div>' +
+            '<div class="actions"><button class="primary" type="button">Ping</button><button type="button">More</button></div>';
+          frag.appendChild(row);
+        }
+        devices.appendChild(frag);
+        window.__panel.eligible = document.querySelectorAll('body *:not(gmp-map *):not(.gm-style *):not(gmp-advanced-marker *)').length;
+        window.__panel.nodes = document.querySelectorAll('*').length;
+      };
+
+      var muts = 0, frames = 0, n = 0;
+      var mo = new MutationObserver(function (recs) {
+        for (j = 0; j < recs.length; j++) muts += recs[j].addedNodes.length + recs[j].removedNodes.length + (recs[j].type === 'attributes' ? 1 : 0);
+      });
+      mo.observe(gm, { subtree: true, childList: true, attributes: true, attributeFilter: ['style', 'class'] });
+
+      function measureTags() {
+        var tags = document.querySelectorAll('gmp-advanced-marker .name-tag');
+        for (j = 0; j < tags.length; j++) {
+          var el = tags[j];
+          var w = Math.ceil(el.getBoundingClientRect().width);
+          if (el.dataset.w !== String(w)) {
+            el.dataset.w = String(w);
+            el.style.setProperty('--tag-w', w + 'px');
+          }
+        }
+      }
+
+      function tick() {
+        n++;
+        frames++;
+        var count = 14;
+        for (j = 0; j < count; j++) {
+          var m = markers[(n + j) % markers.length];
+          var x = 8 + ((n * 3 + j * 17) % 520);
+          var y = 12 + ((n * 2 + j * 9) % 420);
+          m.style.transform = 'translate(' + x + 'px,' + y + 'px)';
+          var lab = m.querySelector('.marker-label');
+          if (lab && n % 8 === j % 8) lab.textContent = 'Unit ' + ((n + j) % MARKERS);
+        }
+        if (n % 10 === 0) measureTags();
+        document.getElementById('map').dispatchEvent(new Event('move'));
+        requestAnimationFrame(tick);
+      }
+      requestAnimationFrame(tick);
+
+      window.__panel = { eligible: 0, nodes: 0, markers: MARKERS, rows: ROWS };
+      window.__recalcCost = function () {
+        var t0 = performance.now();
+        document.documentElement.style.setProperty('--probe', String(Math.random()));
+        getComputedStyle(document.body).color;
+        getComputedStyle(document.body, '::before').content;
+        var row = document.querySelector('.row');
+        if (row) getComputedStyle(row).backgroundColor;
+        return performance.now() - t0;
+      };
+      window.__mutRate = function () { var m = muts, f = frames; muts = 0; frames = 0; return { muts: m, frames: f, perSec: f ? m / (f / 60) : 0 }; };
+      window.__tagged = function () { return document.querySelectorAll('[data-up]').length; };
+
+      window.addEventListener('load', function () {
+        if (new URLSearchParams(location.search).has('nobuild')) return;
+        requestAnimationFrame(function () { requestAnimationFrame(window.__buildPanel); });
+      });
+    })();
+  </script>
+</body>
+</html>

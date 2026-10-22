@@ -1,4 +1,4 @@
-/*! Unpolish v0.1.3 — reversible lo-fi themes for working web prototypes. MIT License. */
+/*! Unpolish v0.1.4 — reversible lo-fi themes for working web prototypes. MIT License. */
 (function () {
   'use strict';
   // Script-tag build. Does nothing outside a browser; if Unpolish is already
@@ -15,7 +15,7 @@
   function createUnpolish() {
     'use strict';
 
-    var VERSION = '0.1.3';
+    var VERSION = '0.1.4';
 
     /* ------------------------------------------------------------------ *
      * Themes
@@ -190,7 +190,10 @@
     }
     function now() { return (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now(); }
     var WORK_BUDGET_MS = 8;
-    var BATCH_MAX = 24;
+    var TASK_BUDGET_MS = 50;
+    var BATCH_MAX = 256;
+    /* Mutation batches smaller than this never disable the theme sheet. */
+    var LIVE_BULK_MIN = 48;
     var HEAVY_CHILD_MIN = 80;
     var CHURN_WINDOW_MS = 1000;
     var CHURN_MARK_MIN = 30;
@@ -241,6 +244,14 @@
         (el.getAttribute('aria-expanded') || '') + '\0' +
         (el.getAttribute('aria-invalid') || '') + '\0' +
         (el.getAttribute('disabled') || '');
+    }
+    function bindRead(r, el) {
+      if (!r) return r;
+      if (r.el === el) return r;
+      var n = {};
+      for (var k in r) n[k] = r[k];
+      n.el = el;
+      return n;
     }
     var isMac = /Mac|iPhone|iPad/.test(navigator.platform || navigator.userAgent || '');
 
@@ -981,7 +992,8 @@
     function Classifier(engine) {
       this.engine = engine;
       this.tags = new WeakMap();      // el -> token string we wrote
-      this.memo = new WeakMap();      // el -> { sig -> { tokens, rect } }
+      this.memo = new WeakMap();      // el -> { sig -> { tokens, rect, read } }
+      this.sigMemo = Object.create(null); // attrSig -> last { tokens, rect, read }
       this.info = new WeakMap();      // el -> { bg (effective, opaque), color }
       this.blockCount = new WeakMap(); // sibling group -> pastel block colour
       this.stable = new WeakMap();     // el -> { v, blk, anc }
@@ -1371,7 +1383,71 @@
       this.skipBusyTimers = new WeakMap();
       this.skipWatched = new WeakSet();
       this.mapMarkers = 'pane';
+      this.avgReadMs = 0;
+      this.lastBatchMs = 0;
+      this.sheetOff = false;
+      this._live = null;
     }
+
+    Engine.prototype.noteBatchCost = function (ms, n) {
+      this.lastBatchMs = ms;
+      if (n > 0) this.avgReadMs = this.avgReadMs ? this.avgReadMs * 0.6 + (ms / n) * 0.4 : ms / n;
+      if (ms > TASK_BUDGET_MS) {
+        try {
+          var h = location.hostname;
+          if (h === 'localhost' || h === '127.0.0.1' || h === '[::1]') {
+            warn('classify batch took ' + Math.round(ms) + 'ms (' + n + ' elements)');
+          }
+        } catch (e) { /* noop */ }
+      }
+    };
+
+    Engine.prototype.batchLimit = function () {
+      var per = this.avgReadMs || 2;
+      var n = Math.floor(TASK_BUDGET_MS / Math.max(0.05, per));
+      return Math.max(1, Math.min(BATCH_MAX, n || 1));
+    };
+
+    Engine.prototype.lookup = function (el) {
+      var c = this.classifier;
+      var sig = attrSig(el);
+      var bag = c.memo.get(el);
+      var hit = bag && bag[sig];
+      if (hit && hit.read) return { sig: sig, hit: hit };
+      var shared = c.sigMemo[sig];
+      if (shared && shared.read) return { sig: sig, hit: shared, shared: true };
+      return { sig: sig, hit: null };
+    };
+
+    Engine.prototype.remember = function (el, tokens, rect, read) {
+      var c = this.classifier;
+      var sig = attrSig(el);
+      var rec = { tokens: tokens, rect: rect, read: read };
+      var bag = c.memo.get(el) || Object.create(null);
+      bag[sig] = rec;
+      c.memo.set(el, bag);
+      c.sigMemo[sig] = rec;
+    };
+
+    Engine.prototype.replayCached = function (el, hit) {
+      var c = this.classifier, vw = window.innerWidth, vh = window.innerHeight;
+      var tagged = c.tags.get(el);
+      var cached = hit.rect;
+      var tiny = !cached || cached.width < 10 || cached.height < 10;
+      var sameEl = !!(hit.read && hit.read.el === el);
+      if (!tiny && tagged === hit.tokens && sameEl) return;
+      var rect = el.getBoundingClientRect();
+      if (!tiny && sameEl && cached && Math.abs(rect.width - cached.width) < 1 && Math.abs(rect.height - cached.height) < 1) {
+        if (tagged !== hit.tokens) c.write(el, hit.tokens);
+        return;
+      }
+      try {
+        var r = bindRead(hit.read, el);
+        var tokens = c.decide(r, rect, vw, vh);
+        if (tagged !== tokens) c.write(el, tokens);
+        this.remember(el, tokens, rect, r);
+      } catch (e) { warn('classify', e); }
+    };
 
     Engine.prototype.configure = function (cfg) {
       var ex = BUILTIN_EXEMPT.concat(cfg.exclude || []);
@@ -1410,96 +1486,168 @@
       this.shadowSheets.forEach(function (sheet) { sheet.disabled = off; });
     };
 
-    /* Read original styles for a batch with Unpolish switched off, then tag. */
-    Engine.prototype.classify = function (els) {
+    /* Read original styles with Unpolish switched off, then tag. Time-sliced so
+     * one disable/enable pair can cover thousands of nodes without a multi-second
+     * task: the sheet stays off across idle slices, then we write. */
+    Engine.prototype.classify = function (els, from) {
       var c = this.classifier, eng = this;
-      els = (els || []).filter(function (el) { return el && el.isConnected && !eng.inSkipTree(el); });
-      var exempts = (c.exemptRoots || []).filter(function (e) { return e.isConnected && !e.hasAttribute('data-unpolish-x') && e.tagName !== 'UNPOLISH-HARNESS' && e !== eng.filters && e !== eng.style; });
-      c.exemptRoots = [];
-      if (!els.length && !exempts.length) return;
-      var sx = window.scrollX, sy = window.scrollY;
-      this.setDisabled(true);
-      var html = document.documentElement;
-      var reads;
-      try {
+      if (from == null) {
+        els = (els || []).filter(function (el) { return el && el.isConnected && !eng.inSkipTree(el); });
+        var exempts = (c.exemptRoots || []).filter(function (e) { return e.isConnected && !e.hasAttribute('data-unpolish-x') && e.tagName !== 'UNPOLISH-HARNESS' && e !== eng.filters && e !== eng.style; });
+        c.exemptRoots = [];
+        if (!els.length && !exempts.length) return;
+        this._cls = { els: els, exempts: exempts, reads: [], i: 0, sx: window.scrollX, sy: window.scrollY, t0: now() };
+        this.setDisabled(true);
+        this.sheetOff = true;
+        var html = document.documentElement;
         var bodyCs = getComputedStyle(document.body), htmlCs = getComputedStyle(html);
         var bb = bgOf(bodyCs).color, hb = bgOf(htmlCs).color;
         var page = over(hb.a > 0.01 ? hb : { r: 255, g: 255, b: 255, a: 1 }, { r: 255, g: 255, b: 255, a: 1 });
         c.pageBg = bb.a > 0.01 ? over(bb, page) : page;
         c.pageColor = parseColor(bodyCs.color);
-        reads = els.map(function (el) { return c.read(el); });
-        // Excluded regions keep the font and colour they would have inherited.
-        exempts.forEach(function (el) {
-          var par = parentEl(el);
+        from = 0;
+      }
+      var job = this._cls;
+      if (!job) return;
+      var t0 = now();
+      for (; job.i < job.els.length; job.i++) {
+        if (job.reads.length && now() - t0 >= TASK_BUDGET_MS) {
+          eng.noteBatchCost(now() - t0, job.reads.length - (job.noted || 0));
+          job.noted = job.reads.length;
+          scheduleIdle(function () { eng.classify(null, job.i); });
+          return;
+        }
+        var el = job.els[job.i];
+        if (el && el.isConnected && !eng.inSkipTree(el)) job.reads.push(c.read(el));
+      }
+      try {
+        job.reads.forEach(function (r) { c.parentInfo(r.el); });
+        job.exempts.forEach(function (node) {
+          var par = parentEl(node);
           if (!par) return;
           var pcs = getComputedStyle(par);
           var id = String(++eng.exemptCount);
-          el.setAttribute('data-unpolish-x', id);
+          node.setAttribute('data-unpolish-x', id);
           eng.exemptRules.push('[data-unpolish-x="' + id + '"]{font-family:' + pcs.fontFamily + ';color:' + pcs.color + '}');
         });
-        // Parent chains for dynamic insertions are resolved now, while originals are visible.
-        reads.forEach(function (r) { c.parentInfo(r.el); });
       } finally {
         this.setDisabled(false);
+        this.sheetOff = false;
+        if (window.scrollX !== job.sx || window.scrollY !== job.sy) window.scrollTo(job.sx, job.sy);
       }
-      if (window.scrollX !== sx || window.scrollY !== sy) window.scrollTo(sx, sy);
-      this.finishClassify(reads, exempts.length);
+      this.noteBatchCost(now() - t0, job.reads.length - (job.noted || 0));
+      var reads = job.reads, wroteExempt = job.exempts.length;
+      this._cls = null;
+      this.finishClassify(reads, wroteExempt);
     };
 
-    /* Mutation-path classify: read original colours without disabling the theme
-     * sheet (that restyles the whole page). Clones only this batch into an
-     * exempt off-screen probe — skipped maps are never in the batch. */
+    /* Mutation-path classify: never disable the theme sheet (that restyles the
+     * whole page). Insert the whole batch into an exempt off-screen probe, read
+     * once, then remove — one style recalc per slice, not per element. */
     Engine.prototype.ensureProbe = function () {
       if (this.probe && this.probe.isConnected) return this.probe;
       var probe = this.probe = document.createElement('div');
       probe.id = 'unpolish-probe';
       probe.setAttribute('data-unpolish-ignore', '');
       probe.setAttribute('aria-hidden', 'true');
-      probe.style.cssText = 'position:absolute;left:-9999px;top:0;width:0;height:0;overflow:hidden;pointer-events:none';
+      probe.style.cssText = 'position:absolute;left:-9999px;top:0;width:0;height:0;overflow:hidden;pointer-events:none;contain:strict';
       (document.body || document.documentElement).appendChild(probe);
       return probe;
     };
 
-    Engine.prototype.classifyLive = function (els) {
-      var c = this.classifier, probe = this.ensureProbe();
-      els = (els || []).filter(function (el) { return el && el.isConnected; });
-      if (!els.length) return;
-      var htmlClass = document.documentElement.className || '';
-      var bodyClass = (document.body && document.body.className) || '';
-      var reads = els.map(function (el) {
-        var chain = [];
-        for (var n = el; n && n !== document.body && n !== document.documentElement; n = parentEl(n)) chain.unshift(n);
-        var wrap = document.createElement('div');
-        wrap.className = (htmlClass + ' ' + bodyClass).trim();
-        var leaf = wrap;
-        chain.forEach(function (orig) {
-          var copy = orig.cloneNode(false);
-          leaf.appendChild(copy);
-          leaf = copy;
-        });
-        probe.appendChild(wrap);
-        var r = c.read(leaf === wrap ? el : leaf);
-        probe.removeChild(wrap);
-        r.el = el;
-        return r;
-      });
-      reads.forEach(function (r) { c.parentInfo(r.el); });
-      this.finishClassify(reads, false);
+    Engine.prototype.stripClone = function (copy) {
+      copy.removeAttribute('data-up');
+      copy.removeAttribute('data-unpolish-x');
+      copy.removeAttribute('data-unpolish-skip');
+      copy.removeAttribute('data-unpolish-busy');
+      copy.removeAttribute('data-unpolish-markers');
     };
 
-    Engine.prototype.finishClassify = function (reads, wroteExempt) {
-      var c = this.classifier, vw = window.innerWidth, vh = window.innerHeight;
-      var rects = reads.map(function (r) { return r.el.getBoundingClientRect(); });
-      reads.forEach(function (r, i) {
-        if (!r.el.isConnected) return;
+    Engine.prototype.classifyLive = function (els, from) {
+      var c = this.classifier, eng = this;
+      if (from == null) {
+        els = (els || []).filter(function (el) { return el && el.isConnected && !eng.inSkipTree(el); });
+        if (!els.length) return;
+        if (this._live) {
+          for (var a = 0; a < els.length; a++) this._live.els.push(els[a]);
+          return;
+        }
+        this._live = { els: els, i: 0 };
+      }
+      var job = this._live;
+      if (!job) return;
+      var probe = this.ensureProbe();
+      var t0 = now();
+      var limit = this.batchLimit();
+      var batch = [];
+      for (; job.i < job.els.length && batch.length < limit; job.i++) {
+        var el0 = job.els[job.i];
+        if (el0 && el0.isConnected && !eng.inSkipTree(el0)) batch.push(el0);
+      }
+      if (batch.length) {
+        var htmlClass = document.documentElement.className || '';
+        var bodyClass = (document.body && document.body.className) || '';
+        var wraps = [];
+        var leaves = [];
+        var i, el, n, wrap, leaf, copy, chain, k;
+        for (i = 0; i < batch.length; i++) {
+          el = batch[i];
+          chain = [];
+          for (n = el; n && n !== document.body && n !== document.documentElement; n = parentEl(n)) chain.unshift(n);
+          wrap = document.createElement('div');
+          wrap.className = (htmlClass + ' ' + bodyClass).trim();
+          leaf = wrap;
+          for (k = 0; k < chain.length; k++) {
+            copy = chain[k].cloneNode(false);
+            this.stripClone(copy);
+            leaf.appendChild(copy);
+            leaf = copy;
+          }
+          wraps.push(wrap);
+          leaves.push(leaf === wrap ? el : leaf);
+        }
+        var frag = document.createDocumentFragment();
+        for (i = 0; i < wraps.length; i++) frag.appendChild(wraps[i]);
+        probe.appendChild(frag);
+        var reads = [];
+        for (i = 0; i < leaves.length; i++) {
+          var rec = c.read(leaves[i]);
+          rec.el = batch[i];
+          reads.push(rec);
+        }
+        probe.textContent = '';
+        for (i = 0; i < reads.length; i++) c.parentInfo(reads[i].el);
+        this.finishClassify(reads, false);
+        this.noteBatchCost(now() - t0, batch.length);
+      }
+      if (job.i < job.els.length) {
+        scheduleIdle(function () { eng.classifyLive(null, job.i); });
+        return;
+      }
+      this._live = null;
+    };
+
+    Engine.prototype.finishClassify = function (reads, wroteExempt, from) {
+      var c = this.classifier, vw = window.innerWidth, vh = window.innerHeight, eng = this;
+      var t0 = now();
+      var i = from || 0;
+      var n0 = i;
+      for (; i < reads.length; i++) {
+        if (i > n0 && now() - t0 >= TASK_BUDGET_MS) {
+          this.noteBatchCost(now() - t0, i - n0);
+          scheduleIdle(function () { eng.finishClassify(reads, wroteExempt, i); });
+          return;
+        }
+        var r = reads[i];
+        if (!r.el || !r.el.isConnected) continue;
         try {
-          var tokens = c.decide(r, rects[i], vw, vh);
+          var rect = r.el.getBoundingClientRect();
+          var tokens = c.decide(r, rect, vw, vh);
           c.write(r.el, tokens);
-          var bag = c.memo.get(r.el) || Object.create(null);
-          bag[attrSig(r.el)] = { tokens: tokens, rect: rects[i], read: r };
-          c.memo.set(r.el, bag);
+          this.remember(r.el, tokens, rect, r);
         } catch (e) { warn('classify', e); }
-      });
+      }
+      if (i > n0) this.noteBatchCost(now() - t0, i - n0);
       if (wroteExempt) this.writeExempt();
       if (this.observer) this.observer.takeRecords();
     };
@@ -1526,24 +1674,21 @@
       roots.forEach(function (r) { self.attachShadow(r); });
     };
 
-    Engine.prototype.retagCached = function (els) {
-      var c = this.classifier, vw = window.innerWidth, vh = window.innerHeight, need = [], i;
-      for (i = 0; i < els.length; i++) {
+    Engine.prototype.retagCached = function (els, from) {
+      var need = [], i = from || 0, t0 = now(), self = this;
+      for (; i < els.length; i++) {
         var el = els[i];
         if (!el.isConnected) continue;
-        var sig = attrSig(el), bag = c.memo.get(el), hit = bag && bag[sig];
-        if (hit && hit.read) {
-          try {
-            var rect = el.getBoundingClientRect();
-            var tokens = c.decide(hit.read, rect, vw, vh);
-            c.write(el, tokens);
-            bag[sig] = { tokens: tokens, rect: rect, read: hit.read };
-          } catch (e) { warn('classify', e); }
-        } else {
-          need.push(el);
+        if (now() - t0 >= TASK_BUDGET_MS && i > (from || 0)) {
+          this.tagBatch(need, [], true);
+          scheduleIdle(function () { self.retagCached(els, i); });
+          return;
         }
+        var found = this.lookup(el);
+        if (found.hit && found.hit.read) this.replayCached(el, found.hit);
+        else need.push(el);
       }
-      if (need.length) this.classify(need);
+      this.tagBatch(need, [], false);
     };
 
     Engine.prototype.attachShadow = function (root) {
@@ -1696,6 +1841,11 @@
       }
       strip(document);
       this.classifier = new Classifier(this);
+      this.avgReadMs = 0;
+      this.lastBatchMs = 0;
+      this.sheetOff = false;
+      this._cls = null;
+      this._live = null;
       void self;
     };
 
@@ -1889,6 +2039,12 @@
 
     Engine.prototype.flushWork = function () {
       this.workScheduled = false;
+      if (this.sheetOff) {
+        var wait = this;
+        this.workScheduled = true;
+        scheduleIdle(function () { wait.flushWork(); });
+        return;
+      }
       if (!this.active) {
         this.pendingRoots.clear();
         this.pendingNodes.clear();
@@ -1929,39 +2085,36 @@
     Engine.prototype.flushClassify = function (list, start, shadowRoots, t0) {
       this.workScheduled = false;
       if (!this.active) return;
-      var need = [], i = start, c = this.classifier, self = this;
-      var vw = window.innerWidth, vh = window.innerHeight;
+      if (this.sheetOff) {
+        if (this._cls) {
+          var job = this._cls, self0 = this;
+          for (var j = start; j < list.length; j++) {
+            var node = list[j];
+            if (!node.isConnected || self0.isOwnNode(node) || self0.inExemptTree(node) || self0.inSkipTree(node)) continue;
+            var found0 = self0.lookup(node);
+            if (found0.hit && found0.hit.read) self0.replayCached(node, found0.hit);
+            else job.els.push(node);
+          }
+          start = list.length;
+        }
+        var hold = this;
+        this.workScheduled = true;
+        scheduleIdle(function () { hold.flushClassify(list, start, shadowRoots, now()); });
+        return;
+      }
+      var need = [], i = start, self = this;
       for (; i < list.length; i++) {
         var el = list[i];
         if (!el.isConnected || self.isOwnNode(el) || self.inExemptTree(el) || self.inSkipTree(el)) continue;
-        if ((need.length && now() - t0 >= WORK_BUDGET_MS) || need.length >= BATCH_MAX) {
-          this.workScheduled = true;
-          scheduleIdle(function () { self.flushClassify(list, i, shadowRoots, now()); });
-          this.tagBatch(need, shadowRoots, true);
-          return;
-        }
-        var sig = attrSig(el), bag = c.memo.get(el), hit = bag && bag[sig];
-        if (hit && hit.read) {
-          if (now() - t0 >= WORK_BUDGET_MS && i > start) {
+        var found = this.lookup(el);
+        if (found.hit && found.hit.read) {
+          if (now() - t0 >= TASK_BUDGET_MS && i > start) {
             this.workScheduled = true;
             scheduleIdle(function () { self.flushClassify(list, i, shadowRoots, now()); });
             this.tagBatch(need, shadowRoots, true);
             return;
           }
-          var tagged = c.tags.get(el);
-          var cached = hit.rect;
-          var tiny = !cached || cached.width < 10 || cached.height < 10;
-          if (!tiny && tagged === hit.tokens) continue;
-          var rect = el.getBoundingClientRect();
-          if (!tiny && cached && Math.abs(rect.width - cached.width) < 1 && Math.abs(rect.height - cached.height) < 1) {
-            if (tagged !== hit.tokens) c.write(el, hit.tokens);
-            continue;
-          }
-          try {
-            var tokens = c.decide(hit.read, rect, vw, vh);
-            if (tagged !== tokens) c.write(el, tokens);
-            bag[sig] = { tokens: tokens, rect: rect, read: hit.read };
-          } catch (e) { warn('classify', e); }
+          this.replayCached(el, found.hit);
           continue;
         }
         need.push(el);
@@ -1970,9 +2123,18 @@
     };
 
     Engine.prototype.tagBatch = function (need, shadowRoots, moreComing) {
-      // Read the whole batch, then write. No clone-and-measure, no per-element insert.
-      if (need && need.length) this.classifyLive(need);
-      if ((this.classifier.exemptRoots || []).length) this.classify([]);
+      if (need && need.length) {
+        if (this._cls) {
+          for (var i = 0; i < need.length; i++) this._cls.els.push(need[i]);
+        } else if (this._live) {
+          for (var j = 0; j < need.length; j++) this._live.els.push(need[j]);
+        } else if (need.length >= LIVE_BULK_MIN) {
+          this.classify(need);
+        } else {
+          this.classifyLive(need);
+        }
+      }
+      if ((this.classifier.exemptRoots || []).length && !this._cls && !this._live) this.classify([]);
       if (moreComing) return;
       var eng = this;
       shadowRoots.forEach(function (r) { eng.attachShadow(r); });
@@ -3065,6 +3227,7 @@
       var lt = this.local.themes;
       Object.keys(lt).forEach(function (id) { if (lt[id]) delete lt[id].roughness; if (!lt[id] || !Object.keys(lt[id]).length) delete lt[id]; });
       this.engine.configure(this.config);
+      this.urlChoice = opts.urlChoice || snapshotURL();
       this.readURL();
       var self = this;
       var start = function () {
@@ -3078,27 +3241,46 @@
       return this;
     };
 
+    function snapshotURL() {
+      var params = null;
+      try {
+        var u = new URL(window.location.href);
+        params = u.searchParams;
+        if (!params.has('unpolish') && !params.has('unpolish-ui') && u.hash) {
+          var q = u.hash.indexOf('?');
+          if (q >= 0) params = new URLSearchParams(u.hash.slice(q + 1));
+        }
+      } catch (e) { params = null; }
+      if (!params) return { has: false, hasTheme: false, theme: null, ui: null };
+      return {
+        has: params.has('unpolish') || params.has('unpolish-ui'),
+        hasTheme: params.has('unpolish'),
+        theme: params.get('unpolish'),
+        ui: params.get('unpolish-ui')
+      };
+    }
+
     App.prototype.readURL = function () {
-      var params;
-      try { params = new URL(window.location.href).searchParams; } catch (e) { params = null; }
-      var has = params && (params.has('unpolish') || params.has('unpolish-ui'));
-      if (has) {
-        var theme = normTheme(params.get('unpolish'));
-        if (params.has('unpolish') && !theme) warn('Unknown theme in URL:', params.get('unpolish'), '— using the project default.');
-        var ui = params.get('unpolish-ui');
+      var snap = this.urlChoice || snapshotURL();
+      if (snap.has) {
+        var theme = normTheme(snap.theme);
+        if (snap.hasTheme && !theme) warn('Unknown theme in URL:', snap.theme, '— using the project default.');
+        var urlTheme = theme || this.config.defaultTheme;
         this.state.review = {
-          theme: theme || this.config.defaultTheme,
-          ui: ui === 'hidden' ? 'hidden' : 'visible',
-          edits: {}
+          theme: urlTheme,
+          ui: snap.ui === 'hidden' ? 'hidden' : 'visible',
+          edits: {},
+          active: urlTheme
         };
         storage.set('sessionStorage', this.keys.review, this.state.review);
-      } else {
-        var saved = storage.get('sessionStorage', this.keys.review);
-        if (saved && saved.theme && normTheme(saved.theme)) {
-          saved.theme = normTheme(saved.theme);
-          saved.edits = saved.edits || {};
-          this.state.review = saved;
-        }
+        this.state.active = urlTheme;
+        return;
+      }
+      var saved = storage.get('sessionStorage', this.keys.review);
+      if (saved && saved.theme && normTheme(saved.theme)) {
+        saved.theme = normTheme(saved.theme);
+        saved.edits = saved.edits || {};
+        this.state.review = saved;
       }
       if (this.state.review) this.state.active = this.state.review.active || this.state.review.theme;
       else this.state.active = normTheme(this.local.active) || this.config.defaultTheme;
@@ -3385,14 +3567,16 @@
       init: function (opts) {
         opts = opts || {};
         if (app.started || pending) return api;
+        var urlChoice = snapshotURL();
         if (opts.configUrl && !opts.config) {
           pending = true;
           loadConfig(opts.configUrl, opts.fallbackConfigUrl).then(function (cfg) {
             pending = false;
-            if (!app.started) app.init({ config: cfg });
+            if (!app.started) app.init({ config: cfg, urlChoice: urlChoice });
           });
           return api;
         }
+        if (!opts.urlChoice) opts.urlChoice = urlChoice;
         app.init(opts);
         return api;
       },
@@ -3423,6 +3607,8 @@
           var e = app.engine;
           return { pending: e.pendingRoots.size + e.pendingNodes.size, roots: e.pendingRoots.size, nodes: e.pendingNodes.size };
         },
+        taggedCount: function () { return document.querySelectorAll('[data-up]').length; },
+        lastBatchMs: function () { return app.engine.lastBatchMs || 0; },
         setMapMarkers: function (mode) { app.engine.setMapMarkers(mode); }
       }
     };

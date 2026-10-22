@@ -163,6 +163,7 @@ test('help, version and dry-run of the packed CLI', () => {
   r = run(dir, ['init', '--dry-run', '--json']);
   expect(r.code).toBe(0);
   expect(r.report.status).toBe('planned');
+  expect(r.report.verify.join('\n')).toMatch(/npm run dev -- --force/);
   expect(existsSync(join(dir, 'unpolish'))).toBe(false);
   expect(read(join(dir, 'index.html'))).not.toContain('unpolish');
 });
