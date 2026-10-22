@@ -67,7 +67,7 @@ Exit codes: `0` done or nothing to do · `1` failed, nothing changed (e.g. the l
 
 One file, no dependencies, starts itself. `data-config` resolves relative to the page (falling back to the script's folder). Keep `unpolish.config.json` next to your pages and commit it. Without `data-config` the built-in presets are used. Alternatives: inline `<script type="application/json" id="unpolish-config">{…}</script>` before the tag, `window.UnpolishConfig = {…}`, or `data-manual` and call `Unpolish.init({ config })` yourself.
 
-Pin a version: the bundle's first line names it (`/*! Unpolish v0.1.2 …`). After publication, jsDelivr and unpkg serve every npm version at `https://cdn.jsdelivr.net/npm/unpolish@<version>/dist/unpolish.js` — use an exact version, never `latest`, for a prototype others review.
+Pin a version: the bundle's first line names it (`/*! Unpolish v0.1.3 …`). After publication, jsDelivr and unpkg serve every npm version at `https://cdn.jsdelivr.net/npm/unpolish@<version>/dist/unpolish.js` — use an exact version, never `latest`, for a prototype others review.
 
 ## In code
 
@@ -114,7 +114,9 @@ Precedence: **review link → local draft (this browser) → project config → 
 
 ```jsonc
 {
-  "exclude": [".brand-logo", "#map"],  // extra regions; maps, data-unpolish-ignore and gmp-* are already skipped
+  "exclude": [".brand-logo"],           // extra regions that keep their original look
+  "include": ["#tiny-map"],             // opt a skipped map/image back in (or set data-unpolish="keep")
+  "mapMarkers": "original",             // keep map pin/car icons full color (default is "pane")
   "roles": { ".my-chip": "fill" },     // classifier hints: surface | fill | media | icon | plain
   "launcher": "bottom-left",           // or top-right | top-left | false
   "webFonts": false,                   // system fonts instead of Google Fonts
@@ -127,7 +129,16 @@ Precedence: **review link → local draft (this browser) → project config → 
 }
 ```
 
-`exclude` is additive. Unpolish already skips `[data-unpolish-ignore]`, its own UI, Google Maps containers (`gmp-map`, `gmp-advanced-marker`, `.gm-style`, and any `gmp-*` custom element), and does not walk into `canvas` / `video` / `iframe` internals. Put a `data-unpolish-ignore` attribute on a region, or list a selector here, when something else must keep its look.
+`exclude` is additive and keeps the original look (no theme filter). Unpolish already ignores `[data-unpolish-ignore]` and its own UI.
+
+Maps, images and other heavy widgets are skipped automatically — they are not classified. One CSS `filter` is applied on the container so the content stays visible but looks sketch- or blueprint-like. Descendants are never walked or restyled:
+
+- **Media:** `img`, `picture`, `video`, `canvas`, `iframe`, `svg` internals, `object`, `embed`
+- **Map widgets:** Leaflet (`.leaflet-container`), Mapbox/MapLibre (`.mapboxgl-map`, `.maplibregl-map`), Google Maps (`.gm-style`, `gmp-map`, `gmp-*`), OpenLayers (`.ol-viewport`), deck.gl, and `[role="application"]`
+- **Heavy subtrees:** a node with a very high count of absolutely positioned children, or a lot of mutation churn, is marked skipped at runtime
+- **Sketch hybrid:** idle skipped regions use the SVG pencil-line edge filter. While a region is panning, zooming, playing, or otherwise changing (including moving map markers), one `data-unpolish-busy` toggle on that root swaps it to a cheap CSS grayscale filter, then back after ~260ms still. Video and animated canvas that never sit still stay gray. On Leaflet maps the filter sits on the **tile pane** (never per tile). Moving cars keep the tiles gray — leaving the edge filter on while cars move drops to ~5 fps. Marker icons get a second cheap CSS filter on the **marker pane** (`mapMarkers: "pane"`, default) so they read as sketch/blueprint without an SVG edge filter and without classifying each `img`. `mapMarkers: "original"` or `data-unpolish-ignore` on the pane keeps icons full color. Blueprint stays a cheap ink wash on tiles and the marker pane.
+
+To classify a skipped region anyway, set `data-unpolish="keep"` on it or list a selector in `include`. Do not do that on a map with thousands of markers. Put `data-unpolish-ignore` or an `exclude` selector on a region that must keep its real pixels with no filter.
 
 The schema (`schema/unpolish.config.schema.json`) documents every field and gives editors autocomplete.
 
@@ -150,7 +161,7 @@ Removes only what it can identify: the marked `unpolish:start…end` block, the 
 
 ## How it stays safe
 
-Themes live in one `<style id="unpolish-theme">` (an `@layer`), `data-up` attributes and a hidden SVG filter set — Original removes all of it. They change colours, outlines, backgrounds, radii, shadows and fonts, never size, padding, position or border width. No element is replaced, wrapped or covered, so handlers, focus, form values, scroll and routes are untouched. New content is classified as it appears; open shadow roots get the theme too. The panel lives in its own shadow root.
+Themes live in `<style id="unpolish-theme">` (an `@layer`), skip filters in `#unpolish-skip`, `data-up` attributes and a hidden SVG filter set — Original removes all of it. They change colours, outlines, backgrounds, radii, shadows and fonts, never size, padding, position or border width. No element is replaced, wrapped or covered, so handlers, focus, form values, scroll and routes are untouched. New content is classified as it appears; open shadow roots get the theme too. The panel lives in its own shadow root.
 
 ## Limitations
 

@@ -28,7 +28,7 @@ for (const [name, url] of Object.entries(EXAMPLES)) {
       await settle(page);
       expect(await page.getAttribute('html', 'data-unpolish')).toBeNull();
       expect(await page.locator('[data-up]').count()).toBe(0);
-      expect(await page.locator('#unpolish-theme, #unpolish-filters').count()).toBe(0);
+      expect(await page.locator('#unpolish-theme, #unpolish-skip, #unpolish-filters, #unpolish-probe').count()).toBe(0);
       expect(await styles(page)).toEqual(before);
       expect(errors).toEqual([]);
     });
@@ -77,18 +77,18 @@ test('exempt regions, canvas and project overrides are respected', async ({ page
   await settle(page);
   expect(await brand.getAttribute('data-up')).toBeNull();
   expect(await brand.evaluate((e) => getComputedStyle(e).backgroundColor + getComputedStyle(e).fontFamily)).toBe(before);
-  // Canvas pixels are left alone.
-  expect(await page.getByTestId('canvas').getAttribute('data-up')).toBe('media-opaque');
-  expect(await page.getByTestId('canvas').evaluate((e) => getComputedStyle(e).filter)).toBe('none');
-  // Project config: sketch with 2px strokes + black-and-white images.
+  // Canvas is skipped (one CSS filter, drawing stays), not classified.
+  expect(await page.getByTestId('canvas').getAttribute('data-up')).toBeNull();
+  expect(await page.getByTestId('canvas').getAttribute('data-unpolish-skip')).toBe('canvas');
+  expect(await page.getByTestId('canvas').evaluate((e) => getComputedStyle(e).filter)).toMatch(/grayscale|url\(/);
+  // Project config: sketch with 2px strokes + black-and-white images (applies to opted-in media).
   const s = await page.evaluate(() => window.Unpolish.getSettings('sketch'));
   expect(s.border.weight).toBe(2);
   expect(s.images).toBe('mono');
-  expect(await page.locator('img[data-up~="media"]').first().evaluate((e) => getComputedStyle(e).filter)).toContain('grayscale(1)');
-  // Match theme is the default: Sketch draws images with its pencil filter
-  await page.evaluate(() => window.Unpolish.update({ images: 'theme' }));
-  await settle(page);
-  expect(await page.locator('img[data-up~="media"]').first().evaluate((e) => getComputedStyle(e).filter)).toContain('url');
+  const img = page.locator('img').first();
+  expect(await img.getAttribute('data-up')).toBeNull();
+  expect(await img.getAttribute('data-unpolish-skip')).toBe('image');
+  expect(await img.evaluate((e) => getComputedStyle(e).filter)).toMatch(/grayscale|url\(/);
   // Older configs: "simplified" means Match theme, details true/false map to the default/0
   expect(await page.evaluate(() => window.Unpolish._internal.normalizeSettings('sketch', { images: 'simplified', details: false }))).toMatchObject({ images: 'theme', details: 0 });
 
@@ -120,12 +120,19 @@ test('image placeholders keep dimensions and accessible meaning', async ({ page 
   const img = page.locator('.venue img').first();
   const box = await img.boundingBox();
   await setTheme(page, 'black-white');
-  await page.evaluate(() => window.Unpolish.update({ images: 'placeholder' }));
   await settle(page);
   expect(await img.boundingBox()).toEqual(box);
   expect(await img.getAttribute('alt')).toBe('Lakeside terrace at sunset');
+  expect(await img.evaluate((e) => getComputedStyle(e).filter)).toMatch(/grayscale/);
+  await expect(page.getByRole('img', { name: 'Lakeside terrace at sunset' })).toBeVisible();
+  // Opted-in media still honours images: placeholder.
+  await img.evaluate((e) => e.setAttribute('data-unpolish', 'keep'));
+  await setTheme(page, 'original');
+  await setTheme(page, 'black-white');
+  await page.evaluate(() => window.Unpolish.update({ images: 'placeholder' }));
+  await settle(page);
+  expect(await img.boundingBox()).toEqual(box);
   const cs = await img.evaluate((e) => ({ op: getComputedStyle(e).objectPosition, bg: getComputedStyle(e).backgroundImage }));
   expect(cs.op).toContain('-99999px');
   expect(cs.bg).toContain('data:image/svg+xml');
-  await expect(page.getByRole('img', { name: 'Lakeside terrace at sunset' })).toBeVisible();
 });

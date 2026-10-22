@@ -1,4 +1,4 @@
-/*! Unpolish v0.1.2 — reversible lo-fi themes for working web prototypes. MIT License. */
+/*! Unpolish v0.1.3 — reversible lo-fi themes for working web prototypes. MIT License. */
 (function () {
   'use strict';
   // Script-tag build. Does nothing outside a browser; if Unpolish is already
@@ -15,7 +15,7 @@
   function createUnpolish() {
     'use strict';
 
-    var VERSION = '0.1.2';
+    var VERSION = '0.1.3';
 
     /* ------------------------------------------------------------------ *
      * Themes
@@ -101,10 +101,12 @@
       launcher: 'bottom-right',
       webFonts: true,
       exclude: [],
+      include: [],
       roles: {},
       shortcuts: { toggle: '\\', themes: {} },
       themes: {},
-      overrides: {}
+      overrides: {},
+      mapMarkers: 'pane'
     };
 
     /* ------------------------------------------------------------------ *
@@ -145,6 +147,36 @@
     function clamp(n, lo, hi) { return Math.min(hi, Math.max(lo, n)); }
     function round(n, p) { var f = Math.pow(10, p || 0); return Math.round(n * f) / f; }
     function warn() { try { console.warn.apply(console, ['[unpolish]'].concat([].slice.call(arguments))); } catch (e) { /* noop */ } }
+    function validSelectors(list, kind) {
+      return (Array.isArray(list) ? list : [list]).filter(function (sel) {
+        if (typeof sel !== 'string' || !sel.trim()) return false;
+        try { document.createDocumentFragment().querySelector(sel); return true; } catch (e) { warn('Ignoring invalid ' + kind + ' selector:', sel); return false; }
+      });
+    }
+    function keptWhere(include) {
+      var parts = [KEEP_SEL, KEEP_SEL + ' *'];
+      splitSel(include || '').forEach(function (s) { if (s) { parts.push(s); parts.push(s + ' *'); } });
+      return ':where(' + parts.join(', ') + ')';
+    }
+    function skipKind(el) {
+      var tag = el.tagName;
+      if (tag === 'IMG' || tag === 'PICTURE') return 'image';
+      if (tag === 'VIDEO') return 'video';
+      if (tag === 'CANVAS') return 'canvas';
+      if (tag === 'IFRAME' || tag === 'EMBED' || tag === 'OBJECT') return 'media';
+      if (/^GMP-/.test(tag)) return 'map';
+      try { if (el.matches(MAP_WIDGET_SEL)) return 'map'; } catch (e) { /* invalid */ }
+      return 'heavy';
+    }
+    function absMajority(el) {
+      var kids = el.children, n = Math.min(kids.length, 24), abs = 0, i;
+      if (!n) return false;
+      for (i = 0; i < n; i++) {
+        var s = kids[i].getAttribute('style') || '';
+        if (/position\s*:\s*(absolute|fixed)/i.test(s)) abs++;
+      }
+      return abs * 2 >= n;
+    }
     function normTheme(id) {
       if (id == null) return null;
       id = String(id).trim().toLowerCase();
@@ -152,12 +184,24 @@
       return id === 'original' || THEMES[id] ? id : null;
     }
     function raf(fn) { return (window.requestAnimationFrame || setTimeout)(fn); }
+    function scheduleIdle(fn) {
+      if (typeof requestIdleCallback === 'function') return requestIdleCallback(fn, { timeout: 48 });
+      return raf(fn);
+    }
     function now() { return (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now(); }
     var WORK_BUDGET_MS = 8;
-    // Regions that churn or must keep their own look. data-unpolish-ignore is always honoured;
-    // Google Maps (gmp-* / .gm-style) is skipped even without a project exclude.
-    var BUILTIN_EXEMPT = ['[data-unpolish-ignore]', 'unpolish-harness', '#unpolish-filters', '#unpolish-probe', 'gmp-map', 'gmp-advanced-marker', '.gm-style'];
-    var MEDIA_LEAF = { CANVAS: 1, VIDEO: 1, IFRAME: 1, EMBED: 1, OBJECT: 1 };
+    var BATCH_MAX = 24;
+    var HEAVY_CHILD_MIN = 80;
+    var CHURN_WINDOW_MS = 1000;
+    var CHURN_MARK_MIN = 30;
+    var SKIP_BUSY_MS = 260;
+    // Regions that must keep their own look. data-unpolish-ignore and project exclude
+    // win over skip filters. Maps and media are skipped separately (filter on the root, no walk).
+    var BUILTIN_EXEMPT = ['[data-unpolish-ignore]', 'unpolish-harness', '#unpolish-filters', '#unpolish-probe'];
+    var MEDIA_LEAF = { IMG: 1, PICTURE: 1, VIDEO: 1, CANVAS: 1, IFRAME: 1, EMBED: 1, OBJECT: 1 };
+    var MAP_WIDGET_SEL = '.leaflet-container, .mapboxgl-map, .maplibregl-map, .gm-style, gmp-map, .ol-viewport, [class*="deckgl"], [class*="deck-gl"], [role="application"]:not(html, body)';
+    var SKIP_MEDIA_SEL = 'img, picture, video, canvas, iframe, object, embed';
+    var KEEP_SEL = '[data-unpolish="keep"]';
     var ANIM_STYLE = /^(transform|translate|rotate|scale|offset|opacity|filter|perspective|perspective-origin|transform-origin|will-change|left|top|right|bottom|x|y|cx|cy|d|points|transition|animation|offset-path|offset-distance|offset-rotate|contain|content-visibility)$/i;
     function styleDecls(s) {
       var out = {};
@@ -326,10 +370,8 @@
       cfg.defaultTheme = normTheme(cfg.defaultTheme) || 'original';
       cfg.ui = cfg.ui === 'hidden' ? 'hidden' : 'visible';
       if (!/^(top|bottom)-(left|right)$/.test(cfg.launcher) && cfg.launcher !== false) cfg.launcher = 'bottom-right';
-      cfg.exclude = (Array.isArray(cfg.exclude) ? cfg.exclude : [cfg.exclude]).filter(function (sel) {
-        if (typeof sel !== 'string' || !sel.trim()) return false;
-        try { document.createDocumentFragment().querySelector(sel); return true; } catch (e) { warn('Ignoring invalid exclude selector:', sel); return false; }
-      });
+      cfg.exclude = validSelectors(cfg.exclude, 'exclude');
+      cfg.include = validSelectors(cfg.include, 'include');
       var themes = {};
       Object.keys(cfg.themes || {}).forEach(function (k) {
         var id = normTheme(k);
@@ -344,6 +386,7 @@
         if (id && typeof sc.themes[k] === 'string' && sc.themes[k]) themeKeys[id] = sc.themes[k];
       });
       cfg.shortcuts = { toggle: typeof sc.toggle === 'string' && sc.toggle ? sc.toggle : '\\', themes: themeKeys };
+      cfg.mapMarkers = cfg.mapMarkers === 'original' || cfg.mapMarkers === 'img' || cfg.mapMarkers === 'pane' ? cfg.mapMarkers : 'pane';
       return cfg;
     }
 
@@ -491,6 +534,25 @@
       var mono = 'grayscale(1) contrast(' + round(1.05 + r * 0.3, 2) + ')';
       v.imgFilter = s.images === 'mono' || id === 'black-white' ? mono : 'url(#up-f-' + id + ')';
       v.imgTint = s.images === 'mono' || id === 'black-white' ? '#ffffff' : id === 'blueprint' ? v.paper : id === 'pastel' ? p.block4 : '#ffffff';
+      // One CSS filter on each skipped root. Sketch is hybrid: SVG pencil-edge
+      // while the region is still, cheap grayscale while it is moving (one
+      // attribute toggle on the skip root). Blueprint stays a cheap ink wash —
+      // the same edge swap does not read as a blueprint line drawing.
+      v.skipFilterBusy = id === 'sketch'
+        ? 'grayscale(1) contrast(1.35) brightness(1.05)'
+        : '';
+      v.skipFilter = id === 'sketch'
+        ? 'url(#up-f-skip-edge)'
+        : id === 'blueprint'
+          ? 'grayscale(1) sepia(0.9) hue-rotate(185deg) saturate(2.8) brightness(0.9) contrast(1.15)'
+          : id === 'black-white'
+            ? 'grayscale(1) contrast(1.4)'
+            : 'grayscale(0.4) saturate(0.7) contrast(1.08) brightness(1.04)';
+      v.skipFilterStill = id === 'sketch'
+        ? 'url(#up-f-skip-edge)'
+        : id === 'blueprint'
+          ? 'url(#up-f-blueprint)'
+          : v.skipFilter;
       v.ph = placeholderSvg(id, v);
       v.phBg = id === 'blueprint' ? mix(v.paper, '#000000', 0.12) : id === 'pastel' ? p.block2 : id === 'sketch' ? mix(v.surface, v.ink, 0.04) : mix(v.surface, v.ink, 0.05);
       v.phIcon = placeholderIcon(id === 'blueprint' ? v.line : mix(v.ink, v.surface, 0.45));
@@ -564,7 +626,11 @@
     function buildCSS(v, opts) {
       var P = opts.shadow ? '' : 'html[data-unpolish] ';
       var EXQ = ':is(' + opts.exempt + ')';
-      var NOTX = ':where(:not(' + EXQ + ', ' + EXQ + ' *))';
+      var SKIPQ = ':is(' + MAP_WIDGET_SEL + ', [data-unpolish-skip])';
+      var MEDIAQ = ':is(' + SKIP_MEDIA_SEL + ')';
+      var KEPTQ = keptWhere(opts.include);
+      var NOTKEEP = ':not(' + KEPTQ + ')';
+      var NOTX = ':where(:not(' + EXQ + ', ' + EXQ + ' *, ' + SKIPQ + ', ' + SKIPQ + ' *, ' + MEDIAQ + ':not(svg)))';
       var t = v.tones, I = ' !important';
       var css = [];
       function rule(sel, body) { css.push(sel + '{' + body + '}'); }
@@ -787,7 +853,7 @@
       rule(P + ':where(*' + NOTX + '):focus-visible', 'outline:2px solid var(--up-focus)' + I + ';outline-offset:2px' + I);
       rule(S('dialog::backdrop'), 'background-color:' + alpha(v.ink, 0.35) + I + ';backdrop-filter:none' + I);
 
-      // Media
+      // Media that was classified (opted-in with include / data-unpolish="keep", or svg / background-image).
       if (v.images === 'theme' || v.images === 'mono') {
         rule(S('[data-up~="media"]'), 'filter:' + v.imgFilter + I);
         rule(S('[data-up~="media-bg"][data-up~="solo"]'), 'filter:' + v.imgFilter + I);
@@ -807,6 +873,59 @@
         if (ov['*']) css.push('html[data-unpolish]{' + ov['*'] + '}');
         if (ov[v.id]) css.push('html[data-unpolish="' + v.id + '"]{' + ov[v.id] + '}');
       }
+      return '@layer unpolish{' + css.join('\n') + '}';
+    }
+
+    /* Always-on skip filters. Kept in a separate sheet so mutation-path classify
+     * can disable token CSS without restyling skipped maps. */
+    function buildSkipCSS(v, opts) {
+      var P = opts.shadow ? '' : 'html[data-unpolish] ';
+      var EXQ = ':is(' + opts.exempt + ')';
+      var KEPTQ = keptWhere(opts.include);
+      var NOTKEEP = ':not(' + KEPTQ + ')';
+      var NOTEX = ':not(' + EXQ + ', ' + EXQ + ' *)';
+      var I = ' !important';
+      var css = [];
+      function rule(sel, body) { css.push(sel + '{' + body + '}'); }
+      function S(sel) { return splitSel(sel).map(function (x) { return P + x; }).join(','); }
+      var skipLive = ':is(' + MAP_WIDGET_SEL + ', [data-unpolish-skip="map"], [data-unpolish-skip="heavy"])' + NOTKEEP + NOTEX;
+      var NOTINSIDE = ':not(:is(' + MAP_WIDGET_SEL + ', [data-unpolish-skip]) *)';
+      var skipReplaced = ':is(video, iframe, embed, object, [data-unpolish-skip="video"], [data-unpolish-skip="media"])' + NOTKEEP + NOTEX + NOTINSIDE;
+      var skipStill = ':is(img, picture, canvas, input[type="image"], [data-unpolish-skip="image"], [data-unpolish-skip="canvas"])' + NOTKEEP + NOTEX + NOTINSIDE;
+      // Leaflet: filter the tile pane only so moving markers stay crisp on top.
+      var skipTiles = skipLive + ' .leaflet-tile-pane';
+      var skipLiveBare = skipLive + ':not(:has(.leaflet-tile-pane))';
+      rule(S(skipStill), 'filter:' + v.skipFilterStill + I);
+      rule(S(skipReplaced + ', ' + skipLiveBare), 'filter:' + v.skipFilter + I);
+      rule(S(skipTiles), 'filter:' + v.skipFilter + I + ';isolation:isolate' + I);
+      if (v.skipFilterBusy && v.skipFilterBusy !== v.skipFilter) {
+        rule(S(skipStill + '[data-unpolish-busy], ' + skipReplaced + '[data-unpolish-busy], ' + skipLiveBare + '[data-unpolish-busy]'),
+          'filter:' + v.skipFilterBusy + I);
+        rule(S(skipLive + '[data-unpolish-busy] .leaflet-tile-pane'),
+          'filter:' + v.skipFilterBusy + I);
+      }
+      // Marker icons: cheap CSS only (never SVG edge). Gated by html[data-unpolish-markers].
+      // pane = one filter on the marker pane; img = stylesheet rule on marker imgs (raster cache).
+      var markerCheap = v.id === 'sketch'
+        ? 'grayscale(1) contrast(1.35) brightness(1.05)'
+        : v.id === 'blueprint' ? v.skipFilter : '';
+      if (markerCheap) {
+        var markerSel = function (mode, sel) {
+          var prefix = opts.shadow ? '' : 'html[data-unpolish][data-unpolish-markers="' + mode + '"] ';
+          return splitSel(sel).map(function (x) { return prefix + x; }).join(',');
+        };
+        var markerPanes = skipLive + ' :is(.leaflet-marker-pane, .ol-overlaycontainer)' + NOTEX;
+        var markerImgs = skipLive + ' :is(.leaflet-marker-pane, .mapboxgl-marker, .maplibregl-marker) img' + NOTEX;
+        rule(markerSel('pane', markerPanes), 'filter:' + markerCheap + I + ';isolation:isolate' + I);
+        rule(markerSel('img', markerImgs), 'filter:' + markerCheap + I);
+      }
+      rule(S(skipLive), 'position:relative' + I);
+      rule(S(':is(' + MAP_WIDGET_SEL + ', [data-unpolish-skip="map"])' + NOTKEEP + NOTEX + '::after'),
+        'content:"Map"' + I + ';position:absolute' + I + ';top:6px' + I + ';left:6px' + I +
+        ';padding:2px 6px' + I + ';font:600 10px/1.2 var(--up-font, ui-sans-serif, system-ui, sans-serif)' + I +
+        ';letter-spacing:0.06em' + I + ';text-transform:uppercase' + I +
+        ';color:var(--up-ink)' + I + ';background:color-mix(in srgb, var(--up-surface) 86%, transparent)' + I +
+        ';border:1px solid var(--up-line)' + I + ';pointer-events:none' + I + ';z-index:2' + I);
       return '@layer unpolish{' + css.join('\n') + '}';
     }
 
@@ -835,7 +954,17 @@
         '<filter id="up-f-pastel" color-interpolation-filters="sRGB" x="0" y="0" width="100%" height="100%">' +
         '<feColorMatrix type="matrix" values="0.3 0.59 0.11 0 0 0.3 0.59 0.11 0 0 0.3 0.59 0.11 0 0 0 0 0 1 0"/>' +
         '<feComponentTransfer><feFuncR type="discrete" tableValues="' + steps + '"/><feFuncG type="discrete" tableValues="' + steps + '"/><feFuncB type="discrete" tableValues="' + steps + '"/></feComponentTransfer>' +
-        '<feComponentTransfer>' + duo(ink, blk) + '</feComponentTransfer></filter>';
+        '<feComponentTransfer>' + duo(ink, blk) + '</feComponentTransfer></filter>' +
+        '<filter id="up-f-skip-still" color-interpolation-filters="sRGB" x="0" y="0" width="100%" height="100%">' +
+        '<feComponentTransfer><feFuncR type="discrete" tableValues="0 0.22 0.45 0.68 1"/><feFuncG type="discrete" tableValues="0 0.22 0.45 0.68 1"/><feFuncB type="discrete" tableValues="0 0.22 0.45 0.68 1"/></feComponentTransfer></filter>' +
+        // Sketch idle skip filter: pencil-line edges. Swapped off while the region moves.
+        '<filter id="up-f-skip-edge" color-interpolation-filters="sRGB" x="-2%" y="-2%" width="104%" height="104%">' +
+        '<feColorMatrix type="saturate" values="0" result="g"/>' +
+        '<feComponentTransfer in="g" result="paper"><feFuncR type="linear" slope="0.22" intercept="0.78"/><feFuncG type="linear" slope="0.20" intercept="0.76"/><feFuncB type="linear" slope="0.16" intercept="0.72"/></feComponentTransfer>' +
+        '<feConvolveMatrix in="g" order="3" kernelMatrix="-1 -1 -1 -1 8 -1 -1 -1 -1" preserveAlpha="true" result="e"/>' +
+        '<feComponentTransfer in="e" result="inv"><feFuncR type="linear" slope="-10" intercept="1"/><feFuncG type="linear" slope="-10" intercept="1"/><feFuncB type="linear" slope="-10" intercept="1"/></feComponentTransfer>' +
+        '<feComponentTransfer in="inv" result="lines"><feFuncR type="discrete" tableValues="0 0 1"/><feFuncG type="discrete" tableValues="0 0 1"/><feFuncB type="discrete" tableValues="0 0 1"/></feComponentTransfer>' +
+        '<feBlend in="lines" in2="paper" mode="multiply"/></filter>';
     }
 
     /* ------------------------------------------------------------------ *
@@ -862,20 +991,40 @@
 
     Classifier.prototype.isExempt = function (el) {
       if (!el || el.nodeType !== 1) return true;
-      if (/^GMP-/.test(el.tagName)) return true;
       try { return el.matches(this.engine.exemptSelector); } catch (e) { return false; }
     };
 
-    /* Collect elements under `root` in document order, skipping exempt subtrees. */
+    Classifier.prototype.isSkipRoot = function (el) {
+      if (!el || el.nodeType !== 1) return false;
+      if (el === document.body || el === document.documentElement) return false;
+      if (this.engine.isKept(el)) return false;
+      if (this.engine.heavy && this.engine.heavy.has(el)) return true;
+      var tag = el.tagName;
+      if (MEDIA_LEAF[tag]) return true;
+      if (/^GMP-/.test(tag)) return true;
+      try { if (el.matches(MAP_WIDGET_SEL)) return true; } catch (e) { /* invalid */ }
+      if (el.childElementCount >= HEAVY_CHILD_MIN && absMajority(el)) return true;
+      return false;
+    };
+
+    Classifier.prototype.markSkip = function (el, kind) {
+      if (!el || el.nodeType !== 1) return;
+      kind = kind || skipKind(el);
+      if (el.getAttribute('data-unpolish-skip') !== kind) el.setAttribute('data-unpolish-skip', kind);
+      this.engine.watchSkip(el);
+    };
+
+    /* Collect elements under `root` in document order, skipping exempt and heavy subtrees. */
     Classifier.prototype.collect = function (root, out, roots) {
       var self = this;
       (function walk(el) {
         var tag = el.tagName;
         if (SKIP[tag] && tag !== 'HTML' && tag !== 'BODY') return;
         if (self.isExempt(el)) { if (self.exemptRoots) self.exemptRoots.push(el); return; }
+        if (self.isSkipRoot(el)) { self.markSkip(el); return; }
         if (tag !== 'HTML' && tag !== 'BODY') out.push(el);
         if (el.shadowRoot && roots) roots.push(el.shadowRoot);
-        if (tag === 'svg' || tag === 'SVG' || MEDIA_LEAF[tag] || el instanceof SVGElement) return;
+        if (tag === 'svg' || tag === 'SVG' || el instanceof SVGElement) return;
         var kids = el.children;
         for (var i = 0; i < kids.length; i++) walk(kids[i]);
         if (el.shadowRoot && roots) {
@@ -1198,6 +1347,8 @@
       this.app = app;
       this.active = null;
       this.style = null;
+      this.skipStyle = null;
+      this.probe = null;
       this.guard = null;
       this.filters = null;
       this.classifier = new Classifier(this);
@@ -1208,18 +1359,27 @@
       this.pendingNodes = new Set();
       this.workScheduled = false;
       this.exemptSelector = BUILTIN_EXEMPT.join(', ');
+      this.includeSelector = '';
       this.roleSelectors = {};
       this.lastCSS = '';
+      this.lastSkipCSS = '';
       this.fontsLoaded = {};
       this.exemptRules = [];
       this.exemptCount = 0;
+      this.heavy = new WeakSet();
+      this.churn = new WeakMap();
+      this.skipBusyTimers = new WeakMap();
+      this.skipWatched = new WeakSet();
+      this.mapMarkers = 'pane';
     }
 
     Engine.prototype.configure = function (cfg) {
       var ex = BUILTIN_EXEMPT.concat(cfg.exclude || []);
       this.exemptSelector = ex.join(', ');
+      this.includeSelector = (cfg.include || []).join(', ');
       this.overrides = cfg.overrides || {};
       this.webFonts = cfg.webFonts !== false;
+      this.mapMarkers = cfg.mapMarkers === 'original' || cfg.mapMarkers === 'img' || cfg.mapMarkers === 'pane' ? cfg.mapMarkers : 'pane';
       var roles = {};
       Object.keys(cfg.roles || {}).forEach(function (sel) {
         var role = cfg.roles[sel];
@@ -1236,6 +1396,15 @@
       return null;
     };
 
+    Engine.prototype.isKept = function (el) {
+      if (!el || el.nodeType !== 1) return false;
+      try {
+        if (el.closest && el.closest(KEEP_SEL)) return true;
+        if (this.includeSelector && el.closest && el.closest(this.includeSelector)) return true;
+      } catch (e) { return false; }
+      return false;
+    };
+
     Engine.prototype.setDisabled = function (off) {
       if (this.style && this.style.sheet) this.style.sheet.disabled = off;
       this.shadowSheets.forEach(function (sheet) { sheet.disabled = off; });
@@ -1244,6 +1413,7 @@
     /* Read original styles for a batch with Unpolish switched off, then tag. */
     Engine.prototype.classify = function (els) {
       var c = this.classifier, eng = this;
+      els = (els || []).filter(function (el) { return el && el.isConnected && !eng.inSkipTree(el); });
       var exempts = (c.exemptRoots || []).filter(function (e) { return e.isConnected && !e.hasAttribute('data-unpolish-x') && e.tagName !== 'UNPOLISH-HARNESS' && e !== eng.filters && e !== eng.style; });
       c.exemptRoots = [];
       if (!els.length && !exempts.length) return;
@@ -1276,7 +1446,9 @@
       this.finishClassify(reads, exempts.length);
     };
 
-    /* Tag newly inserted nodes without disabling the theme sheet (that invalidates the whole page). */
+    /* Mutation-path classify: read original colours without disabling the theme
+     * sheet (that restyles the whole page). Clones only this batch into an
+     * exempt off-screen probe — skipped maps are never in the batch. */
     Engine.prototype.ensureProbe = function () {
       if (this.probe && this.probe.isConnected) return this.probe;
       var probe = this.probe = document.createElement('div');
@@ -1288,8 +1460,9 @@
       return probe;
     };
 
-    Engine.prototype.classifyFresh = function (els) {
+    Engine.prototype.classifyLive = function (els) {
       var c = this.classifier, probe = this.ensureProbe();
+      els = (els || []).filter(function (el) { return el && el.isConnected; });
       if (!els.length) return;
       var htmlClass = document.documentElement.className || '';
       var bodyClass = (document.body && document.body.className) || '';
@@ -1346,12 +1519,31 @@
       this.classifier.exemptRoots = [];
       var roots = [];
       var els = this.classifier.collect(document.body, [], roots);
-      this.classifier.info = new WeakMap();
-      this.classifier.memo = new WeakMap();
-      this.classify(els);
+      // Keep memo/info across resize so we re-decide from cached reads, not a full reclassify.
+      this.retagCached(els);
       if (this.observer) this.observer.takeRecords();
       var self = this;
       roots.forEach(function (r) { self.attachShadow(r); });
+    };
+
+    Engine.prototype.retagCached = function (els) {
+      var c = this.classifier, vw = window.innerWidth, vh = window.innerHeight, need = [], i;
+      for (i = 0; i < els.length; i++) {
+        var el = els[i];
+        if (!el.isConnected) continue;
+        var sig = attrSig(el), bag = c.memo.get(el), hit = bag && bag[sig];
+        if (hit && hit.read) {
+          try {
+            var rect = el.getBoundingClientRect();
+            var tokens = c.decide(hit.read, rect, vw, vh);
+            c.write(el, tokens);
+            bag[sig] = { tokens: tokens, rect: rect, read: hit.read };
+          } catch (e) { warn('classify', e); }
+        } else {
+          need.push(el);
+        }
+      }
+      if (need.length) this.classify(need);
     };
 
     Engine.prototype.attachShadow = function (root) {
@@ -1382,6 +1574,12 @@
       // First in <head> so the "unpolish" cascade layer is declared first: for
       // !important rules, earlier layers win over later layers and unlayered CSS.
       if (head.firstChild !== this.style) head.insertBefore(this.style, head.firstChild);
+      if (!this.skipStyle) {
+        this.skipStyle = document.createElement('style');
+        this.skipStyle.id = 'unpolish-skip';
+        this.skipStyle.setAttribute('data-unpolish-ignore', '');
+      }
+      if (this.style.nextSibling !== this.skipStyle) this.style.after(this.skipStyle);
       if (!this.filters) {
         var ns = 'http://www.w3.org/2000/svg';
         this.filters = document.createElementNS(ns, 'svg');
@@ -1392,7 +1590,6 @@
         this.filters.setAttribute('style', 'position:absolute;width:0;height:0;overflow:hidden;pointer-events:none;left:-9999px;top:0');
       }
       if (!this.filters.isConnected) document.body.appendChild(this.filters);
-      this.ensureProbe();
     };
 
     Engine.prototype.suppressTransitions = function () {
@@ -1427,10 +1624,13 @@
       this.ensureNodes();
       var v = derive(id, settings);
       this.loadFont(v.typography);
-      var css = buildCSS(v, { exempt: this.exemptSelector, overrides: this.overrides });
-      this.shadowCSS = buildCSS(v, { exempt: this.exemptSelector, shadow: true });
+      var css = buildCSS(v, { exempt: this.exemptSelector, include: this.includeSelector, overrides: this.overrides });
+      var skipCss = buildSkipCSS(v, { exempt: this.exemptSelector, include: this.includeSelector });
+      this.shadowCSS = buildCSS(v, { exempt: this.exemptSelector, include: this.includeSelector, shadow: true }) +
+        buildSkipCSS(v, { exempt: this.exemptSelector, include: this.includeSelector, shadow: true });
       if (changedTheme) this.suppressTransitions();
       if (css !== this.lastCSS) { this.style.textContent = css; this.lastCSS = css; }
+      if (skipCss !== this.lastSkipCSS) { this.skipStyle.textContent = skipCss; this.lastSkipCSS = skipCss; }
       var fx = buildFilters(v);
       if (this.filters.innerHTML !== fx) this.filters.innerHTML = fx;
       var self = this;
@@ -1442,6 +1642,20 @@
         this.observe();
       }
       if (html.getAttribute('data-unpolish') !== id) html.setAttribute('data-unpolish', id);
+      this.applyMapMarkers();
+      if (id !== 'sketch') this.clearSkipBusy();
+    };
+
+    Engine.prototype.applyMapMarkers = function () {
+      var html = document.documentElement;
+      var mode = this.mapMarkers;
+      if (mode === 'pane' || mode === 'img') html.setAttribute('data-unpolish-markers', mode);
+      else html.removeAttribute('data-unpolish-markers');
+    };
+
+    Engine.prototype.setMapMarkers = function (mode) {
+      this.mapMarkers = mode === 'pane' || mode === 'img' ? mode : 'original';
+      this.applyMapMarkers();
     };
 
     Engine.prototype.teardown = function () {
@@ -1453,10 +1667,13 @@
       this.pendingNodes.clear();
       this.workScheduled = false;
       document.documentElement.removeAttribute('data-unpolish');
+      document.documentElement.removeAttribute('data-unpolish-markers');
       if (this.style) this.style.remove();
+      if (this.skipStyle) this.skipStyle.remove();
+      this.lastSkipCSS = '';
+      if (this.probe) this.probe.remove();
       if (this.filters) this.filters.remove();
       if (this.exemptStyle) this.exemptStyle.remove();
-      if (this.probe) { this.probe.remove(); this.probe = null; }
       this.exemptRules = [];
       this.lastCSS = '';
       var self = this;
@@ -1465,9 +1682,15 @@
       });
       this.shadowSheets.clear();
       this.shadowRoots.clear();
+      this.clearSkipBusy();
       function strip(root) {
-        var nodes = root.querySelectorAll('[data-up], [data-unpolish-x]');
-        for (var i = 0; i < nodes.length; i++) { nodes[i].removeAttribute('data-up'); nodes[i].removeAttribute('data-unpolish-x'); }
+        var nodes = root.querySelectorAll('[data-up], [data-unpolish-x], [data-unpolish-skip], [data-unpolish-busy]');
+        for (var i = 0; i < nodes.length; i++) {
+          nodes[i].removeAttribute('data-up');
+          nodes[i].removeAttribute('data-unpolish-x');
+          nodes[i].removeAttribute('data-unpolish-skip');
+          nodes[i].removeAttribute('data-unpolish-busy');
+        }
         var all = root.querySelectorAll('*');
         for (var j = 0; j < all.length; j++) if (all[j].shadowRoot) strip(all[j].shadowRoot);
       }
@@ -1476,20 +1699,113 @@
       void self;
     };
 
-    var ATTRS = ['class', 'style', 'open', 'hidden', 'disabled', 'checked', 'selected', 'aria-selected', 'aria-current', 'aria-pressed', 'aria-checked', 'aria-expanded', 'aria-invalid', 'aria-disabled', 'aria-busy', 'data-state', 'data-active', 'data-selected', 'data-highlighted', 'data-disabled', 'data-up', 'data-unpolish', 'data-unpolish-role'];
+    var ATTRS = ['class', 'style', 'open', 'hidden', 'disabled', 'checked', 'selected', 'aria-selected', 'aria-current', 'aria-pressed', 'aria-checked', 'aria-expanded', 'aria-invalid', 'aria-disabled', 'aria-busy', 'data-state', 'data-active', 'data-selected', 'data-highlighted', 'data-disabled', 'data-up', 'data-unpolish', 'data-unpolish-role', 'd', 'cx', 'cy', 'r', 'points', 'transform'];
 
     Engine.prototype.isOwnNode = function (el) {
       if (!el || el.nodeType !== 1) return true;
-      if (el === this.style || el === this.filters || el === this.guard || el === this.exemptStyle || el === this.probe) return true;
+      if (el === this.style || el === this.skipStyle || el === this.filters || el === this.guard || el === this.exemptStyle || el === this.probe) return true;
       if (el.id && el.id.indexOf('unpolish-') === 0) return true;
       if (el.tagName === 'UNPOLISH-HARNESS') return true;
-      return !!(el.closest && el.closest('unpolish-harness, #unpolish-filters, #unpolish-theme, #unpolish-guard, #unpolish-exempt, #unpolish-probe'));
+      return !!(el.closest && el.closest('unpolish-harness, #unpolish-filters, #unpolish-theme, #unpolish-skip, #unpolish-guard, #unpolish-exempt, #unpolish-probe'));
     };
 
     Engine.prototype.inExemptTree = function (el) {
       if (!el || el.nodeType !== 1) return true;
-      if (/^GMP-/.test(el.tagName)) return true;
       try { return !!(el.closest && el.closest(this.exemptSelector)); } catch (e) { return false; }
+    };
+
+    Engine.prototype.inSkipTree = function (el) {
+      if (!el || el.nodeType !== 1) return false;
+      if (this.isKept(el)) return false;
+      var tag = el.tagName;
+      if (MEDIA_LEAF[tag] || /^GMP-/.test(tag)) return true;
+      if (el instanceof SVGElement && tag !== 'svg' && tag !== 'SVG') return true;
+      try {
+        if (el.closest && el.closest(MAP_WIDGET_SEL + ', [data-unpolish-skip], ' + SKIP_MEDIA_SEL)) return true;
+      } catch (e) { return false; }
+      return false;
+    };
+
+    Engine.prototype.skipRootOf = function (el) {
+      if (!el || el.nodeType !== 1) return null;
+      if (this.isOwnNode(el) || this.isKept(el) || this.inExemptTree(el)) return null;
+      try {
+        var root = el.closest && el.closest(MAP_WIDGET_SEL + ', [data-unpolish-skip], ' + SKIP_MEDIA_SEL);
+        if (!root || this.isOwnNode(root) || this.isKept(root) || this.inExemptTree(root)) return null;
+        return root;
+      } catch (e) { return null; }
+    };
+
+    Engine.prototype.skipStillBusy = function (root) {
+      if (!root || !root.isConnected) return false;
+      var tag = root.tagName;
+      if (tag === 'VIDEO' && !root.paused && !root.ended) return true;
+      var vid = root.querySelector && root.querySelector('video');
+      if (vid && !vid.paused && !vid.ended) return true;
+      if (typeof root.getAnimations === 'function') {
+        try {
+          var anims = root.getAnimations();
+          for (var i = 0; i < anims.length; i++) {
+            if (anims[i].playState === 'running') return true;
+          }
+        } catch (e) { /* getAnimations can throw on disconnected */ }
+      }
+      return false;
+    };
+
+    Engine.prototype.skipBusy = function (el) {
+      if (!this.active || this.active !== 'sketch') return;
+      var root = this.skipRootOf(el);
+      if (!root) return;
+      if (!root.hasAttribute('data-unpolish-busy')) root.setAttribute('data-unpolish-busy', '');
+      var self = this;
+      var prev = this.skipBusyTimers.get(root);
+      if (prev) clearTimeout(prev);
+      this.skipBusyTimers.set(root, setTimeout(function () {
+        self.skipBusyTimers.delete(root);
+        if (!self.active || self.active !== 'sketch' || !root.isConnected) {
+          if (root.removeAttribute) root.removeAttribute('data-unpolish-busy');
+          return;
+        }
+        if (self.skipStillBusy(root)) { self.skipBusy(root); return; }
+        root.removeAttribute('data-unpolish-busy');
+      }, SKIP_BUSY_MS));
+    };
+
+    Engine.prototype.clearSkipBusy = function () {
+      var nodes = document.querySelectorAll('[data-unpolish-busy]');
+      for (var i = 0; i < nodes.length; i++) nodes[i].removeAttribute('data-unpolish-busy');
+    };
+
+    Engine.prototype.watchSkip = function (el) {
+      if (!el || this.skipWatched.has(el)) return;
+      this.skipWatched.add(el);
+      var self = this;
+      var onMove = function () { self.skipBusy(el); };
+      // Leaflet / Mapbox / MapLibre fire these on the map object; some builds
+      // also dispatch them as DOM events on the container. Cheap no-ops otherwise.
+      ['movestart', 'zoomstart', 'move', 'zoom', 'rotatestart', 'pitchstart', 'drag', 'viewreset', 'boxzoomstart'].forEach(function (type) {
+        try { el.addEventListener(type, onMove, true); } catch (e) { /* ignore */ }
+      });
+    };
+
+    Engine.prototype.noteChurn = function (el) {
+      if (!el || this.isKept(el) || this.inExemptTree(el)) return;
+      var t = now(), node = el, depth = 0;
+      while (node && node !== document.body && depth < 6) {
+        if (node.childElementCount >= 40 && absMajority(node)) {
+          var rec = this.churn.get(node);
+          if (!rec || t - rec.at > CHURN_WINDOW_MS) rec = { at: t, n: 0 };
+          rec.n++;
+          this.churn.set(node, rec);
+          if (rec.n >= CHURN_MARK_MIN) {
+            this.heavy.add(node);
+            this.classifier.markSkip(node, 'heavy');
+          }
+        }
+        node = parentEl(node);
+        depth++;
+      }
     };
 
     Engine.prototype.scheduleFullPass = function () {
@@ -1502,19 +1818,19 @@
       if (this.workScheduled) return;
       this.workScheduled = true;
       var self = this;
-      raf(function () { self.flushWork(); });
+      scheduleIdle(function () { self.flushWork(); });
     };
 
     Engine.prototype.queueRoot = function (el) {
       if (!el || el.nodeType !== 1 || !el.isConnected) return;
-      if (this.isOwnNode(el) || this.inExemptTree(el)) return;
+      if (this.isOwnNode(el) || this.inExemptTree(el) || this.inSkipTree(el)) return;
       this.pendingRoots.add(el);
       this.scheduleWork();
     };
 
     Engine.prototype.queueNode = function (el) {
       if (!el || el.nodeType !== 1 || !el.isConnected) return;
-      if (this.isOwnNode(el) || this.inExemptTree(el)) return;
+      if (this.isOwnNode(el) || this.inExemptTree(el) || this.inSkipTree(el)) return;
       this.pendingNodes.add(el);
       this.scheduleWork();
     };
@@ -1541,6 +1857,28 @@
           if (!self.active) return;
           self.scheduleFullPass();
         });
+        var skipFromEvent = function (e) {
+          if (!self.active) return;
+          var t = null;
+          try { t = e.composedPath && e.composedPath()[0]; } catch (err) { t = e.target; }
+          if (!t) t = e.target;
+          if (t && t.nodeType !== 1) t = t.parentElement;
+          if (t) self.skipBusy(t);
+        };
+        var skipFromDrag = function (e) {
+          if (!self.active) return;
+          if (e.pointerType !== 'touch' && !e.buttons) return;
+          skipFromEvent(e);
+        };
+        document.addEventListener('pointermove', skipFromDrag, { capture: true, passive: true });
+        document.addEventListener('wheel', skipFromEvent, { capture: true, passive: true });
+        document.addEventListener('touchmove', skipFromEvent, { capture: true, passive: true });
+        document.addEventListener('animationstart', skipFromEvent, true);
+        document.addEventListener('transitionrun', skipFromEvent, true);
+        document.addEventListener('transitionstart', skipFromEvent, true);
+        ['play', 'playing', 'timeupdate', 'seeking', 'seeked'].forEach(function (ev) {
+          document.addEventListener(ev, skipFromEvent, true);
+        });
       }
     };
 
@@ -1563,7 +1901,7 @@
       var list = [], seen = new Set(), shadowRoots = [], self = this;
 
       roots.forEach(function (el) {
-        if (!el.isConnected || self.isOwnNode(el) || self.inExemptTree(el)) return;
+        if (!el.isConnected || self.isOwnNode(el) || self.inExemptTree(el) || self.inSkipTree(el)) return;
         var p = parentEl(el);
         while (p && p !== document.documentElement && p !== document.body) {
           if (roots.has(p)) return;
@@ -1573,7 +1911,7 @@
       });
       list.forEach(function (el) { seen.add(el); });
       nodes.forEach(function (el) {
-        if (!el.isConnected || seen.has(el) || self.isOwnNode(el) || self.inExemptTree(el)) return;
+        if (!el.isConnected || seen.has(el) || self.isOwnNode(el) || self.inExemptTree(el) || self.inSkipTree(el)) return;
         var p = parentEl(el), covered = false;
         while (p && p !== document.documentElement) {
           if (roots.has(p) || seen.has(p)) { covered = true; break; }
@@ -1583,7 +1921,7 @@
         seen.add(el);
         list.push(el);
       });
-      list = list.filter(function (el) { return el.isConnected && !self.isOwnNode(el) && !self.inExemptTree(el); });
+      list = list.filter(function (el) { return el.isConnected && !self.isOwnNode(el) && !self.inExemptTree(el) && !self.inSkipTree(el); });
       list.sort(function (a, b) { return a === b ? 0 : (a.compareDocumentPosition(b) & 4 ? -1 : 1); });
       this.flushClassify(list, 0, shadowRoots, now());
     };
@@ -1591,18 +1929,25 @@
     Engine.prototype.flushClassify = function (list, start, shadowRoots, t0) {
       this.workScheduled = false;
       if (!this.active) return;
-      var fresh = [], known = [], i = start, c = this.classifier;
+      var need = [], i = start, c = this.classifier, self = this;
       var vw = window.innerWidth, vh = window.innerHeight;
       for (; i < list.length; i++) {
-        if (i > start && now() - t0 >= WORK_BUDGET_MS) {
-          var later = this;
+        var el = list[i];
+        if (!el.isConnected || self.isOwnNode(el) || self.inExemptTree(el) || self.inSkipTree(el)) continue;
+        if ((need.length && now() - t0 >= WORK_BUDGET_MS) || need.length >= BATCH_MAX) {
           this.workScheduled = true;
-          raf(function () { later.flushClassify(list, i, shadowRoots, now()); });
-          this.tagBatch(fresh, known, shadowRoots, true);
+          scheduleIdle(function () { self.flushClassify(list, i, shadowRoots, now()); });
+          this.tagBatch(need, shadowRoots, true);
           return;
         }
-        var el = list[i], sig = attrSig(el), bag = c.memo.get(el), hit = bag && bag[sig];
+        var sig = attrSig(el), bag = c.memo.get(el), hit = bag && bag[sig];
         if (hit && hit.read) {
+          if (now() - t0 >= WORK_BUDGET_MS && i > start) {
+            this.workScheduled = true;
+            scheduleIdle(function () { self.flushClassify(list, i, shadowRoots, now()); });
+            this.tagBatch(need, shadowRoots, true);
+            return;
+          }
           var tagged = c.tags.get(el);
           var cached = hit.rect;
           var tiny = !cached || cached.width < 10 || cached.height < 10;
@@ -1619,19 +1964,14 @@
           } catch (e) { warn('classify', e); }
           continue;
         }
-        if (c.tags.get(el)) known.push(el);
-        else fresh.push(el);
+        need.push(el);
       }
-      this.tagBatch(fresh, known, shadowRoots, false);
+      this.tagBatch(need, shadowRoots, false);
     };
 
-    Engine.prototype.tagBatch = function (fresh, known, shadowRoots, moreComing) {
-      // Mutation-path tagging never disables the theme sheet: that would force a
-      // full-document style recalc. New nodes and first-seen class/state signatures
-      // are read from the ignore probe; repeats hit Classifier.memo. A cached
-      // 0×0 rect (e.g. a closed <details> child) is remeasured when it appears.
-      if (fresh.length) this.classifyFresh(fresh);
-      if (known.length) this.classifyFresh(known);
+    Engine.prototype.tagBatch = function (need, shadowRoots, moreComing) {
+      // Read the whole batch, then write. No clone-and-measure, no per-element insert.
+      if (need && need.length) this.classifyLive(need);
       if ((this.classifier.exemptRoots || []).length) this.classify([]);
       if (moreComing) return;
       var eng = this;
@@ -1642,11 +1982,15 @@
     Engine.prototype.onMutations = function (recs) {
       if (!this.active) return;
       var html = document.documentElement;
+      var busyHint = null;
       for (var i = 0; i < recs.length; i++) {
         var rec = recs[i], t = rec.target;
         if (t.nodeType === 1 && this.isOwnNode(t)) continue;
         if (rec.type === 'childList') {
-          if (t.nodeType === 1 && MEDIA_LEAF[t.tagName]) continue;
+          if (t.nodeType === 1 && (MEDIA_LEAF[t.tagName] || this.inSkipTree(t))) {
+            busyHint = t;
+            continue;
+          }
           for (var j = 0; j < rec.addedNodes.length; j++) {
             var n = rec.addedNodes[j];
             if (n.nodeType !== 1 || SKIP[n.tagName]) continue;
@@ -1660,7 +2004,13 @@
               } catch (e) { /* invalid */ }
               continue;
             }
+            if (this.classifier.isSkipRoot(n)) {
+              this.classifier.markSkip(n);
+              continue;
+            }
+            if (this.inSkipTree(n)) { busyHint = n; continue; }
             if (n.getRootNode && n.getRootNode() instanceof ShadowRoot && n.getRootNode() === this.app.ui.root) continue;
+            this.noteChurn(n);
             this.queueRoot(n);
           }
           if (t === document.head || t === html) {
@@ -1673,16 +2023,19 @@
             if (html.getAttribute('data-unpolish') !== this.active) html.setAttribute('data-unpolish', this.active);
             continue;
           }
-          if (name === 'data-up' || name === 'data-unpolish-x') continue;
+          if (name === 'data-up' || name === 'data-unpolish-x' || name === 'data-unpolish-skip' || name === 'data-unpolish-busy' || name === 'data-unpolish-markers') continue;
           if (t === html || t === document.body) {
             if (name === 'class' || name === 'data-state') this.scheduleFullPass();
             continue;
           }
-          if (this.inExemptTree(t) || MEDIA_LEAF[t.tagName]) continue;
+          if (this.inExemptTree(t)) continue;
+          if (this.inSkipTree(t) || MEDIA_LEAF[t.tagName]) { busyHint = t; continue; }
           if (name === 'style' && !styleAffectsTheme(rec.oldValue, t.getAttribute('style'))) continue;
+          this.noteChurn(t);
           this.queueAttr(t, name === 'class' || name === 'open' || name === 'hidden' || name === 'data-state');
         }
       }
+      if (busyHint) this.skipBusy(busyHint);
     };
 
     /* ------------------------------------------------------------------ *
@@ -2971,6 +3324,8 @@
       if (cfg.launcher !== 'bottom-right') out.launcher = cfg.launcher;
       if (cfg.webFonts === false) out.webFonts = false;
       out.exclude = cfg.exclude;
+      if (cfg.include && cfg.include.length) out.include = cfg.include;
+      if (cfg.mapMarkers && cfg.mapMarkers !== 'pane') out.mapMarkers = cfg.mapMarkers;
       if (Object.keys(cfg.roles || {}).length) out.roles = cfg.roles;
       out.shortcuts = this.shortcuts();
       out.themes = {};
@@ -3061,7 +3416,15 @@
         if (app.ui.host) app.ui.host.remove();
         app.started = false;
       },
-      _internal: { derive: derive, buildCSS: buildCSS, normalizeConfig: normalizeConfig, normalizeSettings: normalizeSettings, THEMES: THEMES, comboFromEvent: comboFromEvent, checkCombo: checkCombo }
+      _internal: {
+        derive: derive, buildCSS: buildCSS, normalizeConfig: normalizeConfig, normalizeSettings: normalizeSettings,
+        THEMES: THEMES, comboFromEvent: comboFromEvent, checkCombo: checkCombo,
+        queueSize: function () {
+          var e = app.engine;
+          return { pending: e.pendingRoots.size + e.pendingNodes.size, roots: e.pendingRoots.size, nodes: e.pendingNodes.size };
+        },
+        setMapMarkers: function (mode) { app.engine.setMapMarkers(mode); }
+      }
     };
     /* ------------------------------------------------------------------ *
      * Auto-start for classic <script> tags
