@@ -264,6 +264,20 @@ test.describe('panel', () => {
 });
 
 test.describe('review links', () => {
+  test('?unpolish= wins over a persisted local theme', async ({ page }) => {
+    await open(page, EXAMPLES.plain);
+    await setTheme(page, 'blueprint');
+    expect(await theme(page)).toBe('blueprint');
+    await page.evaluate(() => {
+      const id = window.Unpolish.getConfig().id || 'default';
+      localStorage.setItem('unpolish:' + id, JSON.stringify({ active: 'blueprint', themes: {}, shortcuts: {} }));
+      sessionStorage.setItem('unpolish:' + id + ':review', JSON.stringify({ theme: 'blueprint', active: 'blueprint', ui: 'visible', edits: {} }));
+    });
+    await page.goto(EXAMPLES.plain + '?unpolish=sketch');
+    await page.waitForFunction(() => window.Unpolish && document.documentElement.getAttribute('data-unpolish') === 'sketch');
+    expect(await theme(page)).toBe('sketch');
+  });
+
   test('URL selects theme, hides UI, survives client-side navigation and reloads', async ({ page }) => {
     await open(page, EXAMPLES.react + 'clients?ref=mail&unpolish=blueprint&unpolish-ui=hidden#team');
     expect(await theme(page)).toBe('blueprint');

@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.1.4
+
+- Classify no longer inserts a probe and calls `getComputedStyle` per element. Cached original reads are reused when the attribute signature is unchanged, including across different nodes that share a class/state signature; `fullPass` keeps the memo and invalidates per element. The first pass of many uncached nodes disables the theme sheet once and time-slices reads. Mutation-path classify never disables the sheet: first-seen signatures batch into an exempt probe (insert all, read all, remove all) so a page pays one style recalc per slice. Classify, read and write time counts against a ~50ms task budget; batch size adapts from the measured per-element cost. On localhost, a batch that overruns logs `console.warn('[unpolish] classify batch took Xms')`.
+- `?unpolish=` on the URL wins over a persisted theme, including when config loads asynchronously.
+- After `init --upgrade`, the installer tells you to restart Vite with `npm run dev -- --force`.
+
 ## 0.1.3
 
 - Maps, images and other heavy widgets are never classified. One CSS `filter` is applied on the skipped container so the content stays visible. Descendants are not restyled. Detected automatically: `img`, `picture`, `video`, `canvas`, `iframe`, `svg` internals, `object`, `embed`; Leaflet, Mapbox, MapLibre, Google Maps, OpenLayers, deck.gl and `[role="application"]`; plus subtrees with a very high absolute-child count or mutation churn.

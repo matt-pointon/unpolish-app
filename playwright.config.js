@@ -16,12 +16,12 @@ export default defineConfig({
   workers: process.env.CI ? 2 : 4,
   reporter: [['list']],
   projects: [
-    { name: 'app', testIgnore: /site-build\.spec\.js|perf\.spec\.js|heavy\.spec\.js/, use: { ...use, baseURL: 'http://localhost:4174' } },
+    { name: 'app', testIgnore: /site-build\.spec\.js|perf\.spec\.js|heavy\.spec\.js|gmaps-panel\.spec\.js/, use: { ...use, baseURL: 'http://localhost:4174' } },
     { name: 'site-build', testMatch: /site-build\.spec\.js/, use: { ...use, baseURL: 'http://localhost:4175' } },
     // After installer tests so the existing CI retry is not racing Next.js.
     {
       name: 'perf',
-      testMatch: /perf\.spec\.js|heavy\.spec\.js/,
+      testMatch: /perf\.spec\.js|heavy\.spec\.js|gmaps-panel\.spec\.js/,
       fullyParallel: false,
       workers: 1,
       timeout: 90_000,

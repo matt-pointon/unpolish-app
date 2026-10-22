@@ -691,6 +691,7 @@ function verifyNotes(report, info, kind) {
   const dev = devCommand(info);
   const v = report.data.verify;
   v.push(dev ? `Run \`${dev}\` and open the app.` : 'Open the prototype in a browser (serve the folder, e.g. `npx serve .`).');
+  v.push('After upgrading, restart the Vite dev server with `npm run dev -- --force` so it does not serve a cached Unpolish build.');
   v.push('Press \\ (or click the launcher, bottom right) and switch themes. Check navigation, forms and dialogs still work.');
   v.push('Open the page with ?unpolish=sketch&unpolish-ui=hidden — Sketch loads with the controls hidden; \\ still opens them.');
   v.push('Choose Original: the prototype looks exactly as before.');
