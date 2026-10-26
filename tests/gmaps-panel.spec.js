@@ -257,3 +257,65 @@ test('reused tab with persisted Sketch stays interactive and does not mass-retag
   console.log('gmaps-panel reused-tab tagged-swing', JSON.stringify(taggedSwing));
   expect(taggedSwing.max - taggedSwing.min, `tagged oscillated ${taggedSwing.min}–${taggedSwing.max}`).toBeLessThan(120);
 });
+
+test('skipFilter.maps original leaves Google Maps unfiltered', async ({ page }) => {
+  await page.goto('/tests/fixtures/gmaps-panel.html?skipFilter=maps');
+  await page.waitForFunction(() => window.Unpolish);
+  await page.evaluate(() => {
+    if (typeof window.__buildPanel === 'function') window.__buildPanel();
+    window.Unpolish.setTheme('sketch');
+  });
+  await page.waitForFunction(() => document.documentElement.getAttribute('data-unpolish') === 'sketch');
+  const look = await page.evaluate(() => {
+    const map = document.querySelector('gmp-map');
+    const gm = document.querySelector('.gm-style');
+    const dot = document.querySelector('.marker-dot');
+    return {
+      skip: map && map.getAttribute('data-unpolish-skip'),
+      mapFilter: map ? getComputedStyle(map).filter : null,
+      gmFilter: gm ? getComputedStyle(gm).filter : null,
+      busy: !!(map && map.hasAttribute('data-unpolish-busy')) || !!(gm && gm.hasAttribute('data-unpolish-busy')),
+      markers: document.documentElement.getAttribute('data-unpolish-markers'),
+      skipFilter: window.Unpolish.getConfig().skipFilter,
+      dotBg: dot ? getComputedStyle(dot).backgroundColor : null
+    };
+  });
+  expect(look.skip).toMatch(/map/);
+  expect(look.skipFilter).toEqual({ maps: 'original' });
+  expect(look.markers).toBeNull();
+  expect(look.mapFilter === 'none' || look.mapFilter === '').toBeTruthy();
+  expect(look.gmFilter === 'none' || look.gmFilter === '').toBeTruthy();
+  expect(look.busy).toBeFalsy();
+  expect(look.dotBg).toMatch(/rgb\(\s*220,\s*38,\s*38\s*\)/);
+});
+
+test('burst fleet motion does not strobe Sketch skip filters', async ({ page }) => {
+  await page.goto('/tests/fixtures/gmaps-panel.html?churn=burst');
+  await page.waitForFunction(() => window.Unpolish);
+  await page.evaluate(() => {
+    if (typeof window.__buildPanel === 'function') window.__buildPanel();
+    window.Unpolish.setTheme('sketch');
+  });
+  await page.waitForFunction(() => document.documentElement.getAttribute('data-unpolish') === 'sketch');
+  await page.waitForTimeout(500);
+  const flips = await page.evaluate(async () => {
+    const el = document.querySelector('.gm-style') || document.querySelector('gmp-map');
+    const samples = [];
+    const t0 = performance.now();
+    while (performance.now() - t0 < 8000) {
+      const f = getComputedStyle(el).filter;
+      const busy = el.hasAttribute('data-unpolish-busy');
+      const kind = /grayscale/.test(f) ? 'busy' : /up-f-skip-edge/.test(f) ? 'still' : 'other';
+      samples.push({ kind, busy });
+      await new Promise((r) => requestAnimationFrame(r));
+    }
+    let swaps = 0;
+    for (let i = 1; i < samples.length; i++) {
+      if (samples[i].kind !== samples[i - 1].kind) swaps++;
+    }
+    return { swaps, first: samples[0] && samples[0].kind, last: samples[samples.length - 1] && samples[samples.length - 1].kind, n: samples.length };
+  });
+  console.log('gmaps-panel burst-filter', JSON.stringify(flips));
+  expect(flips.swaps, `skip filter strobed ${flips.swaps} times (${flips.first}→${flips.last})`).toBe(0);
+});
+

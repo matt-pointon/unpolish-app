@@ -4,16 +4,24 @@
   <meta charset="utf-8">
   <title>Unpolish Google Maps panel fixture</title>
   <script>
-    window.UnpolishConfig = {
-      version: 1,
-      id: 'skittles-research-prototype',
-      defaultTheme: 'original',
-      ui: 'hidden',
-      webFonts: false,
-      exclude: [],
-      shortcuts: { toggle: '\\', themes: {} },
-      themes: {}
-    };
+    window.UnpolishConfig = (function () {
+      var q = new URLSearchParams(location.search);
+      var cfg = {
+        version: 1,
+        id: 'skittles-research-prototype',
+        defaultTheme: 'original',
+        ui: 'hidden',
+        webFonts: false,
+        exclude: [],
+        shortcuts: { toggle: '\\', themes: {} },
+        themes: {}
+      };
+      var sf = q.get('skipFilter');
+      if (sf === 'maps') cfg.skipFilter = { maps: 'original' };
+      else if (sf === 'images') cfg.skipFilter = { images: 'original' };
+      else if (sf === 'none') cfg.skipFilter = { maps: 'original', images: 'original' };
+      return cfg;
+    })();
     (function () {
       var v = new URLSearchParams(location.search).get('runtime');
       var s = document.createElement('script');
@@ -127,6 +135,7 @@
       };
 
       var muts = 0, frames = 0, n = 0;
+      var burst = new URLSearchParams(location.search).get('churn') === 'burst';
       var mo = new MutationObserver(function (recs) {
         for (j = 0; j < recs.length; j++) muts += recs[j].addedNodes.length + recs[j].removedNodes.length + (recs[j].type === 'attributes' ? 1 : 0);
       });
@@ -147,16 +156,21 @@
       function tick() {
         n++;
         frames++;
-        var count = 14;
-        for (j = 0; j < count; j++) {
-          var m = markers[(n + j) % markers.length];
-          var x = 8 + ((n * 3 + j * 17) % 520);
-          var y = 12 + ((n * 2 + j * 9) % 420);
-          m.style.transform = 'translate(' + x + 'px,' + y + 'px)';
-          var lab = m.querySelector('.marker-label');
-          if (lab && n % 8 === j % 8) lab.textContent = 'Unit ' + ((n + j) % MARKERS);
+        // burst: mutate ~every 400ms (would strobe at the old 260ms busy window).
+        var move = !burst || n % 24 === 0;
+        if (move) {
+          var count = 14;
+          for (j = 0; j < count; j++) {
+            var m = markers[(n + j) % markers.length];
+            var x = 8 + ((n * 3 + j * 17) % 520);
+            var y = 12 + ((n * 2 + j * 9) % 420);
+            m.style.transform = 'translate(' + x + 'px,' + y + 'px)';
+            var lab = m.querySelector('.marker-label');
+            if (lab && n % 8 === j % 8) lab.textContent = 'Unit ' + ((n + j) % MARKERS);
+          }
+          if (n % 10 === 0) measureTags();
+          document.getElementById('map').dispatchEvent(new Event('move'));
         }
-        if (n % 10 === 0) measureTags();
         // Unique class/state on eligible panel nodes (not map markers) so live
         // classify cannot skip via attrSig cache — NameTag-style self-measure.
         if (devices.childElementCount && n % 20 === 0) {
@@ -167,7 +181,6 @@
             tag.style.setProperty('--tag-w', (40 + (n % 50)) + 'px');
           }
         }
-        document.getElementById('map').dispatchEvent(new Event('move'));
         requestAnimationFrame(tick);
       }
       requestAnimationFrame(tick);

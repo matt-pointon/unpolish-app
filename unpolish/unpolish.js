@@ -1,4 +1,4 @@
-/*! Unpolish v0.1.5 — reversible lo-fi themes for working web prototypes. MIT License. */
+/*! Unpolish v0.1.6 — reversible lo-fi themes for working web prototypes. MIT License. */
 (function () {
   'use strict';
   // Script-tag build. Does nothing outside a browser; if Unpolish is already
@@ -15,7 +15,7 @@
   function createUnpolish() {
     'use strict';
 
-    var VERSION = '0.1.5';
+    var VERSION = '0.1.6';
 
     /* ------------------------------------------------------------------ *
      * Themes
@@ -106,7 +106,8 @@
       shortcuts: { toggle: '\\', themes: {} },
       themes: {},
       overrides: {},
-      mapMarkers: 'pane'
+      mapMarkers: 'pane',
+      skipFilter: { maps: 'theme', images: 'theme' }
     };
 
     /* ------------------------------------------------------------------ *
@@ -201,7 +202,14 @@
     var HEAVY_CHILD_MIN = 80;
     var CHURN_WINDOW_MS = 1000;
     var CHURN_MARK_MIN = 30;
-    var SKIP_BUSY_MS = 260;
+    /* Sketch hybrid: stay on the cheap busy filter until the region has been
+     * quiet for SKIP_BUSY_MS. Fleet-style burst motion (gaps of a few hundred ms)
+     * used to strobe at 260ms. Regions that actually cycle busy↔still several
+     * times in SKIP_BUSY_PIN_WINDOW_MS stay busy for SKIP_BUSY_PINNED_MS. */
+    var SKIP_BUSY_MS = 1800;
+    var SKIP_BUSY_PIN_WINDOW_MS = 10000;
+    var SKIP_BUSY_PIN_COUNT = 3;
+    var SKIP_BUSY_PINNED_MS = 8000;
     // Regions that must keep their own look. data-unpolish-ignore and project exclude
     // win over skip filters. Maps and media are skipped separately (filter on the root, no walk).
     var BUILTIN_EXEMPT = ['[data-unpolish-ignore]', 'unpolish-harness', '#unpolish-filters', '#unpolish-probe'];
@@ -402,7 +410,21 @@
       });
       cfg.shortcuts = { toggle: typeof sc.toggle === 'string' && sc.toggle ? sc.toggle : '\\', themes: themeKeys };
       cfg.mapMarkers = cfg.mapMarkers === 'original' || cfg.mapMarkers === 'img' || cfg.mapMarkers === 'pane' ? cfg.mapMarkers : 'pane';
+      cfg.skipFilter = normalizeSkipFilter(cfg.skipFilter);
       return cfg;
+    }
+
+    function skipFilterVal(v, fallback) {
+      if (v === 'original' || v === 'none' || v === 'off' || v === false) return 'original';
+      if (v === 'theme' || v === 'hybrid' || v === 'on' || v === true) return 'theme';
+      return fallback;
+    }
+
+    function normalizeSkipFilter(raw) {
+      if (raw === 'original' || raw === 'none' || raw === 'off' || raw === false) return { maps: 'original', images: 'original' };
+      if (raw === 'theme' || raw === 'hybrid' || raw === 'on' || raw === true || raw == null) return { maps: 'theme', images: 'theme' };
+      if (!isObj(raw)) return { maps: 'theme', images: 'theme' };
+      return { maps: skipFilterVal(raw.maps, 'theme'), images: skipFilterVal(raw.images, 'theme') };
     }
 
     /* ------------------------------------------------------------------ *
@@ -553,8 +575,10 @@
       // while the region is still, cheap grayscale while it is moving (one
       // attribute toggle on the skip root). Blueprint stays a cheap ink wash —
       // the same edge swap does not read as a blueprint line drawing.
+      // Busy grayscale is lifted toward Sketch paper so a hybrid swap is a
+      // texture change, not a dark↔light strobe on a dark basemap.
       v.skipFilterBusy = id === 'sketch'
-        ? 'grayscale(1) contrast(1.35) brightness(1.05)'
+        ? 'grayscale(1) contrast(0.18) brightness(1.65) sepia(0.28)'
         : '';
       v.skipFilter = id === 'sketch'
         ? 'url(#up-f-skip-edge)'
@@ -903,27 +927,40 @@
       var css = [];
       function rule(sel, body) { css.push(sel + '{' + body + '}'); }
       function S(sel) { return splitSel(sel).map(function (x) { return P + x; }).join(','); }
-      var skipLive = ':is(' + MAP_WIDGET_SEL + ', [data-unpolish-skip="map"], [data-unpolish-skip="heavy"])' + NOTKEEP + NOTEX;
+      var NOTFILTER = ':not([data-unpolish-filter="original"], [data-unpolish-filter="original"] *)';
+      var skipLive = ':is(' + MAP_WIDGET_SEL + ', [data-unpolish-skip="map"], [data-unpolish-skip="heavy"])' + NOTKEEP + NOTEX + NOTFILTER;
       var NOTINSIDE = ':not(:is(' + MAP_WIDGET_SEL + ', [data-unpolish-skip]) *)';
-      var skipReplaced = ':is(video, iframe, embed, object, [data-unpolish-skip="video"], [data-unpolish-skip="media"])' + NOTKEEP + NOTEX + NOTINSIDE;
-      var skipStill = ':is(img, picture, canvas, input[type="image"], [data-unpolish-skip="image"], [data-unpolish-skip="canvas"])' + NOTKEEP + NOTEX + NOTINSIDE;
+      var skipReplaced = ':is(video, iframe, embed, object, [data-unpolish-skip="video"], [data-unpolish-skip="media"])' + NOTKEEP + NOTEX + NOTINSIDE + NOTFILTER;
+      var skipStill = ':is(img, picture, canvas, input[type="image"], [data-unpolish-skip="image"], [data-unpolish-skip="canvas"])' + NOTKEEP + NOTEX + NOTINSIDE + NOTFILTER;
       // Leaflet: filter the tile pane only so moving markers stay crisp on top.
       var skipTiles = skipLive + ' .leaflet-tile-pane';
       var skipLiveBare = skipLive + ':not(:has(.leaflet-tile-pane))';
-      rule(S(skipStill), 'filter:' + v.skipFilterStill + I);
-      rule(S(skipReplaced + ', ' + skipLiveBare), 'filter:' + v.skipFilter + I);
-      rule(S(skipTiles), 'filter:' + v.skipFilter + I + ';isolation:isolate' + I);
+      var filterMaps = opts.filterMaps !== false;
+      var filterImages = opts.filterImages !== false;
+      if (filterImages) rule(S(skipStill), 'filter:' + v.skipFilterStill + I);
+      if (filterMaps) {
+        rule(S(skipReplaced + ', ' + skipLiveBare), 'filter:' + v.skipFilter + I);
+        rule(S(skipTiles), 'filter:' + v.skipFilter + I + ';isolation:isolate' + I);
+      } else {
+        rule(S(skipReplaced), 'filter:' + v.skipFilter + I);
+      }
       if (v.skipFilterBusy && v.skipFilterBusy !== v.skipFilter) {
-        rule(S(skipStill + '[data-unpolish-busy], ' + skipReplaced + '[data-unpolish-busy], ' + skipLiveBare + '[data-unpolish-busy]'),
-          'filter:' + v.skipFilterBusy + I);
-        rule(S(skipLive + '[data-unpolish-busy] .leaflet-tile-pane'),
-          'filter:' + v.skipFilterBusy + I);
+        var busySel = [];
+        if (filterImages) busySel.push(skipStill + '[data-unpolish-busy]');
+        busySel.push(skipReplaced + '[data-unpolish-busy]');
+        if (filterMaps) busySel.push(skipLiveBare + '[data-unpolish-busy]');
+        if (busySel.length) rule(S(busySel.join(', ')), 'filter:' + v.skipFilterBusy + I);
+        if (filterMaps) {
+          rule(S(skipLive + '[data-unpolish-busy] .leaflet-tile-pane'),
+            'filter:' + v.skipFilterBusy + I);
+        }
       }
       // Marker icons: cheap CSS only (never SVG edge). Gated by html[data-unpolish-markers].
       // pane = one filter on the marker pane; img = stylesheet rule on marker imgs (raster cache).
-      var markerCheap = v.id === 'sketch'
+      // Off when maps are opted out of skip filters (Google Maps has no separate pane).
+      var markerCheap = filterMaps && v.id === 'sketch'
         ? 'grayscale(1) contrast(1.35) brightness(1.05)'
-        : v.id === 'blueprint' ? v.skipFilter : '';
+        : filterMaps && v.id === 'blueprint' ? v.skipFilter : '';
       if (markerCheap) {
         var markerSel = function (mode, sel) {
           var prefix = opts.shadow ? '' : 'html[data-unpolish][data-unpolish-markers="' + mode + '"] ';
@@ -1396,6 +1433,8 @@
       this.skipBusyTimers = new WeakMap();
       this.skipWatched = new WeakSet();
       this.mapMarkers = 'pane';
+      this.skipFilter = { maps: 'theme', images: 'theme' };
+      this.skipBusyHits = new WeakMap();
       this.avgReadMs = 0;
       this.lastBatchMs = 0;
       this.sheetOff = false;
@@ -1471,6 +1510,7 @@
       this.overrides = cfg.overrides || {};
       this.webFonts = cfg.webFonts !== false;
       this.mapMarkers = cfg.mapMarkers === 'original' || cfg.mapMarkers === 'img' || cfg.mapMarkers === 'pane' ? cfg.mapMarkers : 'pane';
+      this.skipFilter = normalizeSkipFilter(cfg.skipFilter);
       var roles = {};
       Object.keys(cfg.roles || {}).forEach(function (sel) {
         var role = cfg.roles[sel];
@@ -1865,9 +1905,15 @@
       var v = derive(id, settings);
       this.loadFont(v.typography);
       var css = buildCSS(v, { exempt: this.exemptSelector, include: this.includeSelector, overrides: this.overrides });
-      var skipCss = buildSkipCSS(v, { exempt: this.exemptSelector, include: this.includeSelector });
+      var skipOpts = {
+        exempt: this.exemptSelector,
+        include: this.includeSelector,
+        filterMaps: this.skipFilter.maps === 'theme',
+        filterImages: this.skipFilter.images === 'theme'
+      };
+      var skipCss = buildSkipCSS(v, skipOpts);
       this.shadowCSS = buildCSS(v, { exempt: this.exemptSelector, include: this.includeSelector, shadow: true }) +
-        buildSkipCSS(v, { exempt: this.exemptSelector, include: this.includeSelector, shadow: true });
+        buildSkipCSS(v, { exempt: this.exemptSelector, include: this.includeSelector, shadow: true, filterMaps: skipOpts.filterMaps, filterImages: skipOpts.filterImages });
       if (changedTheme) this.suppressTransitions();
       if (css !== this.lastCSS) { this.style.textContent = css; this.lastCSS = css; }
       if (skipCss !== this.lastSkipCSS) { this.skipStyle.textContent = skipCss; this.lastSkipCSS = skipCss; }
@@ -1884,11 +1930,23 @@
       if (html.getAttribute('data-unpolish') !== id) html.setAttribute('data-unpolish', id);
       this.applyMapMarkers();
       if (id !== 'sketch') this.clearSkipBusy();
+      else this.pruneSkipBusy();
+    };
+
+    Engine.prototype.pruneSkipBusy = function () {
+      var nodes = document.querySelectorAll('[data-unpolish-busy]');
+      for (var i = 0; i < nodes.length; i++) {
+        if (this.skipFilterOff(nodes[i])) nodes[i].removeAttribute('data-unpolish-busy');
+      }
     };
 
     Engine.prototype.applyMapMarkers = function () {
       var html = document.documentElement;
       var mode = this.mapMarkers;
+      if (this.skipFilter && this.skipFilter.maps !== 'theme') {
+        html.removeAttribute('data-unpolish-markers');
+        return;
+      }
       if (mode === 'pane' || mode === 'img') html.setAttribute('data-unpolish-markers', mode);
       else html.removeAttribute('data-unpolish-markers');
     };
@@ -2006,7 +2064,24 @@
       if (!this.active || this.active !== 'sketch') return;
       var root = this.skipRootOf(el);
       if (!root) return;
-      if (!root.hasAttribute('data-unpolish-busy')) root.setAttribute('data-unpolish-busy', '');
+      if (this.skipFilterOff(root)) {
+        if (root.removeAttribute) root.removeAttribute('data-unpolish-busy');
+        return;
+      }
+      var t = now();
+      // Count idle→busy cycles only. Extending an already-busy region (pan,
+      // playing video, burst markers inside the hysteresis window) must not
+      // pin it — otherwise a short pan would stay gray for SKIP_BUSY_PINNED_MS.
+      var wasBusy = root.hasAttribute('data-unpolish-busy');
+      if (!wasBusy) {
+        var hits = this.skipBusyHits.get(root);
+        if (!hits || t - hits.at > SKIP_BUSY_PIN_WINDOW_MS) hits = { at: t, n: 0 };
+        hits.n++;
+        this.skipBusyHits.set(root, hits);
+        root.setAttribute('data-unpolish-busy', '');
+      }
+      var n = (this.skipBusyHits.get(root) || { n: 0 }).n;
+      var hold = n >= SKIP_BUSY_PIN_COUNT ? SKIP_BUSY_PINNED_MS : SKIP_BUSY_MS;
       var self = this;
       var prev = this.skipBusyTimers.get(root);
       if (prev) clearTimeout(prev);
@@ -2018,7 +2093,24 @@
         }
         if (self.skipStillBusy(root)) { self.skipBusy(root); return; }
         root.removeAttribute('data-unpolish-busy');
-      }, SKIP_BUSY_MS));
+      }, hold));
+    };
+
+    Engine.prototype.skipFilterOff = function (root) {
+      if (!root) return true;
+      if (root.getAttribute && root.getAttribute('data-unpolish-filter') === 'original') return true;
+      try {
+        if (root.closest && root.closest('[data-unpolish-filter="original"]')) return true;
+      } catch (e) { /* invalid */ }
+      var maps = this.skipFilter && this.skipFilter.maps === 'theme';
+      var images = this.skipFilter && this.skipFilter.images === 'theme';
+      var tag = root.tagName;
+      var isMap = tag && /^GMP-/.test(tag);
+      try { if (!isMap && root.matches && root.matches(MAP_WIDGET_SEL + ', [data-unpolish-skip="map"], [data-unpolish-skip="heavy"]')) isMap = true; } catch (e) { /* invalid */ }
+      if (isMap) return !maps;
+      var isImage = MEDIA_LEAF[tag] || (root.getAttribute && /^(image|canvas)$/.test(root.getAttribute('data-unpolish-skip') || ''));
+      if (isImage && tag !== 'VIDEO' && tag !== 'IFRAME' && tag !== 'EMBED' && tag !== 'OBJECT') return !images;
+      return false;
     };
 
     Engine.prototype.clearSkipBusy = function () {
@@ -3624,6 +3716,11 @@
       out.exclude = cfg.exclude;
       if (cfg.include && cfg.include.length) out.include = cfg.include;
       if (cfg.mapMarkers && cfg.mapMarkers !== 'pane') out.mapMarkers = cfg.mapMarkers;
+      if (cfg.skipFilter && (cfg.skipFilter.maps !== 'theme' || cfg.skipFilter.images !== 'theme')) {
+        out.skipFilter = {};
+        if (cfg.skipFilter.maps !== 'theme') out.skipFilter.maps = cfg.skipFilter.maps;
+        if (cfg.skipFilter.images !== 'theme') out.skipFilter.images = cfg.skipFilter.images;
+      }
       if (Object.keys(cfg.roles || {}).length) out.roles = cfg.roles;
       out.shortcuts = this.shortcuts();
       out.themes = {};
@@ -3725,7 +3822,12 @@
         },
         taggedCount: function () { return document.querySelectorAll('[data-up]').length; },
         lastBatchMs: function () { return app.engine.lastBatchMs || 0; },
-        setMapMarkers: function (mode) { app.engine.setMapMarkers(mode); }
+        setMapMarkers: function (mode) { app.engine.setMapMarkers(mode); },
+        setSkipFilter: function (val) {
+          app.config.skipFilter = normalizeSkipFilter(val);
+          app.engine.skipFilter = app.config.skipFilter;
+          if (app.state.active !== 'original') app.apply();
+        }
       }
     };
     /* ------------------------------------------------------------------ *

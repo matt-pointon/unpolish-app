@@ -64,6 +64,10 @@ The package name is `unpolish` (unscoped, public, MIT). npm user `mattpointon`. 
 
 npm’s staged-publish flow also created a **`0.0.0-stage` placeholder** version. It is not a real Unpolish release. Do not install it, and **never** move the `latest` dist-tag onto it.
 
+### 0.1.6 (not published yet)
+
+`skipFilter.maps` / `skipFilter.images` (`theme` default, `original` to leave skipped maps or images unfiltered). Sketch hybrid busy→still waits ~1.8s and pins chronically busy regions; busy grayscale is paper-toned so a swap is not a dark↔light strobe.
+
 ### 0.1.5 (latest)
 
 `?unpolish=` including `original` forces that theme for the session: both `review.theme` and `review.active` are set from the URL, so a leftover `{theme:"original", active:"sketch"}` payload cannot apply Sketch. Live classify reads original styles from clones in an isolated iframe (host CSS copied in, never `getComputedStyle` on the live tree). `fullPass` still keeps the memo.

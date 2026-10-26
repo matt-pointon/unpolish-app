@@ -180,7 +180,7 @@ test('Sketch hybrid skip filter: gray while panning, edge when still', async ({ 
           resolve();
           return;
         }
-        if (performance.now() - t0 > 2000) resolve();
+        if (performance.now() - t0 > 4000) resolve();
         else requestAnimationFrame(tick);
       }
       requestAnimationFrame(tick);
@@ -197,14 +197,21 @@ test('Sketch hybrid skip filter: gray while panning, edge when still', async ({ 
   console.log('heavy-map 0.1.3 switchback', JSON.stringify(switched));
   expect(switched.filter).toMatch(/up-f-skip-edge/);
   expect(switched.busy).toBeFalsy();
-  expect(switched.ms, `switchback ${switched.ms}ms`).toBeGreaterThanOrEqual(180);
-  expect(switched.ms, `switchback ${switched.ms}ms`).toBeLessThanOrEqual(900);
+  expect(switched.ms, `switchback ${switched.ms}ms`).toBeGreaterThanOrEqual(1400);
+  expect(switched.ms, `switchback ${switched.ms}ms`).toBeLessThanOrEqual(2800);
 
   const photo = page.getByTestId('photo');
   expect(await photo.evaluate((el) => getComputedStyle(el).filter)).toMatch(/up-f-skip-edge/);
   const imageIdle = await measure(page, 1500);
   console.log('heavy-map 0.1.3 static-image', JSON.stringify(imageIdle));
   expect(imageIdle.fps, `static image ${imageIdle.fps.toFixed(1)} fps`).toBeGreaterThanOrEqual(50);
+
+  await page.evaluate(() => window.Unpolish._internal.setSkipFilter({ images: 'original' }));
+  expect(await photo.evaluate((el) => getComputedStyle(el).filter === 'none' || getComputedStyle(el).filter === '')).toBeTruthy();
+  expect(await map.evaluate((el) => getComputedStyle(el).filter)).toMatch(/up-f-skip-edge|grayscale/);
+  await page.evaluate(() => window.Unpolish._internal.setSkipFilter({ maps: 'original', images: 'theme' }));
+  expect(await map.evaluate((el) => getComputedStyle(el).filter === 'none' || getComputedStyle(el).filter === '')).toBeTruthy();
+  expect(await photo.evaluate((el) => getComputedStyle(el).filter)).toMatch(/up-f-skip-edge/);
 });
 
 test('Sketch hybrid on the Seattle Leaflet map', async ({ page }) => {
@@ -254,7 +261,7 @@ test('Sketch hybrid on the Seattle Leaflet map', async ({ page }) => {
           resolve();
           return;
         }
-        if (performance.now() - t0 > 2000) resolve();
+        if (performance.now() - t0 > 4000) resolve();
         else requestAnimationFrame(tick);
       }
       requestAnimationFrame(tick);
@@ -269,8 +276,8 @@ test('Sketch hybrid on the Seattle Leaflet map', async ({ page }) => {
   });
   console.log('seattle 0.1.3 switchback', JSON.stringify(switched));
   expect(switched.filter).toMatch(/up-f-skip-edge/);
-  expect(switched.ms).toBeGreaterThanOrEqual(180);
-  expect(switched.ms).toBeLessThanOrEqual(900);
+  expect(switched.ms).toBeGreaterThanOrEqual(1400);
+  expect(switched.ms).toBeLessThanOrEqual(2800);
 });
 
 test('Sketch fleet map: gray tiles and marker pane, car imgs not classified, queue idle', async ({ page }) => {

@@ -5,6 +5,10 @@
   "ui": "visible",
   "exclude": [],
   "include": [],
+  "skipFilter": {
+    "maps": "theme",
+    "images": "theme"
+  },
   "shortcuts": {
     "toggle": "\\",
     "themes": {}
