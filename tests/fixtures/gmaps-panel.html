@@ -153,11 +153,13 @@
         }
       }
 
-      function tick() {
+      function tick(forceMove) {
         n++;
         frames++;
         // burst: mutate ~every 400ms (would strobe at the old 260ms busy window).
-        var move = !burst || n % 24 === 0;
+        // Drive those bursts from setInterval — headless Chromium throttles
+        // rAF when most frames don't paint, so n % 24 never lands.
+        var move = forceMove || !burst;
         if (move) {
           var count = 14;
           for (j = 0; j < count; j++) {
@@ -181,11 +183,12 @@
             tag.style.setProperty('--tag-w', (40 + (n % 50)) + 'px');
           }
         }
-        requestAnimationFrame(tick);
       }
-      requestAnimationFrame(tick);
+      if (burst) setInterval(function () { tick(true); }, 400);
+      requestAnimationFrame(function loop() { tick(false); requestAnimationFrame(loop); });
 
       window.__panel = { eligible: 0, nodes: 0, markers: MARKERS, rows: ROWS };
+      Object.defineProperty(window.__panel, 'n', { get: function () { return n; } });
       window.__recalcCost = function () {
         var t0 = performance.now();
         document.documentElement.style.setProperty('--probe', String(Math.random()));

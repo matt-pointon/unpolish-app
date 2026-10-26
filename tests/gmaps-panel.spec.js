@@ -287,6 +287,28 @@ test('skipFilter.maps original leaves Google Maps unfiltered', async ({ page }) 
   expect(look.gmFilter === 'none' || look.gmFilter === '').toBeTruthy();
   expect(look.busy).toBeFalsy();
   expect(look.dotBg).toMatch(/rgb\(\s*220,\s*38,\s*38\s*\)/);
+  const samples = [];
+  const t0 = Date.now();
+  while (Date.now() - t0 < 4000) {
+    samples.push(await page.evaluate(() => {
+      const map = document.querySelector('gmp-map');
+      const gm = document.querySelector('.gm-style');
+      const dot = document.querySelector('.marker-dot');
+      const mf = map ? getComputedStyle(map).filter : '';
+      const gf = gm ? getComputedStyle(gm).filter : '';
+      return {
+        mapF: mf,
+        gmF: gf,
+        busy: !!(map && map.hasAttribute('data-unpolish-busy')) || !!(gm && gm.hasAttribute('data-unpolish-busy')),
+        dot: dot ? getComputedStyle(dot).backgroundColor : ''
+      };
+    }));
+    await page.waitForTimeout(50);
+  }
+  expect(samples.length).toBeGreaterThan(30);
+  expect(samples.filter((s) => (s.mapF && s.mapF !== 'none') || (s.gmF && s.gmF !== 'none')).length).toBe(0);
+  expect(samples.filter((s) => s.busy).length).toBe(0);
+  expect(samples.filter((s) => !/rgb\(\s*220,\s*38,\s*38\s*\)/.test(s.dot)).length).toBe(0);
 });
 
 test('burst fleet motion does not strobe Sketch skip filters', async ({ page }) => {
@@ -297,25 +319,47 @@ test('burst fleet motion does not strobe Sketch skip filters', async ({ page }) 
     window.Unpolish.setTheme('sketch');
   });
   await page.waitForFunction(() => document.documentElement.getAttribute('data-unpolish') === 'sketch');
-  await page.waitForTimeout(500);
-  const flips = await page.evaluate(async () => {
-    const el = document.querySelector('.gm-style') || document.querySelector('gmp-map');
-    const samples = [];
-    const t0 = performance.now();
-    while (performance.now() - t0 < 8000) {
-      const f = getComputedStyle(el).filter;
-      const busy = el.hasAttribute('data-unpolish-busy');
-      const kind = /grayscale/.test(f) ? 'busy' : /up-f-skip-edge/.test(f) ? 'still' : 'other';
-      samples.push({ kind, busy });
-      await new Promise((r) => requestAnimationFrame(r));
-    }
-    let swaps = 0;
-    for (let i = 1; i < samples.length; i++) {
-      if (samples[i].kind !== samples[i - 1].kind) swaps++;
-    }
-    return { swaps, first: samples[0] && samples[0].kind, last: samples[samples.length - 1] && samples[samples.length - 1].kind, n: samples.length };
+  const snap = () => page.evaluate(() => {
+    const map = document.querySelector('gmp-map');
+    const gm = document.querySelector('.gm-style');
+    const el = gm || map;
+    const f = el ? getComputedStyle(el).filter : '';
+    const kind = /grayscale/.test(f) ? 'busy' : /up-f-skip-edge/.test(f) ? 'still' : (f && f !== 'none' ? 'other' : 'none');
+    return {
+      kind,
+      mapBusy: !!(map && map.hasAttribute('data-unpolish-busy')),
+      gmBusy: !!(gm && gm.hasAttribute('data-unpolish-busy'))
+    };
   });
+  const tWarm = Date.now();
+  while (Date.now() - tWarm < 2500) {
+    if ((await snap()).kind === 'busy') break;
+    await page.waitForTimeout(50);
+  }
+  const samples = [];
+  const t0 = Date.now();
+  while (Date.now() - t0 < 8000) {
+    samples.push(await snap());
+    await page.waitForTimeout(50);
+  }
+  let swaps = 0;
+  for (let i = 1; i < samples.length; i++) {
+    if (samples[i].kind !== samples[i - 1].kind) swaps++;
+  }
+  const flips = {
+    swaps,
+    first: samples[0] && samples[0].kind,
+    last: samples[samples.length - 1] && samples[samples.length - 1].kind,
+    n: samples.length,
+    busyShare: samples.length ? samples.filter((s) => s.kind === 'busy').length / samples.length : 0,
+    mapBusyShare: samples.length ? samples.filter((s) => s.mapBusy).length / samples.length : 0,
+    gmBusyShare: samples.length ? samples.filter((s) => s.gmBusy).length / samples.length : 0
+  };
   console.log('gmaps-panel burst-filter', JSON.stringify(flips));
+  expect(flips.n, 'burst sampler stalled').toBeGreaterThan(50);
+  expect(flips.first).toBe('busy');
+  expect(flips.last).toBe('busy');
+  expect(flips.busyShare).toBeGreaterThan(0.9);
   expect(flips.swaps, `skip filter strobed ${flips.swaps} times (${flips.first}→${flips.last})`).toBe(0);
 });
 
