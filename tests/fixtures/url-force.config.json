@@ -1,0 +1,10 @@
+{
+  "version": 1,
+  "id": "skittles-research-prototype",
+  "defaultTheme": "original",
+  "ui": "hidden",
+  "webFonts": false,
+  "exclude": [],
+  "shortcuts": { "toggle": "\\", "themes": {} },
+  "themes": {}
+}

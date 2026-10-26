@@ -278,6 +278,41 @@ test.describe('review links', () => {
     expect(await theme(page)).toBe('sketch');
   });
 
+  test('?unpolish=original overrides persisted Sketch active', async ({ page }) => {
+    await open(page, EXAMPLES.plain);
+    await setTheme(page, 'sketch');
+    expect(await theme(page)).toBe('sketch');
+    await page.evaluate(() => {
+      const id = window.Unpolish.getConfig().id || 'default';
+      localStorage.setItem('unpolish:' + id, JSON.stringify({ active: 'sketch', themes: {}, shortcuts: {} }));
+      sessionStorage.setItem('unpolish:' + id + ':review', JSON.stringify({ theme: 'original', active: 'sketch', ui: 'visible', edits: {} }));
+    });
+    await page.goto(EXAMPLES.plain + '?unpolish=original');
+    await page.waitForFunction(() => window.Unpolish && window.Unpolish.getTheme() === 'original');
+    expect(await theme(page)).toBeNull();
+    expect(await page.evaluate(() => window.Unpolish.getTheme())).toBe('original');
+    const stored = await page.evaluate(() => {
+      const id = window.Unpolish.getConfig().id || 'default';
+      return JSON.parse(sessionStorage.getItem('unpolish:' + id + ':review'));
+    });
+    expect(stored.theme).toBe('original');
+    expect(stored.active).toBe('original');
+  });
+
+  test('async configUrl: ?unpolish=original forces the session over stored active', async ({ page }) => {
+    await page.addInitScript(() => {
+      localStorage.setItem('unpolish:skittles-research-prototype', JSON.stringify({ active: 'sketch', themes: {}, shortcuts: {} }));
+      sessionStorage.setItem('unpolish:skittles-research-prototype:review', JSON.stringify({ theme: 'original', active: 'sketch', ui: 'visible', edits: {} }));
+    });
+    await page.goto('/tests/fixtures/url-force.html?unpolish=original');
+    await page.waitForFunction(() => window.Unpolish && window.Unpolish.getTheme() === 'original');
+    expect(await theme(page)).toBeNull();
+    expect(await page.evaluate(() => window.Unpolish.getTheme())).toBe('original');
+    const stored = await page.evaluate(() => JSON.parse(sessionStorage.getItem('unpolish:skittles-research-prototype:review')));
+    expect(stored.theme).toBe('original');
+    expect(stored.active).toBe('original');
+  });
+
   test('URL selects theme, hides UI, survives client-side navigation and reloads', async ({ page }) => {
     await open(page, EXAMPLES.react + 'clients?ref=mail&unpolish=blueprint&unpolish-ui=hidden#team');
     expect(await theme(page)).toBe('blueprint');

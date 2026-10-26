@@ -181,6 +181,10 @@ function createUnpolish() {
     return raf(fn);
   }
   function now() { return (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now(); }
+  function csOf(el, pseudo) {
+    var view = (el && el.ownerDocument && el.ownerDocument.defaultView) || window;
+    return pseudo ? view.getComputedStyle(el, pseudo) : view.getComputedStyle(el);
+  }
   var WORK_BUDGET_MS = 8;
   var TASK_BUDGET_MS = 50;
   var BATCH_MAX = 256;
@@ -1112,17 +1116,18 @@ function createUnpolish() {
   }
 
   Classifier.prototype.parentInfo = function (el) {
+    var doc = (el && el.ownerDocument) || document;
     var p = parentEl(el);
-    if (!p || p === document.documentElement || p === document.body) return { bg: this.pageBg, color: this.pageColor, box: null, depth: 0 };
+    if (!p || p === doc.documentElement || p === doc.body) return { bg: this.pageBg, color: this.pageColor, box: null, depth: 0 };
     var inf = this.info.get(p);
     if (inf) return inf;
     // Unknown ancestor (dynamic insertion into an unclassified subtree): read it directly.
     var chain = [], q = p;
-    while (q && q !== document.body && q !== document.documentElement && !this.info.get(q)) { chain.unshift(q); q = parentEl(q); }
+    while (q && q !== doc.body && q !== doc.documentElement && !this.info.get(q)) { chain.unshift(q); q = parentEl(q); }
     var base = q && this.info.get(q) ? this.info.get(q) : { bg: this.pageBg, color: this.pageColor, box: null };
     var self = this;
     chain.forEach(function (n) {
-      var cs = getComputedStyle(n);
+      var cs = csOf(n);
       var b = bgOf(cs).color;
       var eff = b.a > 0.01 ? over(b, base.bg) : base.bg;
       base = { bg: eff, color: parseColor(cs.color) || base.color, box: base.box };
@@ -1133,7 +1138,7 @@ function createUnpolish() {
 
   /* Read phase must run while Unpolish styles are disabled (see Engine.classify). */
   Classifier.prototype.read = function (el) {
-    var cs = getComputedStyle(el);
+    var cs = csOf(el);
     var r = {
       el: el, tag: el.tagName, display: cs.display, position: cs.position,
       bg: bgOf(cs), color: parseColor(cs.color), font: cs.fontFamily,
@@ -1146,7 +1151,7 @@ function createUnpolish() {
     };
     if (r.display === 'contents') r.contents = true;
     ['::before', '::after'].forEach(function (ps) {
-      var pcs = getComputedStyle(el, ps);
+      var pcs = csOf(el, ps);
       var content = pcs.content;
       if (!content || content === 'none' || content === 'normal') return;
       var pb = bgOf(pcs);
@@ -1162,7 +1167,15 @@ function createUnpolish() {
   Classifier.prototype.decide = function (r, rect, vw, vh) {
     var el = r.el, tokens = [], tag = r.tag;
     var forced = this.engine.forcedRole(el);
-    var pinfo = this.parentInfo(el);
+    var pinfo = r.pinfo;
+    if (!pinfo) {
+      var p0 = parentEl(el);
+      pinfo = (p0 && this.info.get(p0)) || null;
+      // Theme sheet off: first-pass classify. Theme sheet on: never getComputedStyle
+      // the live tree (one recalc is 140–170ms on a Maps-sized page).
+      if (!pinfo && this.engine.sheetOff) pinfo = this.parentInfo(el);
+      if (!pinfo) pinfo = { bg: this.pageBg, color: this.pageColor, box: null, depth: 0 };
+    }
     var parentBg = pinfo.bg || this.pageBg;
     var control = isControl(el);
     var w = rect.width, h = rect.height;
@@ -1379,6 +1392,8 @@ function createUnpolish() {
     this.lastBatchMs = 0;
     this.sheetOff = false;
     this._live = null;
+    this.probeFrame = null;
+    this._probeBytes = -1;
   }
 
   Engine.prototype.noteBatchCost = function (ms, n) {
@@ -1513,7 +1528,7 @@ function createUnpolish() {
       if (el && el.isConnected && !eng.inSkipTree(el)) job.reads.push(c.read(el));
     }
     try {
-      job.reads.forEach(function (r) { c.parentInfo(r.el); });
+      job.reads.forEach(function (r) { r.pinfo = c.parentInfo(r.el); });
       job.exempts.forEach(function (node) {
         var par = parentEl(node);
         if (!par) return;
@@ -1534,17 +1549,78 @@ function createUnpolish() {
   };
 
   /* Mutation-path classify: never disable the theme sheet (that restyles the
-   * whole page). Insert the whole batch into an exempt off-screen probe, read
-   * once, then remove — one style recalc per slice, not per element. */
+   * whole page) and never getComputedStyle the live tree (that forces a
+   * full-document recalc). Clones go into an iframe so host style invalidation
+   * stays off the page. */
   Engine.prototype.ensureProbe = function () {
-    if (this.probe && this.probe.isConnected) return this.probe;
-    var probe = this.probe = document.createElement('div');
-    probe.id = 'unpolish-probe';
-    probe.setAttribute('data-unpolish-ignore', '');
-    probe.setAttribute('aria-hidden', 'true');
-    probe.style.cssText = 'position:absolute;left:-9999px;top:0;width:0;height:0;overflow:hidden;pointer-events:none;contain:strict';
-    (document.body || document.documentElement).appendChild(probe);
-    return probe;
+    var doc = this.probeFrame && this.probeFrame.contentDocument;
+    if (doc && doc.body) {
+      this.syncProbeSheets(doc);
+      this.probe = doc.body;
+      return this.probe;
+    }
+    var f = document.createElement('iframe');
+    f.id = 'unpolish-probe';
+    f.setAttribute('data-unpolish-ignore', '');
+    f.setAttribute('aria-hidden', 'true');
+    f.setAttribute('tabindex', '-1');
+    f.setAttribute('sandbox', 'allow-same-origin');
+    f.srcdoc = '<!doctype html><title></title>';
+    f.style.cssText = 'position:absolute;left:-9999px;top:0;width:0;height:0;border:0;overflow:hidden;pointer-events:none;contain:strict';
+    (document.body || document.documentElement).appendChild(f);
+    this.probeFrame = f;
+    doc = f.contentDocument;
+    if (doc) this.syncProbeSheets(doc);
+    this.probe = doc && doc.body;
+    return this.probe;
+  };
+
+  Engine.prototype.syncProbeSheets = function (doc) {
+    if (!doc || !doc.head) return;
+    var parts = [];
+    var bytes = 0;
+    var nodes = document.querySelectorAll('style, link[rel="stylesheet"]');
+    var i, n, j, sheet, rules, css;
+    for (i = 0; i < nodes.length; i++) {
+      n = nodes[i];
+      if (n.id && n.id.indexOf('unpolish-') === 0) continue;
+      css = '';
+      if (n.tagName === 'STYLE') css = n.textContent || '';
+      else {
+        try {
+          sheet = n.sheet;
+          rules = sheet && sheet.cssRules;
+          if (rules) for (j = 0; j < rules.length; j++) css += rules[j].cssText + '\n';
+        } catch (e) { css = ''; }
+      }
+      if (css) { parts.push(css); bytes += css.length; }
+    }
+    if (bytes === this._probeBytes && doc.getElementById('unpolish-probe-css')) {
+      this.syncProbeRoot(doc);
+      return;
+    }
+    this._probeBytes = bytes;
+    var style = doc.getElementById('unpolish-probe-css');
+    if (!style) {
+      style = doc.createElement('style');
+      style.id = 'unpolish-probe-css';
+      doc.head.appendChild(style);
+    }
+    style.textContent = parts.join('\n');
+    try {
+      if (document.adoptedStyleSheets && document.adoptedStyleSheets.length && 'adoptedStyleSheets' in doc) {
+        doc.adoptedStyleSheets = Array.prototype.slice.call(document.adoptedStyleSheets);
+      }
+    } catch (e) { /* noop */ }
+    this.syncProbeRoot(doc);
+  };
+
+  Engine.prototype.syncProbeRoot = function (doc) {
+    if (!doc) return;
+    try {
+      doc.documentElement.className = document.documentElement.className || '';
+      if (doc.body && document.body) doc.body.className = document.body.className || '';
+    } catch (e) { /* noop */ }
   };
 
   Engine.prototype.stripClone = function (copy) {
@@ -1569,6 +1645,18 @@ function createUnpolish() {
     var job = this._live;
     if (!job) return;
     var probe = this.ensureProbe();
+    if (!probe) {
+      job.probeTries = (job.probeTries || 0) + 1;
+      if (job.probeTries > 8) {
+        var rest = job.els.slice(job.i);
+        this._live = null;
+        if (rest.length) this.classify(rest);
+        return;
+      }
+      scheduleIdle(function () { eng.classifyLive(null, job.i); });
+      return;
+    }
+    var idoc = probe.ownerDocument;
     var t0 = now();
     var limit = this.batchLimit();
     var batch = [];
@@ -1586,7 +1674,7 @@ function createUnpolish() {
         el = batch[i];
         chain = [];
         for (n = el; n && n !== document.body && n !== document.documentElement; n = parentEl(n)) chain.unshift(n);
-        wrap = document.createElement('div');
+        wrap = idoc.createElement('div');
         wrap.className = (htmlClass + ' ' + bodyClass).trim();
         leaf = wrap;
         for (k = 0; k < chain.length; k++) {
@@ -1595,20 +1683,27 @@ function createUnpolish() {
           leaf.appendChild(copy);
           leaf = copy;
         }
+        if (leaf === wrap) {
+          copy = el.cloneNode(false);
+          this.stripClone(copy);
+          wrap.appendChild(copy);
+          leaf = copy;
+        }
         wraps.push(wrap);
-        leaves.push(leaf === wrap ? el : leaf);
+        leaves.push(leaf);
       }
-      var frag = document.createDocumentFragment();
+      var frag = idoc.createDocumentFragment();
       for (i = 0; i < wraps.length; i++) frag.appendChild(wraps[i]);
       probe.appendChild(frag);
       var reads = [];
       for (i = 0; i < leaves.length; i++) {
+        if (!leaves[i] || leaves[i].ownerDocument === document) continue;
         var rec = c.read(leaves[i]);
+        rec.pinfo = c.parentInfo(leaves[i]);
         rec.el = batch[i];
         reads.push(rec);
       }
       probe.textContent = '';
-      for (i = 0; i < reads.length; i++) c.parentInfo(reads[i].el);
       this.finishClassify(reads, false);
       this.noteBatchCost(now() - t0, batch.length);
     }
@@ -1808,7 +1903,11 @@ function createUnpolish() {
     if (this.style) this.style.remove();
     if (this.skipStyle) this.skipStyle.remove();
     this.lastSkipCSS = '';
-    if (this.probe) this.probe.remove();
+    if (this.probeFrame) this.probeFrame.remove();
+    if (this.probe && this.probe.remove) this.probe.remove();
+    this.probeFrame = null;
+    this.probe = null;
+    this._probeBytes = -1;
     if (this.filters) this.filters.remove();
     if (this.exemptStyle) this.exemptStyle.remove();
     this.exemptRules = [];
@@ -1845,7 +1944,7 @@ function createUnpolish() {
 
   Engine.prototype.isOwnNode = function (el) {
     if (!el || el.nodeType !== 1) return true;
-    if (el === this.style || el === this.skipStyle || el === this.filters || el === this.guard || el === this.exemptStyle || el === this.probe) return true;
+    if (el === this.style || el === this.skipStyle || el === this.filters || el === this.guard || el === this.exemptStyle || el === this.probe || el === this.probeFrame) return true;
     if (el.id && el.id.indexOf('unpolish-') === 0) return true;
     if (el.tagName === 'UNPOLISH-HARNESS') return true;
     return !!(el.closest && el.closest('unpolish-harness, #unpolish-filters, #unpolish-theme, #unpolish-skip, #unpolish-guard, #unpolish-exempt, #unpolish-probe'));
@@ -2169,6 +2268,7 @@ function createUnpolish() {
         }
         if (t === document.head || t === html) {
           if (this.style && !this.style.isConnected) this.ensureNodes();
+          this._probeBytes = -1;
         }
         if (this.filters && !this.filters.isConnected && document.body) document.body.appendChild(this.filters);
       } else if (rec.type === 'attributes') {
@@ -3253,19 +3353,27 @@ function createUnpolish() {
   }
 
   App.prototype.readURL = function () {
-    var snap = this.urlChoice || snapshotURL();
-    if (snap.has) {
+    var live = snapshotURL();
+    var snap = this.urlChoice || live;
+    // Address-bar theme wins over an earlier empty snapshot (late init). A
+    // captured snapshot still wins after client-side nav drops the param.
+    if (live.hasTheme) snap = live;
+    this.urlChoice = snap;
+    if (snap.hasTheme) {
       var theme = normTheme(snap.theme);
-      if (snap.hasTheme && !theme) warn('Unknown theme in URL:', snap.theme, '— using the project default.');
+      if (!theme) warn('Unknown theme in URL:', snap.theme, '— using the project default.');
       var urlTheme = theme || this.config.defaultTheme;
+      // persist() writes review.active from state.active and leaves review.theme
+      // alone, so a previous Sketch session can look like {theme:original,
+      // active:sketch}. The URL value must force both fields.
       this.state.review = {
         theme: urlTheme,
         ui: snap.ui === 'hidden' ? 'hidden' : 'visible',
         edits: {},
         active: urlTheme
       };
-      storage.set('sessionStorage', this.keys.review, this.state.review);
       this.state.active = urlTheme;
+      storage.set('sessionStorage', this.keys.review, this.state.review);
       return;
     }
     var saved = storage.get('sessionStorage', this.keys.review);
@@ -3274,8 +3382,16 @@ function createUnpolish() {
       saved.edits = saved.edits || {};
       this.state.review = saved;
     }
-    if (this.state.review) this.state.active = this.state.review.active || this.state.review.theme;
+    if (this.state.review) this.state.active = normTheme(this.state.review.active) || this.state.review.theme;
     else this.state.active = normTheme(this.local.active) || this.config.defaultTheme;
+    if (snap.has && snap.ui) {
+      if (!this.state.review) {
+        this.state.review = { theme: this.state.active, ui: snap.ui === 'hidden' ? 'hidden' : 'visible', edits: {}, active: this.state.active };
+      } else {
+        this.state.review.ui = snap.ui === 'hidden' ? 'hidden' : 'visible';
+      }
+      storage.set('sessionStorage', this.keys.review, this.state.review);
+    }
   };
 
   /* Project preset: built-in defaults overlaid with the repo configuration. */

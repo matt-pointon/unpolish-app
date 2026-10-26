@@ -64,6 +64,10 @@ The package name is `unpolish` (unscoped, public, MIT). npm user `mattpointon`. 
 
 npm’s staged-publish flow also created a **`0.0.0-stage` placeholder** version. It is not a real Unpolish release. Do not install it, and **never** move the `latest` dist-tag onto it.
 
+### 0.1.5 (not published yet)
+
+`?unpolish=` including `original` forces that theme for the session: both `review.theme` and `review.active` are set from the URL, so a leftover `{theme:"original", active:"sketch"}` payload cannot apply Sketch. Live classify reads original styles from clones in an isolated iframe (host CSS copied in, never `getComputedStyle` on the live tree). `fullPass` still keeps the memo.
+
 ### 0.1.4 (latest)
 
 Cached original reads (replayed across nodes that share a class/state signature), mutation-path classify never disables the theme sheet, batched probe for first-seen signatures, ~50ms adaptive classify budget, URL `?unpolish=` wins over a persisted theme. Map / image / marker-pane behaviour is unchanged from 0.1.3.
