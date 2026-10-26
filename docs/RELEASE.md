@@ -1,6 +1,6 @@
 # Releasing Unpolish
 
-The package `unpolish@0.1.4` is on npm (`latest`, public). `0.1.0`, `0.1.1`, `0.1.2` and `0.1.3` are also published. The website is `https://unpolishdesign.vercel.app`. This repo does not store npm or Vercel credentials.
+The package `unpolish@0.1.5` is on npm (`latest`, public). `0.1.0`, `0.1.1`, `0.1.2`, `0.1.3` and `0.1.4` are also published. The website is `https://unpolishdesign.vercel.app`. This repo does not store npm or Vercel credentials.
 
 ## One source of truth
 
@@ -60,15 +60,15 @@ Projects update with `npx unpolish@latest init --upgrade`; their config is kept.
 
 ## Publishing to npm
 
-The package name is `unpolish` (unscoped, public, MIT). npm user `mattpointon`. `unpolish@0.1.4` is on npm with dist-tag `latest`. `0.1.0`, `0.1.1`, `0.1.2` and `0.1.3` are published. Do not republish an older file.
+The package name is `unpolish` (unscoped, public, MIT). npm user `mattpointon`. `unpolish@0.1.5` is on npm with dist-tag `latest`. `0.1.0`, `0.1.1`, `0.1.2`, `0.1.3` and `0.1.4` are published. Do not republish an older file.
 
 npm’s staged-publish flow also created a **`0.0.0-stage` placeholder** version. It is not a real Unpolish release. Do not install it, and **never** move the `latest` dist-tag onto it.
 
-### 0.1.5 (not published yet)
+### 0.1.5 (latest)
 
 `?unpolish=` including `original` forces that theme for the session: both `review.theme` and `review.active` are set from the URL, so a leftover `{theme:"original", active:"sketch"}` payload cannot apply Sketch. Live classify reads original styles from clones in an isolated iframe (host CSS copied in, never `getComputedStyle` on the live tree). `fullPass` still keeps the memo.
 
-### 0.1.4 (latest)
+### 0.1.4
 
 Cached original reads (replayed across nodes that share a class/state signature), mutation-path classify never disables the theme sheet, batched probe for first-seen signatures, ~50ms adaptive classify budget, URL `?unpolish=` wins over a persisted theme. Map / image / marker-pane behaviour is unchanged from 0.1.3.
 
@@ -149,6 +149,6 @@ No npm client is required at runtime. Download `unpolish.js` and `unpolish.confi
   data-config="unpolish.config.json" defer></script>
 ```
 
-Pin a version: the bundle’s first line names it (`/*! Unpolish v0.1.4 …`). jsDelivr and unpkg serve every npm version at `https://cdn.jsdelivr.net/npm/unpolish@<version>/dist/unpolish.js` — use an exact version, never `latest`, for a prototype others review.
+Pin a version: the bundle’s first line names it (`/*! Unpolish v0.1.5 …`). jsDelivr and unpkg serve every npm version at `https://cdn.jsdelivr.net/npm/unpolish@<version>/dist/unpolish.js` — use an exact version, never `latest`, for a prototype others review.
 
 Full installer, configuration, update and removal notes: [`packages/unpolish/README.md`](../packages/unpolish/README.md).
