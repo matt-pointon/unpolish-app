@@ -174,6 +174,16 @@ test('Sketch and Blueprint stay interactive on the 7k-node Google Maps panel', a
   console.log('gmaps-panel Sketch', JSON.stringify(sketch));
   expect(sketch.max, `longest Sketch task ${sketch.max}ms`).toBeLessThanOrEqual(200);
   expect(sketch.fps, `Sketch ${sketch.fps.toFixed(1)} fps`).toBeGreaterThanOrEqual(45);
+  const taggedSwing = await page.evaluate(async () => {
+    const samples = [];
+    for (let i = 0; i < 8; i++) {
+      samples.push(document.querySelectorAll('[data-up]').length);
+      await new Promise((r) => setTimeout(r, 250));
+    }
+    return { min: Math.min(...samples), max: Math.max(...samples), last: samples[samples.length - 1] };
+  });
+  console.log('gmaps-panel tagged-swing', JSON.stringify(taggedSwing));
+  expect(taggedSwing.max - taggedSwing.min, `tagged oscillated ${taggedSwing.min}–${taggedSwing.max}`).toBeLessThan(120);
 
   // Matt's 45 fps floor is Sketch. Blueprint's drafting grid is paint-heavier
   // on GitHub runners (~42 fps with 0 long tasks); still must not freeze.
@@ -202,4 +212,48 @@ test('?unpolish=sketch wins over a persisted Blueprint on the panel fixture', as
   await page.goto('/tests/fixtures/gmaps-panel.html?unpolish=sketch');
   await page.waitForFunction(() => window.Unpolish && document.documentElement.getAttribute('data-unpolish') === 'sketch');
   expect(await page.getAttribute('html', 'data-unpolish')).toBe('sketch');
+});
+
+test('?unpolish=original wins over persisted Sketch active in local and session storage', async ({ page }) => {
+  // Matt's 0.1.4 storage: URL wrote review.theme=original but stored active stayed sketch.
+  await page.addInitScript(() => {
+    localStorage.setItem('unpolish:skittles-research-prototype', JSON.stringify({ active: 'sketch', themes: {}, shortcuts: {} }));
+    sessionStorage.setItem('unpolish:skittles-research-prototype:review', JSON.stringify({ theme: 'original', active: 'sketch', ui: 'visible', edits: {} }));
+  });
+  await page.goto('/tests/fixtures/gmaps-panel.html?unpolish=original');
+  await page.waitForFunction(() => window.Unpolish && window.Unpolish.getTheme() === 'original');
+  expect(await page.getAttribute('html', 'data-unpolish')).toBeNull();
+  expect(await page.evaluate(() => window.Unpolish.getTheme())).toBe('original');
+  const stored = await page.evaluate(() => JSON.parse(sessionStorage.getItem('unpolish:skittles-research-prototype:review')));
+  expect(stored.theme).toBe('original');
+  expect(stored.active).toBe('original');
+});
+
+test('reused tab with persisted Sketch stays interactive and does not mass-retag', async ({ page }) => {
+  try {
+    const client = await page.context().newCDPSession(page);
+    await client.send('Emulation.setCPUThrottlingRate', { rate: 1 });
+  } catch (e) { /* noop */ }
+  await page.addInitScript(() => {
+    localStorage.setItem('unpolish:skittles-research-prototype', JSON.stringify({ active: 'sketch', themes: {}, shortcuts: {} }));
+    sessionStorage.setItem('unpolish:skittles-research-prototype:review', JSON.stringify({ theme: 'sketch', active: 'sketch', ui: 'visible', edits: {} }));
+  });
+  await page.goto('/tests/fixtures/gmaps-panel.html?unpolish=sketch');
+  await page.waitForFunction(() => window.Unpolish && document.documentElement.getAttribute('data-unpolish') === 'sketch');
+  const steady = await waitSteadyTagged(page, 5000);
+  expect(steady.timedOut, `tagged count still moving after ${steady.ms}ms (${steady.tagged})`).toBeFalsy();
+  const sketch = await measure(page, { warm: 4000, ms: 3000 });
+  console.log('gmaps-panel reused-tab Sketch', JSON.stringify(sketch));
+  expect(sketch.max, `longest reused-tab Sketch task ${sketch.max}ms`).toBeLessThanOrEqual(200);
+  expect(sketch.fps, `reused-tab Sketch ${sketch.fps.toFixed(1)} fps`).toBeGreaterThanOrEqual(45);
+  const taggedSwing = await page.evaluate(async () => {
+    const samples = [];
+    for (let i = 0; i < 8; i++) {
+      samples.push(document.querySelectorAll('[data-up]').length);
+      await new Promise((r) => setTimeout(r, 250));
+    }
+    return { min: Math.min(...samples), max: Math.max(...samples) };
+  });
+  console.log('gmaps-panel reused-tab tagged-swing', JSON.stringify(taggedSwing));
+  expect(taggedSwing.max - taggedSwing.min, `tagged oscillated ${taggedSwing.min}–${taggedSwing.max}`).toBeLessThan(120);
 });

@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.1.5
+
+- `?unpolish=` including `original` forces that theme for the session. Persisted `review.active` / local `active` cannot win on load.
+- Live classify never calls `getComputedStyle` on the live page: original reads happen on clones inside an isolated iframe, with parent info taken from those clones. Recurring 150–250ms stalls from trickle tagging should stop; tagged count should not swing by hundreds after it settles.
+
 ## 0.1.4
 
 - Classify no longer inserts a probe and calls `getComputedStyle` per element. Cached original reads are reused when the attribute signature is unchanged, including across different nodes that share a class/state signature; `fullPass` keeps the memo and invalidates per element. The first pass of many uncached nodes disables the theme sheet once and time-slices reads. Mutation-path classify never disables the sheet: first-seen signatures batch into an exempt probe (insert all, read all, remove all) so a page pays one style recalc per slice. Classify, read and write time counts against a ~50ms task budget; batch size adapts from the measured per-element cost. On localhost, a batch that overruns logs `console.warn('[unpolish] classify batch took Xms')`.

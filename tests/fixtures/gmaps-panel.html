@@ -157,6 +157,16 @@
           if (lab && n % 8 === j % 8) lab.textContent = 'Unit ' + ((n + j) % MARKERS);
         }
         if (n % 10 === 0) measureTags();
+        // Unique class/state on eligible panel nodes (not map markers) so live
+        // classify cannot skip via attrSig cache — NameTag-style self-measure.
+        if (devices.childElementCount && n % 20 === 0) {
+          var row = devices.children[n % devices.childElementCount];
+          var tag = row && row.querySelector('.name-tag');
+          if (tag) {
+            tag.className = 'name-tag dyn-' + (n % 400);
+            tag.style.setProperty('--tag-w', (40 + (n % 50)) + 'px');
+          }
+        }
         document.getElementById('map').dispatchEvent(new Event('move'));
         requestAnimationFrame(tick);
       }

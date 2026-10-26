@@ -67,7 +67,7 @@ Exit codes: `0` done or nothing to do · `1` failed, nothing changed (e.g. the l
 
 One file, no dependencies, starts itself. `data-config` resolves relative to the page (falling back to the script's folder). Keep `unpolish.config.json` next to your pages and commit it. Without `data-config` the built-in presets are used. Alternatives: inline `<script type="application/json" id="unpolish-config">{…}</script>` before the tag, `window.UnpolishConfig = {…}`, or `data-manual` and call `Unpolish.init({ config })` yourself.
 
-Pin a version: the bundle's first line names it (`/*! Unpolish v0.1.4 …`). After publication, jsDelivr and unpkg serve every npm version at `https://cdn.jsdelivr.net/npm/unpolish@<version>/dist/unpolish.js` — use an exact version, never `latest`, for a prototype others review.
+Pin a version: the bundle's first line names it (`/*! Unpolish v0.1.5 …`). After publication, jsDelivr and unpkg serve every npm version at `https://cdn.jsdelivr.net/npm/unpolish@<version>/dist/unpolish.js` — use an exact version, never `latest`, for a prototype others review.
 
 ## In code
 
@@ -91,7 +91,7 @@ u.destroy();                           // remove the treatment and panel
 
 - **`\`** or the launcher opens the panel. **1–4** pick a theme while it's open, **0** restores Original, **Esc** closes.
 - **Edit theme** — the **Details** dial (how strongly the theme's character shows), colour, type & lines, images (*Match theme*, *B&W*, *Original*, *Placeholder*), shortcuts. **Reset preset** and **Copy configuration** at the bottom.
-- **Review link** copies the current URL with `?unpolish=<theme>` and, optionally, `&unpolish-ui=hidden`. Values: `original`, `black-white`, `sketch`, `blueprint`, `pastel`. Links use the saved project preset, survive navigation in that tab, and leave your app's own parameters and hash alone.
+- **Review link** copies the current URL with `?unpolish=<theme>` and, optionally, `&unpolish-ui=hidden`. Values: `original`, `black-white`, `sketch`, `blueprint`, `pastel`. On load, `?unpolish=` **forces that theme for the session**, including `original` — a persisted Sketch/Blueprint choice in `localStorage` / `sessionStorage` cannot win. Links use the saved project preset, survive navigation in that tab, and leave your app's own parameters and hash alone.
 
 ## Configuration
 
