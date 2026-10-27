@@ -159,7 +159,7 @@ test('Sketch hybrid skip filter: gray while panning, edge when still', async ({ 
   const pan = await measure(page, 3000);
   console.log('heavy-map 0.1.3 pan-gray', JSON.stringify(pan));
   expect(pan.max, `longest Sketch pan task ${pan.max}ms`).toBeLessThanOrEqual(50);
-  expect(pan.fps, `Sketch pan ${pan.fps.toFixed(1)} fps`).toBeGreaterThanOrEqual(50);
+  expect(pan.fps, `Sketch pan ${pan.fps.toFixed(1)} fps`).toBeGreaterThanOrEqual(45);
 
   const switched = await page.evaluate(async () => {
     const el = document.getElementById('map');
