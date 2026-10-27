@@ -287,9 +287,10 @@ test('skipFilter.maps original leaves Google Maps unfiltered', async ({ page }) 
   expect(look.gmFilter === 'none' || look.gmFilter === '').toBeTruthy();
   expect(look.busy).toBeFalsy();
   expect(look.dotBg).toMatch(/rgb\(\s*220,\s*38,\s*38\s*\)/);
+  // Fixed sample count: a 4s/50ms loop expected >30 hops, but each Playwright
+  // evaluate is ~200ms on GitHub runners (~18–20 samples). Product checks stay.
   const samples = [];
-  const t0 = Date.now();
-  while (Date.now() - t0 < 4000) {
+  for (let i = 0; i < 12; i++) {
     samples.push(await page.evaluate(() => {
       const map = document.querySelector('gmp-map');
       const gm = document.querySelector('.gm-style');
@@ -305,7 +306,7 @@ test('skipFilter.maps original leaves Google Maps unfiltered', async ({ page }) 
     }));
     await page.waitForTimeout(50);
   }
-  expect(samples.length).toBeGreaterThan(30);
+  expect(samples.length).toBe(12);
   expect(samples.filter((s) => (s.mapF && s.mapF !== 'none') || (s.gmF && s.gmF !== 'none')).length).toBe(0);
   expect(samples.filter((s) => s.busy).length).toBe(0);
   expect(samples.filter((s) => !/rgb\(\s*220,\s*38,\s*38\s*\)/.test(s.dot)).length).toBe(0);
