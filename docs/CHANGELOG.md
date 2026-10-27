@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.1.6
+
+- `skipFilter.maps` / `skipFilter.images` (`theme` default, or `original`) opt skipped maps and/or images out of the skip/hybrid CSS filter without classifying them. Use `"skipFilter": { "maps": "original" }` on always-live Google Maps so the basemap and status-coloured markers stay unfiltered. `data-unpolish-filter="original"` does the same per element. `mapMarkers` still cannot split GMP markers (no pane); turning map skip filters off is the way.
+- Sketch hybrid waits ~1.8s of stillness before busy→still (and pins a region that keeps going busy). The busy grayscale is lifted toward Sketch paper so a remaining swap is not a dark↔light strobe.
+
 ## 0.1.5
 
 - `?unpolish=` including `original` forces that theme for the session. Persisted `review.active` / local `active` cannot win on load.

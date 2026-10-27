@@ -67,7 +67,7 @@ Exit codes: `0` done or nothing to do · `1` failed, nothing changed (e.g. the l
 
 One file, no dependencies, starts itself. `data-config` resolves relative to the page (falling back to the script's folder). Keep `unpolish.config.json` next to your pages and commit it. Without `data-config` the built-in presets are used. Alternatives: inline `<script type="application/json" id="unpolish-config">{…}</script>` before the tag, `window.UnpolishConfig = {…}`, or `data-manual` and call `Unpolish.init({ config })` yourself.
 
-Pin a version: the bundle's first line names it (`/*! Unpolish v0.1.5 …`). After publication, jsDelivr and unpkg serve every npm version at `https://cdn.jsdelivr.net/npm/unpolish@<version>/dist/unpolish.js` — use an exact version, never `latest`, for a prototype others review.
+Pin a version: the bundle's first line names it (`/*! Unpolish v0.1.6 …`). After publication, jsDelivr and unpkg serve every npm version at `https://cdn.jsdelivr.net/npm/unpolish@<version>/dist/unpolish.js` — use an exact version, never `latest`, for a prototype others review.
 
 ## In code
 
@@ -105,10 +105,13 @@ u.destroy();                           // remove the treatment and panel
   "defaultTheme": "original",
   "ui": "visible",
   "exclude": [],
+  "skipFilter": { "maps": "theme", "images": "theme" },
   "shortcuts": { "toggle": "\\", "themes": {} },
   "themes": {}
 }
 ```
+
+`skipFilter` defaults to `theme` (current Sketch/Blueprint skip/hybrid filters). Set `"maps": "original"` on a live map app so the basemap and marker colours stay unfiltered. `"images": "original"` does the same for skipped photos. There is no panel control — this is project config, like `mapMarkers`.
 
 Precedence: **review link → local draft (this browser) → project config → built-in presets.** Panel edits are saved in the browser only; **Copy configuration** gives you the full JSON to paste into this file (or hand to your agent). Only list what you change:
 
@@ -116,7 +119,8 @@ Precedence: **review link → local draft (this browser) → project config → 
 {
   "exclude": [".brand-logo"],           // extra regions that keep their original look
   "include": ["#tiny-map"],             // opt a skipped map/image back in (or set data-unpolish="keep")
-  "mapMarkers": "original",             // keep map pin/car icons full color (default is "pane")
+  "mapMarkers": "original",             // keep Leaflet/OL pin/car icons full color (default is "pane")
+  "skipFilter": { "maps": "original" }, // live maps: no skip/hybrid filter (keeps marker colours on Google Maps)
   "roles": { ".my-chip": "fill" },     // classifier hints: surface | fill | media | icon | plain
   "launcher": "bottom-left",           // or top-right | top-left | false
   "webFonts": false,                   // system fonts instead of Google Fonts
@@ -136,7 +140,7 @@ Maps, images and other heavy widgets are skipped automatically — they are not 
 - **Media:** `img`, `picture`, `video`, `canvas`, `iframe`, `svg` internals, `object`, `embed`
 - **Map widgets:** Leaflet (`.leaflet-container`), Mapbox/MapLibre (`.mapboxgl-map`, `.maplibregl-map`), Google Maps (`.gm-style`, `gmp-map`, `gmp-*`), OpenLayers (`.ol-viewport`), deck.gl, and `[role="application"]`
 - **Heavy subtrees:** a node with a very high count of absolutely positioned children, or a lot of mutation churn, is marked skipped at runtime
-- **Sketch hybrid:** idle skipped regions use the SVG pencil-line edge filter. While a region is panning, zooming, playing, or otherwise changing (including moving map markers), one `data-unpolish-busy` toggle on that root swaps it to a cheap CSS grayscale filter, then back after ~260ms still. Video and animated canvas that never sit still stay gray. On Leaflet maps the filter sits on the **tile pane** (never per tile). Moving cars keep the tiles gray — leaving the edge filter on while cars move drops to ~5 fps. Marker icons get a second cheap CSS filter on the **marker pane** (`mapMarkers: "pane"`, default) so they read as sketch/blueprint without an SVG edge filter and without classifying each `img`. `mapMarkers: "original"` or `data-unpolish-ignore` on the pane keeps icons full color. Blueprint stays a cheap ink wash on tiles and the marker pane.
+- **Sketch hybrid:** idle skipped regions use the SVG pencil-line edge filter. While a region is panning, zooming, playing, or otherwise changing (including moving map markers), one `data-unpolish-busy` toggle on that root swaps it to a cheap paper-toned grayscale, then back after **~1.8s** still (longer if the region keeps going busy). Video and animated canvas that never sit still stay gray. On Leaflet maps the filter sits on the **tile pane** (never per tile). Moving cars keep the tiles gray — leaving the edge filter on while cars move drops to ~5 fps. Marker icons get a second cheap CSS filter on the **marker pane** (`mapMarkers: "pane"`, default) so they read as sketch/blueprint without an SVG edge filter and without classifying each `img`. `mapMarkers: "original"` or `data-unpolish-ignore` on the pane keeps Leaflet/OpenLayers icons full color. **Google Maps has no separate marker pane**, so `mapMarkers` cannot un-grey GMP markers; set `"skipFilter": { "maps": "original" }` (or `data-unpolish-filter="original"` on the map) to leave the map and its markers unfiltered. `"skipFilter": { "images": "original" }` does the same for skipped `img` / `picture` / `canvas`. Default `theme` keeps the filters. Blueprint stays a cheap ink wash on tiles and the marker pane.
 
 To classify a skipped region anyway, set `data-unpolish="keep"` on it or list a selector in `include`. Do not do that on a map with thousands of markers. Put `data-unpolish-ignore` or an `exclude` selector on a region that must keep its real pixels with no filter.
 
